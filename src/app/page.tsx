@@ -4,10 +4,44 @@ import { latestSections, releasesFor, bestOfYears, bestOf, BEST_CATS } from "@/l
 import { ReleaseRow } from "@/components/release-list";
 import { SearchBox } from "@/components/search-box";
 import { Banner } from "@/components/banner";
+import { Suspense } from "react";
+import { lineupNews } from "@/lib/lineup-news";
 import { getFavoriteArtists, getGenres, getLikedAlbums, recentComments } from "@/lib/user-data";
 import { genreToSection } from "@/lib/genres";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * „Kto zmienił zespół" — osobny strumień, bo to jedno zapytanie do MusicBrainz
+ * na zespół (limit 1/s). Strona główna nie ma na to czekać.
+ */
+async function LineupNews({ bands, favorites }: { bands: { mbid: string; name: string }[]; favorites: Set<string> }) {
+  if (!bands.length) return null;
+  const news = await lineupNews(bands, favorites).catch(() => []);
+  if (!news.length) return null;
+  return (
+    <section>
+      <h2 className="text-3xl">Zmiany w składach</h2>
+      <p className="mb-3 text-sm text-muted">
+        Z dat członkostwa w MusicBrainz — ostatnie półtora roku. ★ to Twoje ulubione zespoły.
+      </p>
+      <ul className="space-y-1.5">
+        {news.map((n, i) => (
+          <li key={`${n.artistMbid}-${n.personMbid}-${n.kind}-${i}`} className="flex flex-wrap items-baseline gap-x-2 text-sm">
+            <span className={n.kind === "joined" ? "text-ok" : "text-warn"}>{n.kind === "joined" ? "+" : "−"}</span>
+            <Link href={`/artist/${n.personMbid}`} className="font-medium hover:text-accent2 hover:underline">{n.personName}</Link>
+            <span className="text-muted">{n.kind === "joined" ? "dołączył(a) do" : "odszedł(-ła) z"}</span>
+            <Link href={`/artist/${n.artistMbid}`} className="font-medium hover:text-accent2 hover:underline">
+              {n.favorite && <span className="text-accent2">★ </span>}{n.artistName}
+            </Link>
+            {n.roles.length > 0 && <span className="font-mono text-[10px] text-faint">{n.roles.join(", ")}</span>}
+            <span className="font-mono text-[10px] text-muted">{n.date}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 export default async function Home() {
   const user = await currentUser();
@@ -28,17 +62,29 @@ export default async function Home() {
   }
   const stars = rel.filter((r) => r.star === 1 && (!prefSections || prefSections.has(r.genre)));
 
+  // Zmiany składów sprawdzamy w Twoich ulubionych zespołach (★).
+  // Premier tu nie doważamy: tabela premier trzyma MBID PŁYTY, nie zespołu, więc
+  // pytanie o nie MusicBrainz kończyłoby się serią chybionych zapytań. Żeby objąć
+  // tym całe kategorie, trzeba najpierw rozwiązać artystów — osobny temat.
+  const favMbids = new Set(favs.map((f) => f.mbid));
+  const newsBands = favs.map((f) => ({ mbid: f.mbid, name: f.name })).slice(0, 10);
+
   return (
     <div className="space-y-10">
       <Banner image="/img/studio.jpg" title="Podróż po muzyce" position="center 40%">
         <p className="mt-3 max-w-2xl text-text2">
-          Premiery co piątek, best of roku i najważniejsze: <b className="text-text">z płyty do muzyka, z muzyka do jego innych płyt</b>. Metal, prog, jazz.
+          Twoja podróż z muzyką zaczyna się tutaj. Zanurz się w tym wspaniałym świecie, podróżuj
+          <b className="text-text"> odwiedzając artystów i ich kolejne przystanie</b>. Zapraszamy.
         </p>
         <div className="mt-5 max-w-xl"><SearchBox big /></div>
         {!user && <p className="mt-3 text-sm text-muted"><Link href="/login" className="underline">Zaloguj się</Link>, żeby ustawić preferencje, oceniać i komentować.</p>}
       </Banner>
 
       <div className="grid gap-10 lg:grid-cols-[1fr_320px]">
+        <Suspense fallback={<p className="font-mono text-xs text-muted">Sprawdzam zmiany w składach…</p>}>
+          <LineupNews bands={newsBands} favorites={favMbids} />
+        </Suspense>
+
         <section>
           <div className="flex items-baseline justify-between">
             <h2 className="text-3xl">Premiery {prefSections ? "dla Ciebie" : "tygodnia"}</h2>

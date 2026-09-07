@@ -72,6 +72,11 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
   const dbDown = summaryS.failed || treeS.failed || likedS.failed || likesS.failed || otherRatingsS.failed;
   const musicians = album.credits.filter((c) => c.roles.some(isMusicianRole));
   const staff = album.credits.filter((c) => !c.roles.some(isMusicianRole));
+  // Okładka to osobna kategoria, nie „produkcja i inne": autor okładki bywa
+  // powodem, dla którego sięga się po płytę, i jest pełnoprawnym węzłem podróży
+  // — z jego strony widać wszystkie płyty, które oprawił.
+  const COVER_ROLES = /design|illustration|art direction|graphic|photograph|artwork/i;
+  const coverArtists = staff.filter((c) => c.roles.some((r) => COVER_ROLES.test(r)));
   const discs = [...new Set(album.tracks.map((t) => t.disc))];
   // MusicBrainz nierzadko nie ma jeszcze składu na poziomie nagrań — wtedy bierzemy
   // listę z sekcji "Skład"/"Personnel" na Wikipedii.
@@ -91,7 +96,18 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
     <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
       <div>
         <header className="flex flex-col gap-4 sm:flex-row">
-          <Cover mbid={mbid} size={176} className="shadow-lg" />
+          <div className="shrink-0">
+            <Cover mbid={mbid} size={176} className="shadow-lg" />
+            {/* Cover Art Archive trzyma też oryginał — bywa wielki i wart obejrzenia. */}
+            <a
+              href={`https://coverartarchive.org/release-group/${mbid}/front`}
+              target="_blank"
+              rel="noopener"
+              className="mt-1 block text-center font-mono text-[10px] text-faint hover:text-accent2"
+            >
+              okładka w pełnym rozmiarze ↗
+            </a>
+          </div>
           <div className="min-w-0">
             <div className="label">{typeLabel(album)}{album.year ? ` · ${album.year}` : ""}</div>
             <h1 className="text-4xl leading-tight">{album.title}</h1>
@@ -105,6 +121,18 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
               <div className="mt-2 flex flex-wrap gap-1">
                 {album.genres.map((g) => <Link key={g} href={`/szukaj?q=${encodeURIComponent(g)}`} className="chip">{g}</Link>)}
               </div>
+            )}
+            {coverArtists.length > 0 && (
+              <p className="mt-2 text-sm">
+                <span className="label mr-1">Okładka</span>
+                {coverArtists.map((c, i) => (
+                  <span key={c.mbid}>
+                    {i > 0 && ", "}
+                    <Link href={`/artist/${c.mbid}`} className="hover:text-accent2 hover:underline">{c.name}</Link>
+                    <span className="ml-1 font-mono text-[10px] text-faint">{c.roles.join(", ")}</span>
+                  </span>
+                ))}
+              </p>
             )}
             <div className="mt-3"><LinksRow links={album.links} /></div>
             <div className="mt-3 flex items-center gap-3">

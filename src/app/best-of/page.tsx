@@ -1,5 +1,9 @@
 import Link from "next/link";
-import { Banner } from "@/components/banner";
+import { Masthead, SectionHead } from "@/components/masthead";
+import { BestPick, BestRow } from "@/components/best-card";
+import { heroArt, leadStyle, sectionHeroArt } from "@/lib/lead-style";
+import { currentUser } from "@/lib/auth";
+import { getGenres } from "@/lib/user-data";
 import type { Metadata } from "next";
 import { BEST_CATS, BEST_ORDER, bestOf, bestOfYears } from "@/lib/lists";
 import { searchLinks } from "@/components/links";
@@ -13,11 +17,20 @@ export default async function BestOfPage({ searchParams }: { searchParams: Promi
   const year = sp.rok && years.some((y) => y.year === sp.rok) ? sp.rok : years[0]?.year;
   if (!year) return <p className="text-muted">Brak danych Best of. Uruchom <code>npm run import:pns</code>.</p>;
   const { year: y, entries } = await bestOf(year);
+  const user = await currentUser();
+  const lead = leadStyle(user ? await getGenres(user.id) : []);
   const chosenCats = sp.kat ? sp.kat.split(",").filter(Boolean) : [];
   const cats = chosenCats.length ? BEST_ORDER.filter((c) => chosenCats.includes(c)) : BEST_ORDER;
 
   return (
-    <div className="grid gap-8 md:grid-cols-[220px_1fr]">
+    <>
+    <Masthead
+      art={heroArt(lead)}
+      eyebrow={`Best of ${y?.label ?? year}`}
+      title="Pure New Shit"
+      meta={y?.sub ? <span>{y.sub}</span> : undefined}
+    />
+    <div className="mt-8 grid gap-8 md:grid-cols-[220px_1fr]">
       <aside className="md:sticky md:top-20 md:self-start">
         <div className="label mb-2">Rok</div>
         <div className="flex gap-1.5">
@@ -43,42 +56,26 @@ export default async function BestOfPage({ searchParams }: { searchParams: Promi
         </div>
       </aside>
       <div>
-        <Banner image="/img/talerz.jpg" title={`Best of ${y?.label ?? year}`} subtitle={y?.sub ?? undefined} position="center 45%" compact />
         {cats.map((c) => {
           const rows = entries.filter((e) => e.category === c);
           if (!rows.length) return null;
+          const [first, ...rest] = rows;
           return (
-            <section key={c} className="mt-8">
-              <h2 className="mb-3 border-b border-rule pb-1 text-2xl">{BEST_CATS[c] ?? c}</h2>
-              <ol className="space-y-3">
-                {rows.map((e) => {
-                  const links = searchLinks(e.artist, e.album);
-                  return (
-                    <li key={e.id} className="flex gap-3">
-                      <span className={`display w-8 shrink-0 text-right text-2xl ${e.rank === 1 ? "text-accent2" : "text-faint"}`}>{e.rank}</span>
-                      <div className="min-w-0">
-                        <Link href={`/go/best/${e.id}`} className="display text-lg font-semibold hover:text-accent2">
-                          {e.artist} – <i>{e.album}</i>
-                        </Link>
-                        <div className="font-mono text-xs text-muted">
-                          {[e.label, e.genre, e.country, e.released].filter(Boolean).join(" · ")}
-                        </div>
-                        {e.why && <p className="mt-0.5 text-sm text-text2">{e.why}</p>}
-                        {e.scores && <p className="text-xs text-muted"><span className="label mr-1">Oceny</span>{e.scores}</p>}
-                        <div className="mt-1 flex gap-4 font-mono text-xs">
-                          <a href={links.spotify} target="_blank" rel="noopener" className="text-spotify hover:underline">▶ Spotify</a>
-                          <a href={links.tidal} target="_blank" rel="noopener" className="text-tidal hover:underline">▶ Tidal</a>
-                          <Link href={`/go/best/${e.id}`} className="text-muted hover:text-accent2">skład i podróż →</Link>
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ol>
+            <section key={c} className="mb-12">
+              <SectionHead
+                image={sectionHeroArt(c)}
+                title={BEST_CATS[c] ?? c}
+                date={year}
+                count={rows.length}
+                variant={c === "death" || c === "db" ? "red" : c === "black" || c === "other" ? "morgue" : "other"}
+              />
+              {first && <BestPick e={first} category={BEST_CATS[c] ?? c} />}
+              {rest.length > 0 && <ul className="mt-4">{rest.map((e) => <BestRow key={e.id} e={e} />)}</ul>}
             </section>
           );
         })}
       </div>
     </div>
+    </>
   );
 }
