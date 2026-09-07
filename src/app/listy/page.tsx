@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Banner } from "@/components/banner";
 import type { Metadata } from "next";
 import { desc, isNotNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
@@ -58,10 +59,9 @@ export default async function ListsPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-4xl">Listy</h1>
-        <p className="text-sm text-muted">Stałe: <Link href="/premiery" className="underline">premiery piątkowe</Link> ({Number(resolved[0]?.n ?? 0)} połączonych z MusicBrainz) i <Link href="/best-of" className="underline">best of roku</Link>. Poniżej listy społeczności portalu.</p>
-      </div>
+      <Banner image="/img/winyl.jpg" title="Listy" position="center 60%">
+        <p className="mt-2 text-sm text-muted">Stałe: <Link href="/premiery" className="underline">premiery piątkowe</Link> ({Number(resolved[0]?.n ?? 0)} połączonych z MusicBrainz) i <Link href="/best-of" className="underline">best of roku</Link>. Poniżej listy społeczności portalu.</p>
+      </Banner>
       <div className="grid gap-4 md:grid-cols-2">
         <List title="Najwyżej oceniane płyty" type="album" items={topAlbums.map((x) => ({ mbid: x.mbid, v: `${Number(x.avg).toFixed(1)} (${x.n})` }))} />
         <List title="Najwyżej oceniani artyści" type="artist" items={topArtists.map((x) => ({ mbid: x.mbid, v: `${Number(x.avg).toFixed(1)} (${x.n})` }))} />

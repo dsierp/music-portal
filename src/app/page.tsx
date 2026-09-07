@@ -3,6 +3,7 @@ import { currentUser } from "@/lib/auth";
 import { latestSections, releasesFor, bestOfYears, bestOf, BEST_CATS } from "@/lib/lists";
 import { ReleaseRow } from "@/components/release-list";
 import { SearchBox } from "@/components/search-box";
+import { Banner } from "@/components/banner";
 import { getFavoriteArtists, getGenres, getLikedAlbums, recentComments } from "@/lib/user-data";
 import { genreToSection } from "@/lib/genres";
 
@@ -29,14 +30,13 @@ export default async function Home() {
 
   return (
     <div className="space-y-10">
-      <section className="rounded-xl border border-rule bg-gradient-to-br from-surface to-bg p-6 sm:p-10">
-        <h1 className="text-5xl leading-none">Podróż po muzyce</h1>
+      <Banner image="/img/studio.jpg" title="Podróż po muzyce" position="center 40%">
         <p className="mt-3 max-w-2xl text-text2">
           Premiery co piątek, best of roku i najważniejsze: <b className="text-text">z płyty do muzyka, z muzyka do jego innych płyt</b>. Metal, prog, jazz.
         </p>
         <div className="mt-5 max-w-xl"><SearchBox big /></div>
         {!user && <p className="mt-3 text-sm text-muted"><Link href="/login" className="underline">Zaloguj się</Link>, żeby ustawić preferencje, oceniać i komentować.</p>}
-      </section>
+      </Banner>
 
       <div className="grid gap-10 lg:grid-cols-[1fr_320px]">
         <section>

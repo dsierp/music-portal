@@ -69,11 +69,35 @@ export const authConfig: NextAuthConfig = {
 
 export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);
 
-/** Zwraca zalogowanego użytkownika (id + email) albo null. */
+/**
+ * Zwraca zalogowanego użytkownika (id + email) albo null.
+ *
+ * Sesja jest w JWT (ciasteczko), więc PRZEŻYWA odtworzenie bazy — po
+ * `npm run db:reset` wyglądasz na zalogowanego, choć Twojego wiersza w bazie
+ * już nie ma. Odczyty wtedy działają, ale każdy zapis (ocena, ulubione,
+ * komentarz) leci kluczem obcym na `user` i kończy się ekranem błędu.
+ * Dlatego sprawdzamy, czy użytkownik faktycznie istnieje.
+ *
+ * Uwaga: gdy baza NIE ODPOWIADA, ufamy tokenowi i nie wylogowujemy —
+ * chwilowa awaria bazy nie może wyrzucać ludzi z konta.
+ */
 export async function currentUser() {
   const session = await auth();
   if (!session?.user?.id) return null;
-  return { id: session.user.id, email: session.user.email ?? "", name: session.user.name ?? null, image: session.user.image ?? null };
+  const me = { id: session.user.id, email: session.user.email ?? "", name: session.user.name ?? null, image: session.user.image ?? null };
+  return (await userExists(me.id)) ? me : null;
+}
+
+/** true = jest w bazie, false = na pewno go nie ma, true przy błędzie bazy (patrz wyżej). */
+async function userExists(id: string): Promise<boolean> {
+  try {
+    const row = await db.query.users.findFirst({ where: eq(schema.users.id, id), columns: { id: true } });
+    return !!row;
+  } catch (e) {
+    // Baza nie odpowiada — nie wyrzucamy nikogo z konta, ale zostawiamy ślad w logu.
+    console.error("[auth] nie udało się sprawdzić użytkownika w bazie:", e instanceof Error ? e.message : e);
+    return true;
+  }
 }
 
 /** Jak currentUser, ale rzuca gdy brak logowania (do server actions). */

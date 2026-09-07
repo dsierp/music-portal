@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ReleaseSection } from "@/components/release-list";
+import { Banner } from "@/components/banner";
 import { GENRE_LABELS, GENRE_ORDER, allSections, latestSections, releasesFor } from "@/lib/lists";
 import { currentUser } from "@/lib/auth";
 import { getGenres } from "@/lib/user-data";
@@ -57,7 +58,8 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
         <p className="mt-5 text-xs text-faint">Lista powstaje co piątek z zestawienia „Pure New Shit”. Kliknięcie w tytuł otwiera stronę płyty ze składem — stamtąd ruszasz w podróż.</p>
       </aside>
       <div>
-        <h1 className="mb-6 text-4xl">Premiery</h1>
+        <Banner image="/img/konsola.jpg" title="Premiery" position="center 55%" compact />
+        <div className="mb-6" />
         {sections.map((s) => (
           <ReleaseSection key={s.id} section={s} releases={rel.filter((r) => r.sectionId === s.id)} filter={filter} />
         ))}

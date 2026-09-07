@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Banner } from "@/components/banner";
 import type { Metadata } from "next";
 import { BEST_CATS, BEST_ORDER, bestOf, bestOfYears } from "@/lib/lists";
 import { searchLinks } from "@/components/links";
@@ -32,8 +33,7 @@ export default async function BestOfPage({ searchParams }: { searchParams: Promi
         </div>
       </aside>
       <div>
-        <h1 className="text-4xl">Best of {y?.label ?? year}</h1>
-        {y?.sub && <p className="text-sm text-muted">{y.sub}</p>}
+        <Banner image="/img/talerz.jpg" title={`Best of ${y?.label ?? year}`} subtitle={y?.sub ?? undefined} position="center 45%" compact />
         {cats.map((c) => {
           const rows = entries.filter((e) => e.category === c);
           if (!rows.length) return null;

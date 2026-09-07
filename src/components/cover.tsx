@@ -8,7 +8,14 @@ export function Cover({ mbid, size = 64, className = "" }: { mbid: string; size?
   return (
     <div className={`shrink-0 overflow-hidden rounded bg-surface2 ${className}`} style={{ width: size, height: size }}>
       {failed ? (
-        <div className="flex h-full w-full items-center justify-center font-mono text-[10px] text-faint">brak okładki</div>
+        // Zamiast pustego prostokąta — przygaszone zdjęcie winyla, żeby lista płyt
+        // bez okładek nie wyglądała na zepsutą.
+        <div
+          className="flex h-full w-full items-center justify-center bg-cover bg-center font-mono text-[10px] text-faint"
+          style={{ backgroundImage: "linear-gradient(rgba(0,0,0,.65),rgba(0,0,0,.65)), url(/img/winyl.jpg)" }}
+        >
+          brak okładki
+        </div>
       ) : (
         <img
           src={`https://coverartarchive.org/release-group/${mbid}/front-${px}`}
