@@ -13,6 +13,7 @@ import { RatingBadge, RatingPanel } from "@/components/rating";
 import { Comments } from "@/components/comments";
 import { AlbumCard } from "@/components/cards";
 import { YoutubeVideos } from "@/components/youtube";
+import { relatedBands } from "@/lib/related";
 import { dbSafe } from "@/lib/db-safe";
 import { DbWarning } from "@/components/db-warning";
 import type { Artist, Membership, PlayedOn } from "@/lib/musicbrainz";
@@ -100,6 +101,36 @@ function MemberList({
  * komponent, żeby reszta strony (nagłówek, bio, oceny, komentarze) wyrenderowała
  * się od razu, a to doładowało się w tle pod własnym spinnerem.
  */
+/**
+ * Powiązane zespoły — w osobnym strumieniu, bo to kilkanaście zapytań do
+ * MusicBrainz (limit 1/s). Reszta strony nie ma na nie czekać.
+ */
+async function RelatedSection({ artist }: { artist: Artist }) {
+  const related = await relatedBands(artist).catch(() => []);
+  if (!related.length) return null;
+  return (
+    <section className="mt-10">
+      <h2 className="mb-1 text-2xl">Powiązane zespoły</h2>
+      <p className="mb-3 text-xs text-muted">
+        Liczone z MusicBrainz: przede wszystkim wspólni muzycy, pomocniczo wspólne gatunki. Bez zgadywania — przy każdym zespole widać, co go łączy.
+      </p>
+      <ul className="grid gap-2 sm:grid-cols-2">
+        {related.map((b) => (
+          <li key={b.mbid} className="rounded-lg border border-rule bg-surface p-3">
+            <Link href={`/artist/${b.mbid}`} className="display text-lg hover:text-accent2">{b.name}</Link>
+            <p className="mt-0.5 text-xs text-text2">
+              {b.people.map((p) => `${p.name}${p.roles.length ? ` (${p.roles.join(", ")})` : ""}`).join(" · ")}
+            </p>
+            {b.genres.length > 0 && (
+              <p className="font-mono text-[10px] text-faint">wspólne: {b.genres.join(", ")}</p>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 async function ArtistDeepContent({ artist, mbid }: { artist: Artist; mbid: string }) {
   const [disco, played] = await Promise.all([
     getDiscography(mbid).catch(() => []),
@@ -188,6 +219,10 @@ async function ArtistDeepContent({ artist, mbid }: { artist: Artist; mbid: strin
         </details>
       )}
       {!disco.length && !played.length && <p className="mt-8 text-sm text-muted">MusicBrainz nie ma wydawnictw dla tego artysty.</p>}
+
+      <Suspense fallback={<p className="mt-10 font-mono text-xs text-muted">Szukam powiązanych zespołów…</p>}>
+        <RelatedSection artist={artist} />
+      </Suspense>
 
       <YoutubeVideos query={artist.isPerson ? artist.name : `${artist.name} band`} />
     </>
