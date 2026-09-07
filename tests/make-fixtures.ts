@@ -29,9 +29,10 @@ const mika = { id: ID.mika, name: "Dr. Mikannibal", type: "Person" };
 const prod = { id: ID.producer, name: "Some Producer", type: "Person" };
 
 // release-group lookup
-put(`/release-group/${ID.rg}`, { inc: "artist-credits+releases+url-rels+genres+tags" }, {
+put(`/release-group/${ID.rg}`, { inc: "artist-credits+releases+url-rels+genres+tags+ratings" }, {
   id: ID.rg, title: "Goh-Ka", "primary-type": "Album", "secondary-types": [], "first-release-date": "2026-09-04",
   "artist-credit": sighCredit,
+  rating: { value: 4.25, "votes-count": 8 },
   releases: [
     { id: ID.rel, title: "Goh-Ka", status: "Official", date: "2026-09-04", country: "GB", "track-count": 3 },
     { id: "ffffffff-ffff-4fff-8fff-ffffffffffff", title: "Goh-Ka", status: "Official", date: "2026-10-01", country: "JP", "track-count": 4 },
