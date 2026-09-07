@@ -102,6 +102,7 @@ export interface MbReleaseGroup {
   genres?: MbTag[];
   tags?: MbTag[];
   relations?: MbArtistRel[];
+  rating?: { value?: number | null; "votes-count"?: number };
 }
 interface MbReleaseStub {
   id: string;
@@ -209,6 +210,8 @@ export interface Album extends AlbumSummary {
   tracks: Track[];
   credits: Credit[];
   coverUrl: string;
+  /** Ocena społeczności MusicBrainz (0–5) — jedyne źródło ocen, które zawsze mamy bez scrapowania. */
+  mbRating: { value: number; votes: number } | null;
 }
 export interface Membership {
   mbid: string;
@@ -390,7 +393,7 @@ function pickRelease(releases: MbReleaseStub[] | undefined): MbReleaseStub | nul
 
 export async function getAlbum(mbid: string): Promise<Album> {
   const rg = await cached(`mb:rg:${mbid}`, TTL.lookup, () =>
-    mbFetch<MbReleaseGroup>(`/release-group/${mbid}`, { inc: "artist-credits+releases+url-rels+genres+tags" }),
+    mbFetch<MbReleaseGroup>(`/release-group/${mbid}`, { inc: "artist-credits+releases+url-rels+genres+tags+ratings" }),
   );
   const summary = normReleaseGroup(rg);
   const chosen = pickRelease(rg.releases);
@@ -446,6 +449,7 @@ export async function getAlbum(mbid: string): Promise<Album> {
     tracks,
     credits,
     coverUrl: `https://coverartarchive.org/release-group/${mbid}/front-250`,
+    mbRating: rg.rating?.value != null ? { value: rg.rating.value, votes: rg.rating["votes-count"] ?? 0 } : null,
   };
 }
 

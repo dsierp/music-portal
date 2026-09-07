@@ -12,6 +12,7 @@ test("album: skład z relacji nagrań, najwcześniejsze wydanie, linki", async (
   assert.equal(a.releaseMbid, ID.rel, "wybiera najwcześniejsze oficjalne wydanie");
   assert.equal(a.tracks.length, 3);
   assert.deepEqual(a.labels, ["Peaceville"]);
+  assert.deepEqual(a.mbRating, { value: 4.25, votes: 8 }, "ocena społeczności MusicBrainz");
   const mirai = a.credits.find((c) => c.mbid === ID.mirai)!;
   assert.deepEqual(mirai.roles.sort(), ["keyboard", "lead vocals", "shamisen"]);
   assert.equal(mirai.onAllTracks, true);

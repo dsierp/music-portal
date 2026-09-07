@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getAlbum, getDiscography, isMusicianRole, fmtLength, MbError } from "@/lib/musicbrainz";
-import { wikiFromLinks, wikiPersonnel } from "@/lib/wikipedia";
+import { getAlbum, getArtist, getDiscography, isMusicianRole, fmtLength, MbError } from "@/lib/musicbrainz";
+import { wikiAlbumRatings, wikiFromLinks, wikiPersonnel } from "@/lib/wikipedia";
+import { nameKeys } from "@/lib/names";
 import { currentUser } from "@/lib/auth";
 import { commentTree, isLiked, likeCount, ratingAverages, ratingSummary } from "@/lib/user-data";
 import { toggleLike } from "@/app/actions";
@@ -10,6 +11,7 @@ import { LinksRow, ReviewLinks } from "@/components/links";
 import { getExternalRatings } from "@/lib/externalRatings";
 import { dbSafe } from "@/lib/db-safe";
 import { DbWarning } from "@/components/db-warning";
+import { RatingsBar } from "@/components/ratings-bar";
 import { RatingPanel } from "@/components/rating";
 import { Comments } from "@/components/comments";
 import { AlbumCard, CreditLinks, typeLabel } from "@/components/cards";
@@ -45,7 +47,7 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
   const mainArtist = album.credit[0];
   // Dane z bazy przez dbSafe: gdy lokalna baza padnie, strona ma dalej pokazać
   // to, co pochodzi z MusicBrainz/Wikipedii, a nie zamienić się w ekran błędu.
-  const [summaryS, treeS, likedS, likesS, wiki, more, externalRatings] = await Promise.all([
+  const [summaryS, treeS, likedS, likesS, wiki, more, externalRatings, pressRatings, band] = await Promise.all([
     dbSafe(ratingSummary("ALBUM", mbid, user?.id), EMPTY_SUMMARY),
     dbSafe(commentTree("ALBUM", mbid), []),
     dbSafe(user ? isLiked(user.id, mbid) : Promise.resolve(false), false),
@@ -53,6 +55,9 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
     wikiFromLinks(album.links).catch(() => null),
     mainArtist ? getDiscography(mainArtist.mbid).catch(() => []) : Promise.resolve([]),
     getExternalRatings(album.links).catch(() => []),
+    wikiAlbumRatings(album.links).catch(() => []),
+    // skład zespołu = źródło MBID-ów dla nazwisk z Wikipedii (żeby dało się w nie kliknąć)
+    mainArtist ? getArtist(mainArtist.mbid).catch(() => null) : Promise.resolve(null),
   ]);
   const summary = summaryS.value;
   const tree = treeS.value;
@@ -65,9 +70,17 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
   const musicians = album.credits.filter((c) => c.roles.some(isMusicianRole));
   const staff = album.credits.filter((c) => !c.roles.some(isMusicianRole));
   const discs = [...new Set(album.tracks.map((t) => t.disc))];
-  // MusicBrainz nierzadko nie ma jeszcze składu na poziomie nagrań — wtedy próbujemy
-  // wyciągnąć listę z sekcji "Skład"/"Personnel" na Wikipedii (surowy tekst, bez linków do MBID).
+  // MusicBrainz nierzadko nie ma jeszcze składu na poziomie nagrań — wtedy bierzemy
+  // listę z sekcji "Skład"/"Personnel" na Wikipedii.
   const wikiCredits = !musicians.length && wiki ? await wikiPersonnel(wiki.lang, wiki.title).catch(() => null) : null;
+  // …i dopasowujemy nazwiska do MBID-ów (członkowie zespołu + credits z MB), żeby
+  // dało się w nie kliknąć — bez tego "podróż" po składach urywa się na tej stronie.
+  const knownPeople = new Map<string, string>();
+  for (const m of [...(band?.members ?? []), ...(band?.memberOf ?? [])]) {
+    for (const k of nameKeys(m.name)) knownPeople.set(k, m.mbid);
+  }
+  for (const c of album.credits) for (const k of nameKeys(c.name)) knownPeople.set(k, c.mbid);
+  const findPerson = (name: string) => nameKeys(name).map((k) => knownPeople.get(k)).find(Boolean) ?? null;
 
   return (
     <>
@@ -109,6 +122,8 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
           </div>
         </header>
 
+        <RatingsBar mbRating={album.mbRating} press={pressRatings} external={externalRatings} links={album.links} />
+
         {wiki && (
           <section className="mt-6 text-sm text-text2">
             <p>{wiki.extract}</p>
@@ -131,10 +146,24 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
           ) : wikiCredits?.length ? (
             <div>
               <ul className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
-                {wikiCredits.map((line, i) => <li key={i}>{line}</li>)}
+                {wikiCredits.map((line, i) => {
+                  const personMbid = findPerson(line.name);
+                  return (
+                    <li key={i} className="flex items-baseline gap-2">
+                      {personMbid ? (
+                        <Link href={`/artist/${personMbid}`} className="font-medium hover:text-accent2 hover:underline">{line.name}</Link>
+                      ) : (
+                        // Nie znamy MBID — ale nazwisko i tak ma prowadzić dalej,
+                        // więc kierujemy do wyszukiwarki portalu.
+                        <Link href={`/szukaj?q=${encodeURIComponent(line.name)}`} className="font-medium text-text2 decoration-dotted hover:text-accent2 hover:underline" title="Szukaj w portalu">{line.name}</Link>
+                      )}
+                      {line.roles && <span className="text-muted">{line.roles}</span>}
+                    </li>
+                  );
+                })}
               </ul>
               <p className="mt-2 text-xs text-faint">
-                Źródło: <a href={wiki?.url} target="_blank" rel="noopener" className="underline hover:text-accent2">Wikipedia</a> — MusicBrainz nie ma jeszcze tego składu na poziomie nagrań, więc nazwiska tutaj nie linkują do profili artystów w portalu.
+                Źródło: <a href={wiki?.url} target="_blank" rel="noopener" className="underline hover:text-accent2">Wikipedia</a> — MusicBrainz nie ma jeszcze tego składu na poziomie nagrań. Nazwiska rozpoznane w MusicBrainz prowadzą do profilu; pozostałe (kropkowane) do wyszukiwarki portalu.
               </p>
             </div>
           ) : (

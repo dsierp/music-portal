@@ -4,6 +4,10 @@
  */
 import { cached, TTL } from "./cache";
 import type { Links } from "./musicbrainz";
+import { PERSONNEL_HEADING, cleanWikitext, splitPersonnelLine, parseRatingsTemplate } from "./wikitext";
+export { parseRatingsTemplate } from "./wikitext";
+import type { PersonnelLine, WikiReview } from "./wikitext";
+export type { PersonnelLine, WikiReview } from "./wikitext";
 
 const UA = process.env.MUSICBRAINZ_USER_AGENT ?? "MusicPortal/0.1 (dev)";
 
@@ -57,27 +61,14 @@ async function summary(lang: string, title: string): Promise<WikiSummary | null>
   });
 }
 
-const PERSONNEL_HEADING = /skład|twórcy|muzycy|personel|obsada|personnel|musicians?|credits?|line-?up/i;
-
-function cleanWikitext(s: string): string {
-  return s
-    .replace(/<ref[^>]*\/>/gi, "")
-    .replace(/<ref[^>]*>[\s\S]*?<\/ref>/gi, "")
-    .replace(/\{\{[^{}]*\}\}/g, "") // proste szablony (bez zagnieżdżeń)
-    .replace(/\[\[(?:[^|\]]*\|)?([^\]]+)\]\]/g, "$1") // [[link|tekst]] / [[tekst]] → tekst
-    .replace(/'''?([^']*)'''?/g, "$1") // '''pogrubienie''' / ''kursywa''
-    .replace(/<[^>]+>/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 /**
  * Skład/personel z sekcji Wikipedii (np. "Skład"/"Twórcy" pl, "Personnel" en) —
- * gdy MusicBrainz nie ma jeszcze credits na poziomie nagrań. Zwraca surowe,
- * nieustandaryzowane linie (bez dopasowania do MBID artystów).
+ * gdy MusicBrainz nie ma jeszcze credits na poziomie nagrań. Rozbite na nazwisko
+ * + role, żeby dało się nazwiska dopasować do artystów w MB i zrobić z nich linki.
  */
-export async function wikiPersonnel(lang: string, title: string): Promise<string[] | null> {
-  return cached(`wiki:personnel:${lang}:${title}`, TTL.wiki, async () => {
+export async function wikiPersonnel(lang: string, title: string): Promise<PersonnelLine[] | null> {
+  // v2 — zmieniony kształt danych, stary cache (same stringi) trzeba ominąć.
+  return cached(`wiki:personnel:v2:${lang}:${title}`, TTL.wiki, async () => {
     const sections = await getJson<{ parse?: { sections?: { index: string; line: string; anchor: string }[] } }>(
       `https://${lang}.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}&prop=sections&format=json&formatversion=2`,
     );
@@ -91,13 +82,15 @@ export async function wikiPersonnel(lang: string, title: string): Promise<string
       .split("\n")
       .filter((l) => /^\*/.test(l.trim()))
       .map((l) => cleanWikitext(l.replace(/^\*+/, "")))
-      .filter((l) => l.length > 1 && l.length < 200);
+      .filter((l) => l.length > 1 && l.length < 200)
+      .map(splitPersonnelLine)
+      .filter((l): l is PersonnelLine => !!l);
     return lines.length ? lines.slice(0, 40) : null;
   });
 }
 
-/** Opis dla artysty/płyty na podstawie linków z MusicBrainz. */
-export async function wikiFromLinks(links: Links, preferred: string[] = ["pl", "en"]): Promise<WikiSummary | null> {
+/** Wszystkie znane tytuły artykułu {lang: title} — do prób w kilku językach. */
+async function titlesFromLinks(links: Links): Promise<Record<string, string>> {
   const titles: Record<string, string> = {};
   if (links.wikipedia) {
     const m = links.wikipedia.match(/^https?:\/\/([a-z]+)\.wikipedia\.org\/wiki\/(.+)$/);
@@ -107,6 +100,32 @@ export async function wikiFromLinks(links: Links, preferred: string[] = ["pl", "
     const q = links.wikidata.match(/(Q\d+)/)?.[1];
     if (q) Object.assign(titles, await sitelinksFor(q));
   }
+  return titles;
+}
+
+/**
+ * Oceny prasowe płyty. Próbuje kolejnych języków — angielska Wikipedia ma ten
+ * szablon zdecydowanie najczęściej, więc jest pierwsza mimo polskiego interfejsu.
+ */
+export async function wikiAlbumRatings(links: Links, preferred: string[] = ["en", "pl"]): Promise<WikiReview[]> {
+  const titles = await titlesFromLinks(links);
+  for (const lang of preferred) {
+    const title = titles[lang];
+    if (!title) continue;
+    const reviews = await cached(`wiki:ratings:v1:${lang}:${title}`, TTL.wiki, async () => {
+      const body = await getJson<{ parse?: { wikitext?: string } }>(
+        `https://${lang}.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}&prop=wikitext&format=json&formatversion=2`,
+      );
+      return parseRatingsTemplate(body?.parse?.wikitext ?? "");
+    });
+    if (reviews.length) return reviews;
+  }
+  return [];
+}
+
+/** Opis dla artysty/płyty na podstawie linków z MusicBrainz. */
+export async function wikiFromLinks(links: Links, preferred: string[] = ["pl", "en"]): Promise<WikiSummary | null> {
+  const titles = await titlesFromLinks(links);
   for (const lang of preferred) {
     if (titles[lang]) {
       const s = await summary(lang, titles[lang]);
