@@ -13,7 +13,8 @@ export default async function BestOfPage({ searchParams }: { searchParams: Promi
   const year = sp.rok && years.some((y) => y.year === sp.rok) ? sp.rok : years[0]?.year;
   if (!year) return <p className="text-muted">Brak danych Best of. Uruchom <code>npm run import:pns</code>.</p>;
   const { year: y, entries } = await bestOf(year);
-  const cats = sp.kat ? [sp.kat] : BEST_ORDER;
+  const chosenCats = sp.kat ? sp.kat.split(",").filter(Boolean) : [];
+  const cats = chosenCats.length ? BEST_ORDER.filter((c) => chosenCats.includes(c)) : BEST_ORDER;
 
   return (
     <div className="grid gap-8 md:grid-cols-[220px_1fr]">
@@ -25,11 +26,20 @@ export default async function BestOfPage({ searchParams }: { searchParams: Promi
           ))}
         </div>
         <div className="label mt-5 mb-2">Kategorie</div>
+        {/* Brak wyboru = wszystkie kategorie włączone. Klik wyłącza/włącza pojedynczą,
+            więc nie ma osobnego przycisku „wszystkie" — pusty wybór to i tak komplet. */}
         <div className="flex flex-col gap-1.5">
-          <Link href={`?rok=${year}`} className={`chip ${!sp.kat ? "chip-on" : ""}`}>wszystkie</Link>
-          {BEST_ORDER.map((c) => (
-            <Link key={c} href={`?rok=${year}&kat=${c}`} className={`chip ${sp.kat === c ? "chip-on" : ""}`}>{BEST_CATS[c]}</Link>
-          ))}
+          {BEST_ORDER.map((c) => {
+            const chosen = sp.kat ? sp.kat.split(",").filter(Boolean) : [];
+            const on = !chosen.length || chosen.includes(c);
+            const next = chosen.length
+              ? chosen.includes(c) ? chosen.filter((x) => x !== c) : [...chosen, c]
+              : BEST_ORDER.filter((x) => x !== c);
+            const q = next.length && next.length < BEST_ORDER.length ? `?rok=${year}&kat=${next.join(",")}` : `?rok=${year}`;
+            return (
+              <Link key={c} href={q} className={`chip ${on ? "chip-on" : ""}`}>{BEST_CATS[c]}</Link>
+            );
+          })}
         </div>
       </aside>
       <div>

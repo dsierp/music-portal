@@ -73,8 +73,12 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
         <div className="label mb-2">Gatunki</div>
         <div className="flex flex-wrap gap-1.5">
           {available.map((g) => {
-            const on = genres.includes(g);
-            const next = on ? genres.filter((x) => x !== g) : [...genres, g];
+            // Puste filtry = wszystko włączone, więc chipy świecą się domyślnie;
+            // pierwszy klik wyłącza jedną kategorię, a nie włącza pojedynczą.
+            const on = !genres.length || genres.includes(g);
+            const next = genres.length
+              ? genres.includes(g) ? genres.filter((x) => x !== g) : [...genres, g]
+              : available.filter((x) => x !== g);
             return (
               <Link key={g} href={qs({ ...base, g: next.join(","), all: next.length ? undefined : "1" })} className={`chip ${on ? "chip-on" : ""}`}>
                 {genreLabel(g)}
