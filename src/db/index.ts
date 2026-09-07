@@ -1,14 +1,12 @@
 import * as schema from "./schema";
+import { acquirePgliteLock } from "./lock";
 
 /**
- * Wybór bazy:
- *  - DATABASE_URL=postgresql://…  → prawdziwy Postgres (produkcja, docker),
- *  - DATABASE_URL pusty albo "pglite:<katalog>" → PGlite: Postgres w WASM zapisywany do pliku
- *    (zero instalacji; domyślnie ./data/pglite). Do lokalnego użytku, nie na produkcję.
+ * Połączenie z bazą. Sam wybór (Postgres vs PGlite) i ścieżki są w paths.ts —
+ * tam może zajrzeć skrypt, który nie chce otwierać bazy.
  */
-const url = process.env.DATABASE_URL ?? "";
-export const usingPglite = !url || url.startsWith("pglite:");
-export const pgliteDir = usingPglite ? url.replace(/^pglite:/, "") || "./data/pglite" : null;
+import { url, usingPglite, pgliteDir } from "./paths";
+export { usingPglite, pgliteDir };
 
 type AnyDb = ReturnType<typeof makePg>;
 
@@ -29,6 +27,8 @@ function makePglite(): AnyDb {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { PGlite } = require("@electric-sql/pglite") as typeof import("@electric-sql/pglite");
   const g = globalThis as unknown as { pglite?: InstanceType<typeof PGlite> };
+  // Zanim WASM dotknie katalogu: upewnij się, że nie trzyma go inny żywy proces.
+  if (!g.pglite) acquirePgliteLock(pgliteDir!);
   const client = g.pglite ?? new PGlite(pgliteDir!);
   g.pglite = client; // jeden proces = jedna instancja (PGlite blokuje katalog)
   return drizzle(client, { schema }) as unknown as AnyDb;

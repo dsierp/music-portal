@@ -1,8 +1,11 @@
 /** Migracje działające dla obu baz (Postgres i PGlite): npm run db:migrate */
 import "dotenv/config";
-import { db, usingPglite, pgliteDir } from "../src/db";
+import { PgliteLockedError } from "../src/db/lock";
 
 async function main() {
+  // Import dynamiczny: otwarcie bazy może rzucić PgliteLockedError (ktoś inny ją
+  // trzyma) — chcemy wtedy pokazać czytelny komunikat, a nie stack trace.
+  const { db, usingPglite, pgliteDir } = await import("../src/db");
   if (usingPglite) {
     const { migrate } = await import("drizzle-orm/pglite/migrator");
     await migrate(db as never, { migrationsFolder: "./drizzle" });
@@ -13,4 +16,9 @@ async function main() {
     console.log("Postgres: migracje zastosowane");
   }
 }
-main().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });
+main()
+  .then(() => process.exit(0))
+  .catch((e) => {
+    console.error(e instanceof PgliteLockedError ? `\n${e.message}\n` : e);
+    process.exit(1);
+  });

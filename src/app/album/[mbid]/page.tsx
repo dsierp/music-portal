@@ -8,6 +8,8 @@ import { commentTree, isLiked, likeCount, ratingAverages, ratingSummary } from "
 import { toggleLike } from "@/app/actions";
 import { LinksRow, ReviewLinks } from "@/components/links";
 import { getExternalRatings } from "@/lib/externalRatings";
+import { dbSafe } from "@/lib/db-safe";
+import { DbWarning } from "@/components/db-warning";
 import { RatingPanel } from "@/components/rating";
 import { Comments } from "@/components/comments";
 import { AlbumCard, CreditLinks, typeLabel } from "@/components/cards";
@@ -16,6 +18,7 @@ import { YoutubeVideos } from "@/components/youtube";
 
 export const dynamic = "force-dynamic";
 const UUID = /^[0-9a-f-]{36}$/;
+const EMPTY_SUMMARY = { avg: null, count: 0, histogram: new Array(11).fill(0) as number[], mine: null };
 
 export async function generateMetadata({ params }: { params: Promise<{ mbid: string }> }): Promise<Metadata> {
   const { mbid } = await params;
@@ -40,17 +43,25 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
   }
   const user = await currentUser();
   const mainArtist = album.credit[0];
-  const [summary, tree, liked, likes, wiki, more, externalRatings] = await Promise.all([
-    ratingSummary("ALBUM", mbid, user?.id),
-    commentTree("ALBUM", mbid),
-    user ? isLiked(user.id, mbid) : false,
-    likeCount(mbid),
+  // Dane z bazy przez dbSafe: gdy lokalna baza padnie, strona ma dalej pokazać
+  // to, co pochodzi z MusicBrainz/Wikipedii, a nie zamienić się w ekran błędu.
+  const [summaryS, treeS, likedS, likesS, wiki, more, externalRatings] = await Promise.all([
+    dbSafe(ratingSummary("ALBUM", mbid, user?.id), EMPTY_SUMMARY),
+    dbSafe(commentTree("ALBUM", mbid), []),
+    dbSafe(user ? isLiked(user.id, mbid) : Promise.resolve(false), false),
+    dbSafe(likeCount(mbid), 0),
     wikiFromLinks(album.links).catch(() => null),
     mainArtist ? getDiscography(mainArtist.mbid).catch(() => []) : Promise.resolve([]),
     getExternalRatings(album.links).catch(() => []),
   ]);
+  const summary = summaryS.value;
+  const tree = treeS.value;
+  const liked = likedS.value;
+  const likes = likesS.value;
   const others = more.filter((a) => a.mbid !== mbid && a.primaryType === "Album" && !a.secondaryTypes.length).slice(0, 8);
-  const otherRatings = await ratingAverages("ALBUM", others.map((a) => a.mbid));
+  const otherRatingsS = await dbSafe(ratingAverages("ALBUM", others.map((a) => a.mbid)), new Map<string, { avg: number; count: number }>());
+  const otherRatings = otherRatingsS.value;
+  const dbDown = summaryS.failed || treeS.failed || likedS.failed || likesS.failed || otherRatingsS.failed;
   const musicians = album.credits.filter((c) => c.roles.some(isMusicianRole));
   const staff = album.credits.filter((c) => !c.roles.some(isMusicianRole));
   const discs = [...new Set(album.tracks.map((t) => t.disc))];
@@ -59,6 +70,8 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
   const wikiCredits = !musicians.length && wiki ? await wikiPersonnel(wiki.lang, wiki.title).catch(() => null) : null;
 
   return (
+    <>
+    {dbDown && <DbWarning />}
     <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
       <div>
         <header className="flex flex-col gap-4 sm:flex-row">
@@ -185,5 +198,6 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
         </p>
       </aside>
     </div>
+    </>
   );
 }

@@ -93,18 +93,18 @@ function fmtValue(v: number): string {
 }
 
 async function fetchOne(source: string, url: string): Promise<ExternalRating | null> {
-  return cached(`extrating:v1:${url}`, TTL.wiki, async () => {
+  // Wynik pakujemy w obiekt {r: …}, bo kolumna cache'u jest NOT NULL — samo `null`
+  // nie zapisałoby się i każde wejście na stronę męczyłoby serwis od nowa.
+  // Brak oceny też chcemy zapamiętać (na krócej — może dojść).
+  const hit = await cached<{ r: ExternalRating | null }>(`extrating:v1:${url}`, TTL.wiki, async () => {
     const html = await fetchHtml(url);
-    if (!html) return null;
-    const ar = extractAggregateRating(html);
-    if (!ar) return null;
+    const ar = html ? extractAggregateRating(html) : null;
+    if (!ar) return { r: null };
     return {
-      source,
-      display: `${fmtValue(ar.value)} / ${fmtValue(ar.best)}`,
-      count: ar.count,
-      url,
-    } satisfies ExternalRating;
+      r: { source, display: `${fmtValue(ar.value)} / ${fmtValue(ar.best)}`, count: ar.count, url },
+    };
   });
+  return hit?.r ?? null;
 }
 
 const SOURCES: { key: keyof Links; label: string }[] = [
