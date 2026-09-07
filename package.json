@@ -6,22 +6,38 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "import:pns": "tsx scripts/import-pns.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts"
   },
   "dependencies": {
+    "@auth/drizzle-adapter": "^1.11.3",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
+    "next": "15.5.25",
+    "next-auth": "^5.0.0-beta.29",
+    "pg": "^8.23.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "next": "15.5.25"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "15.5.25",
-    "@eslint/eslintrc": "^3"
+    "playwright": "^1.63.0",
+    "tailwindcss": "^4",
+    "tsx": "^4.23.13",
+    "typescript": "^5"
   }
 }

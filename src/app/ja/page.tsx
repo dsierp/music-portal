@@ -1,0 +1,145 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import type { Metadata } from "next";
+import { currentUser } from "@/lib/auth";
+import { getFavoriteArtists, getGenres, getLikedAlbums, myRatings } from "@/lib/user-data";
+import { setGenreAction, toggleFavorite, toggleLike } from "@/app/actions";
+import { GENRE_GROUPS, WEIGHT_LABELS } from "@/lib/genres";
+import { Cover } from "@/components/cover";
+
+export const metadata: Metadata = { title: "Mój profil" };
+export const dynamic = "force-dynamic";
+
+export default async function MePage() {
+  const user = await currentUser();
+  if (!user) redirect("/login?callbackUrl=/ja");
+  const [genres, liked, favs, albumRatings, artistRatings] = await Promise.all([
+    getGenres(user.id), getLikedAlbums(user.id), getFavoriteArtists(user.id), myRatings(user.id, "ALBUM"), myRatings(user.id, "ARTIST"),
+  ]);
+  const weightOf = new Map(genres.map((g) => [g.genre, g.weight]));
+  const custom = genres.filter((g) => !GENRE_GROUPS.some((gr) => gr.genres.includes(g.genre)));
+
+  return (
+    <div className="space-y-10">
+      <header>
+        <div className="label">Profil</div>
+        <h1 className="text-4xl">{user.name || user.email}</h1>
+        <p className="text-sm text-muted">{user.email}</p>
+      </header>
+
+      <section id="style">
+        <h2 className="text-2xl">Style muzyczne</h2>
+        <p className="mb-4 text-sm text-muted">Kliknij styl, żeby dodać (waga 3), potem ustaw wagę 1–5. Wagi ≥3 filtrują premiery na stronie głównej.</p>
+        {genres.length > 0 && (
+          <div className="card mb-4">
+            <div className="label mb-2">Twoje style</div>
+            <ul className="space-y-2">
+              {genres.map((g) => (
+                <li key={g.genre} className="flex flex-wrap items-center gap-3 text-sm">
+                  <span className="w-56 font-medium">{g.genre}</span>
+                  <form action={setGenreAction} className="flex items-center gap-1">
+                    <input type="hidden" name="genre" value={g.genre} />
+                    {[1, 2, 3, 4, 5].map((w) => (
+                      <button key={w} name="weight" value={w} title={WEIGHT_LABELS[w]} className={`h-7 w-7 rounded border font-mono text-xs ${g.weight === w ? "border-accent bg-accent text-white" : "border-rule bg-surface2 hover:border-accent"}`}>{w}</button>
+                    ))}
+                    <span className="ml-2 text-xs text-muted">{WEIGHT_LABELS[g.weight]}</span>
+                    <button name="weight" value="0" className="ml-3 text-xs text-muted hover:text-accent2">usuń</button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <div className="space-y-3">
+          {GENRE_GROUPS.map((grp) => (
+            <div key={grp.label}>
+              <div className="label mb-1">{grp.label}</div>
+              <div className="flex flex-wrap gap-1.5">
+                {grp.genres.map((g) => (
+                  <form key={g} action={setGenreAction}>
+                    <input type="hidden" name="genre" value={g} />
+                    <input type="hidden" name="weight" value={weightOf.has(g) ? "0" : "3"} />
+                    <button className={`chip ${weightOf.has(g) ? "chip-on" : ""}`}>{g}{weightOf.has(g) ? ` · ${weightOf.get(g)}` : ""}</button>
+                  </form>
+                ))}
+              </div>
+            </div>
+          ))}
+          <form action={setGenreAction} className="flex max-w-md gap-2">
+            <input name="genre" placeholder="własny styl, np. zeuhl" className="input" maxLength={60} />
+            <input type="hidden" name="weight" value="3" />
+            <button className="btn">Dodaj</button>
+          </form>
+          {custom.length > 0 && <p className="text-xs text-muted">Własne: {custom.map((c) => c.genre).join(", ")}</p>}
+        </div>
+      </section>
+
+      <section id="plyty">
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-2xl">Płyty, które lubię <span className="font-mono text-sm text-muted">{liked.length}</span></h2>
+          <Link href="/szukaj?lubie=1" className="btn">+ dodaj płytę</Link>
+        </div>
+        {liked.length ? (
+          <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+            {liked.map((a) => (
+              <li key={a.mbid} className="flex items-center gap-3 rounded border border-rule bg-surface p-2 text-sm">
+                <Cover mbid={a.mbid} size={40} />
+                <div className="min-w-0 flex-1">
+                  <Link href={`/album/${a.mbid}`} className="block truncate font-medium hover:text-accent2">{a.title}</Link>
+                  <div className="truncate text-xs text-muted">{a.artistMbid ? <Link href={`/artist/${a.artistMbid}`} className="hover:text-accent2">{a.artistName}</Link> : a.artistName}</div>
+                </div>
+                <form action={toggleLike}>
+                  <input type="hidden" name="mbid" value={a.mbid} />
+                  <input type="hidden" name="liked" value="1" />
+                  <button className="text-xs text-muted hover:text-accent2">usuń</button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-2 text-sm text-muted">Jeszcze nic. Na stronie płyty kliknij „Lubię tę płytę” albo dodaj z wyszukiwarki.</p>
+        )}
+      </section>
+
+      <section id="artysci">
+        <h2 className="text-2xl">Ulubieni artyści <span className="font-mono text-sm text-muted">{favs.length}</span></h2>
+        {favs.length ? (
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {favs.map((f) => (
+              <li key={f.mbid} className="flex items-center gap-2 rounded border border-rule bg-surface px-3 py-1 text-sm">
+                <Link href={`/artist/${f.mbid}`} className="hover:text-accent2">{f.name}</Link>
+                <form action={toggleFavorite}>
+                  <input type="hidden" name="mbid" value={f.mbid} />
+                  <input type="hidden" name="favorite" value="1" />
+                  <input type="hidden" name="name" value={f.name} />
+                  <button className="text-xs text-muted hover:text-accent2">×</button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-2 text-sm text-muted">Na stronie artysty kliknij „Do ulubionych”.</p>
+        )}
+      </section>
+
+      <section id="oceny" className="grid gap-6 sm:grid-cols-2">
+        <div>
+          <h2 className="text-2xl">Moje oceny płyt <span className="font-mono text-sm text-muted">{albumRatings.length}</span></h2>
+          <ul className="mt-2 space-y-1 text-sm">
+            {albumRatings.slice(0, 30).map((r) => (
+              <li key={r.targetMbid} className="flex gap-2"><span className="w-8 font-mono text-accent2">{r.score}</span><Link href={`/album/${r.targetMbid}`} className="truncate text-text2 hover:text-accent2">{r.label ?? r.targetMbid}</Link></li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <h2 className="text-2xl">Moje oceny artystów <span className="font-mono text-sm text-muted">{artistRatings.length}</span></h2>
+          <ul className="mt-2 space-y-1 text-sm">
+            {artistRatings.slice(0, 30).map((r) => (
+              <li key={r.targetMbid} className="flex gap-2"><span className="w-8 font-mono text-accent2">{r.score}</span><Link href={`/artist/${r.targetMbid}`} className="truncate text-text2 hover:text-accent2">{r.label ?? r.targetMbid}</Link></li>
+            ))}
+          </ul>
+        </div>
+      </section>
+    </div>
+  );
+}

@@ -1,0 +1,78 @@
+import type { Metadata } from "next";
+import { SearchBox } from "@/components/search-box";
+import { AlbumCard, ArtistCard, Empty } from "@/components/cards";
+import { searchAlbums, searchArtists } from "@/lib/musicbrainz";
+import { ratingAverages } from "@/lib/user-data";
+import { currentUser } from "@/lib/auth";
+import { addLikedFromSearch } from "@/app/actions";
+
+export const metadata: Metadata = { title: "Szukaj" };
+export const dynamic = "force-dynamic";
+
+export default async function SearchPage({ searchParams }: { searchParams: Promise<{ q?: string; miss?: string; lubie?: string }> }) {
+  const { q = "", miss, lubie } = await searchParams;
+  const user = await currentUser();
+  let albums: Awaited<ReturnType<typeof searchAlbums>> = [];
+  let artists: Awaited<ReturnType<typeof searchArtists>> = [];
+  let error: string | null = null;
+  if (q.trim()) {
+    try {
+      [albums, artists] = await Promise.all([searchAlbums(q, 15), searchArtists(q, 10)]);
+    } catch (e) {
+      error = e instanceof Error ? e.message : "Błąd wyszukiwania";
+    }
+  }
+  const ratings = await ratingAverages("ALBUM", albums.map((a) => a.mbid));
+  return (
+    <div>
+      <h1 className="mb-4 text-4xl">Szukaj</h1>
+      <SearchBox defaultValue={q} big />
+      {miss && <p className="mt-3 text-sm text-warn">Nie udało się automatycznie dopasować tej pozycji w MusicBrainz — wybierz właściwą płytę z wyników.</p>}
+      {lubie && <p className="mt-3 text-sm text-muted">Wybierz płytę, którą mam zapamiętać jako lubianą.</p>}
+      {error && <p className="mt-3 text-sm text-warn">{error}</p>}
+      {q && (
+        <div className="mt-8 grid gap-8 md:grid-cols-[1fr_320px]">
+          <section>
+            <h2 className="label mb-3">Płyty</h2>
+            {albums.length ? (
+              <div className="grid gap-3">
+                {albums.map((a) => (
+                  <AlbumCard
+                    key={a.mbid}
+                    album={a}
+                    rating={ratings.get(a.mbid)}
+                    extra={
+                      lubie && user ? (
+                        <form action={addLikedFromSearch} className="mt-1">
+                          <input type="hidden" name="mbid" value={a.mbid} />
+                          <input type="hidden" name="title" value={a.title} />
+                          <input type="hidden" name="artistName" value={a.artistText} />
+                          <input type="hidden" name="artistMbid" value={a.credit[0]?.mbid ?? ""} />
+                          <button className="btn text-xs">♥ Lubię tę płytę</button>
+                        </form>
+                      ) : null
+                    }
+                  />
+                ))}
+              </div>
+            ) : (
+              <Empty>Brak płyt dla „{q}”.</Empty>
+            )}
+          </section>
+          <section>
+            <h2 className="label mb-3">Artyści i muzycy</h2>
+            {artists.length ? (
+              <div className="grid gap-2">
+                {artists.map((a) => (
+                  <ArtistCard key={a.mbid} mbid={a.mbid} name={a.name} sub={[a.isPerson ? "osoba" : a.type?.toLowerCase(), a.country, a.disambiguation].filter(Boolean).join(" · ")} />
+                ))}
+              </div>
+            ) : (
+              <Empty>Brak artystów.</Empty>
+            )}
+          </section>
+        </div>
+      )}
+    </div>
+  );
+}

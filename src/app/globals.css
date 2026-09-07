@@ -1,26 +1,69 @@
 @import "tailwindcss";
 
+/* Paleta jak w Pure New Shit: ciemno, kościany tekst, krwista czerwień. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #0e0f14;
+  --surface: #161821;
+  --surface2: #1c1f2b;
+  --rule: #262a38;
+  --text: #e8e4da;
+  --text2: #bdb8ac;
+  --muted: #8b8778;
+  --faint: #5d5a50;
+  --accent: #d6392f;
+  --accent2: #f0655b;
+  --spotify: #4fc36a;
+  --tidal: #8fb8ff;
+  --warn: #c98a5a;
+  --ok: #7fb37a;
+  color-scheme: dark;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface2: var(--surface2);
+  --color-rule: var(--rule);
+  --color-text: var(--text);
+  --color-text2: var(--text2);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent2: var(--accent2);
+  --color-spotify: var(--spotify);
+  --color-tidal: var(--tidal);
+  --color-warn: var(--warn);
+  --color-ok: var(--ok);
+  --font-display: "Cormorant Garamond", Georgia, serif;
+  --font-sans: "Archivo", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+html { background: var(--bg); }
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
 }
+h1, h2, h3, .display { font-family: var(--font-display); font-weight: 600; letter-spacing: 0.01em; }
+a { color: inherit; }
+a:hover { color: var(--accent2); }
+
+/* Opisy z importu (HTML z Pure New Shit) */
+.rich .g { color: var(--accent2); font-style: italic; }
+.rich .score { font-family: var(--font-mono); font-size: 0.85em; color: var(--text); background: var(--surface2); padding: 0 .35em; border-radius: 3px; }
+.rich .split { color: var(--warn); font-family: var(--font-mono); font-size: .85em; }
+.rich q { font-style: italic; color: var(--text2); }
+.rich q::before, .rich q::after { content: "„"; }
+.rich q::after { content: "”"; }
+.rich b { color: var(--text); font-weight: 600; }
+
+.btn { @apply inline-flex items-center gap-1 rounded border border-rule bg-surface2 px-3 py-1.5 text-sm hover:border-accent hover:text-accent2 transition-colors cursor-pointer; }
+.btn-accent { @apply border-accent bg-accent text-white hover:bg-accent2 hover:text-white; }
+.chip { @apply inline-flex items-center rounded-full border border-rule px-2.5 py-0.5 text-xs text-text2 hover:border-accent hover:text-accent2; }
+.chip-on { @apply border-accent bg-accent/15 text-accent2; }
+.card { @apply rounded-lg border border-rule bg-surface p-4; }
+.label { @apply font-mono text-[11px] uppercase tracking-widest text-muted; }
+.input { @apply w-full rounded border border-rule bg-bg px-3 py-2 text-text placeholder:text-faint focus:border-accent focus:outline-none; }

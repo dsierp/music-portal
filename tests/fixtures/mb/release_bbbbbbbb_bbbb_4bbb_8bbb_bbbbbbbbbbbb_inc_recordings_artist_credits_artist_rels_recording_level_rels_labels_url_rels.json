@@ -1,0 +1,188 @@
+{
+ "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+ "title": "Goh-Ka",
+ "date": "2026-09-04",
+ "status": "Official",
+ "label-info": [
+  {
+   "label": {
+    "id": "l1",
+    "name": "Peaceville"
+   },
+   "catalog-number": "CDVILEF999"
+  }
+ ],
+ "media": [
+  {
+   "position": 1,
+   "format": "CD",
+   "tracks": [
+    {
+     "position": 1,
+     "number": "1",
+     "title": "Kaen",
+     "length": 301000,
+     "recording": {
+      "id": "r1-0000-4000-8000-000000000001",
+      "title": "Kaen",
+      "length": 301000,
+      "relations": [
+       {
+        "type": "vocal",
+        "direction": "backward",
+        "attributes": [
+         "lead vocals"
+        ],
+        "target-type": "artist",
+        "artist": {
+         "id": "22222222-2222-4222-8222-222222222222",
+         "name": "Mirai Kawashima",
+         "type": "Person"
+        }
+       },
+       {
+        "type": "instrument",
+        "direction": "backward",
+        "attributes": [
+         "keyboard"
+        ],
+        "target-type": "artist",
+        "artist": {
+         "id": "22222222-2222-4222-8222-222222222222",
+         "name": "Mirai Kawashima",
+         "type": "Person"
+        }
+       },
+       {
+        "type": "instrument",
+        "direction": "backward",
+        "attributes": [
+         "saxophone"
+        ],
+        "target-type": "artist",
+        "artist": {
+         "id": "33333333-3333-4333-8333-333333333333",
+         "name": "Dr. Mikannibal",
+         "type": "Person"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "position": 2,
+     "number": "2",
+     "title": "Shoki",
+     "length": 302000,
+     "recording": {
+      "id": "r1-0000-4000-8000-000000000002",
+      "title": "Shoki",
+      "length": 302000,
+      "relations": [
+       {
+        "type": "vocal",
+        "direction": "backward",
+        "attributes": [
+         "lead vocals"
+        ],
+        "target-type": "artist",
+        "artist": {
+         "id": "22222222-2222-4222-8222-222222222222",
+         "name": "Mirai Kawashima",
+         "type": "Person"
+        }
+       },
+       {
+        "type": "instrument",
+        "direction": "backward",
+        "attributes": [
+         "keyboard"
+        ],
+        "target-type": "artist",
+        "artist": {
+         "id": "22222222-2222-4222-8222-222222222222",
+         "name": "Mirai Kawashima",
+         "type": "Person"
+        }
+       },
+       {
+        "type": "instrument",
+        "direction": "backward",
+        "attributes": [
+         "saxophone"
+        ],
+        "target-type": "artist",
+        "artist": {
+         "id": "33333333-3333-4333-8333-333333333333",
+         "name": "Dr. Mikannibal",
+         "type": "Person"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "position": 3,
+     "number": "3",
+     "title": "Mukou",
+     "length": 303000,
+     "recording": {
+      "id": "r1-0000-4000-8000-000000000003",
+      "title": "Mukou",
+      "length": 303000,
+      "relations": [
+       {
+        "type": "vocal",
+        "direction": "backward",
+        "attributes": [
+         "lead vocals"
+        ],
+        "target-type": "artist",
+        "artist": {
+         "id": "22222222-2222-4222-8222-222222222222",
+         "name": "Mirai Kawashima",
+         "type": "Person"
+        }
+       },
+       {
+        "type": "instrument",
+        "direction": "backward",
+        "attributes": [
+         "keyboard",
+         "shamisen"
+        ],
+        "target-type": "artist",
+        "artist": {
+         "id": "22222222-2222-4222-8222-222222222222",
+         "name": "Mirai Kawashima",
+         "type": "Person"
+        }
+       }
+      ]
+     }
+    }
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "type": "producer",
+   "direction": "backward",
+   "attributes": [],
+   "target-type": "artist",
+   "artist": {
+    "id": "44444444-4444-4444-8444-444444444444",
+    "name": "Some Producer",
+    "type": "Person"
+   }
+  },
+  {
+   "type": "streaming",
+   "direction": "forward",
+   "target-type": "url",
+   "url": {
+    "resource": "https://open.spotify.com/album/abc"
+   }
+  }
+ ]
+}
