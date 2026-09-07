@@ -1,6 +1,7 @@
 /** Zapytania do list z importu (premiery, best of). */
 import { asc, desc, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { genreToSection } from "./genres";
 import { genreImage } from "./genre-art";
 
 export const GENRE_LABELS: Record<string, string> = {
@@ -32,6 +33,20 @@ export function splitDb(genre: string, description: string): string {
   if (black < 0 && death < 0) return "db";
   if (black >= 0 && (death < 0 || black < death)) return "black";
   return "death";
+}
+
+/**
+ * Kategoria zestawienia dla stylu wybranego przez użytkownika.
+ * „technical death metal" → death, „atmospheric black metal" → black,
+ * „modern jazz" → jazz, „country" → country (bo tak trzymają je premiery z MB).
+ */
+export function styleToCategory(style: string): string {
+  const s = style.toLowerCase();
+  if (s.includes("black")) return "black";
+  if (s.includes("death")) return "death";
+  const section = genreToSection(style);
+  if (section === "jazz" || section === "prog" || section === "other") return section;
+  return s;
 }
 
 export function genreLabel(genre: string): string {

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { ReleaseSection } from "@/components/release-list";
 import { Masthead } from "@/components/masthead";
 import { heroArt, leadStyle } from "@/lib/lead-style";
-import { GENRE_ORDER, allSections, genreLabel, latestSections, releasesFor, splitDb } from "@/lib/lists";
+import { GENRE_ORDER, allSections, genreLabel, latestSections, releasesFor, splitDb, styleToCategory } from "@/lib/lists";
 import { currentUser } from "@/lib/auth";
 import { getGenres } from "@/lib/user-data";
 import { genreToSection } from "@/lib/genres";
@@ -38,11 +38,22 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
   // Kategorie biorą się z tego, co faktycznie jest w tym tygodniu — łącznie ze
   // stylami dobranymi z MusicBrainz. Sztywna czwórka z importu PNS to za mało,
   // gdy ktoś słucha country albo klasyki.
-  const present = [...new Set(rel.map((r) => splitDb(r.genre, r.description)))];
-  const available = [
-    ...GENRE_ORDER.filter((g) => present.includes(g)),
-    ...present.filter((g) => !GENRE_ORDER.includes(g)).sort((a, b) => a.localeCompare(b, "pl")),
-  ];
+  // Filtry pokazują STYLE UŻYTKOWNIKA (z profilu), a nie tylko to, co akurat
+  // jest w danych — inaczej ktoś, kto wybrał country, nigdy by go tu nie zobaczył.
+  // Przy każdym piszemy, ile pozycji ma w tym tygodniu; zero = kategoria bez premier.
+  const counts = new Map<string, number>();
+  for (const r of rel) {
+    const g = splitDb(r.genre, r.description);
+    counts.set(g, (counts.get(g) ?? 0) + 1);
+  }
+  const mine = [...new Set(prefs.slice().sort((a, b) => b.weight - a.weight).map((p) => styleToCategory(p.genre)))];
+  const present = [...counts.keys()];
+  const available = mine.length
+    ? [...mine, ...present.filter((g) => !mine.includes(g))]
+    : [
+        ...GENRE_ORDER.filter((g) => present.includes(g)),
+        ...present.filter((g) => !GENRE_ORDER.includes(g)).sort((a, b) => a.localeCompare(b, "pl")),
+      ];
   return (
     <>
     <Masthead
@@ -67,6 +78,7 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
             return (
               <Link key={g} href={qs({ ...base, g: next.join(","), all: next.length ? undefined : "1" })} className={`chip ${on ? "chip-on" : ""}`}>
                 {genreLabel(g)}
+                <span className="ml-1.5 font-mono text-[10px] text-faint">{counts.get(g) ?? 0}</span>
               </Link>
             );
           })}
