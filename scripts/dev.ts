@@ -19,6 +19,7 @@ import { usingPglite, pgliteDir } from "../src/db/paths";
 import { acquirePgliteLock, PgliteLockedError } from "../src/db/lock";
 
 if (usingPglite) {
+  console.log(`Baza: ${pgliteDir}`);
   try {
     acquirePgliteLock(pgliteDir!);
   } catch (e) {

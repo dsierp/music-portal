@@ -12,6 +12,8 @@ import { RatingBadge, RatingPanel } from "@/components/rating";
 import { Comments } from "@/components/comments";
 import { AlbumCard } from "@/components/cards";
 import { YoutubeVideos } from "@/components/youtube";
+import { dbSafe } from "@/lib/db-safe";
+import { DbWarning } from "@/components/db-warning";
 import type { Artist, Membership, PlayedOn } from "@/lib/musicbrainz";
 
 /** Grupuje "Grał(a) na płytach" wg zespołu (do rozwijania przy pozycji w Zespoły). */
@@ -27,6 +29,7 @@ function groupByBand(played: PlayedOn[]) {
 
 export const dynamic = "force-dynamic";
 const UUID = /^[0-9a-f-]{36}$/;
+const EMPTY_SUMMARY = { avg: null, count: 0, histogram: new Array(11).fill(0) as number[], mine: null };
 
 export async function generateMetadata({ params }: { params: Promise<{ mbid: string }> }): Promise<Metadata> {
   const { mbid } = await params;
@@ -210,13 +213,16 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
     throw e;
   }
   const user = await currentUser();
-  const [summary, tree, fav, favs, wiki] = await Promise.all([
-    ratingSummary("ARTIST", mbid, user?.id),
-    commentTree("ARTIST", mbid),
-    user ? isFavorite(user.id, mbid) : false,
-    favoriteCount(mbid),
+  // Przez dbSafe: padnięta baza ma nie zabierać treści z MusicBrainz/Wikipedii.
+  const [summaryS, treeS, favS, favsS, wiki] = await Promise.all([
+    dbSafe(ratingSummary("ARTIST", mbid, user?.id), EMPTY_SUMMARY),
+    dbSafe(commentTree("ARTIST", mbid), []),
+    dbSafe(user ? isFavorite(user.id, mbid) : Promise.resolve(false), false),
+    dbSafe(favoriteCount(mbid), 0),
     wikiFromLinks(artist.links).catch(() => null),
   ]);
+  const [summary, tree, fav, favs] = [summaryS.value, treeS.value, favS.value, favsS.value];
+  const dbDown = summaryS.failed || treeS.failed || favS.failed || favsS.failed;
 
   const meta = [
     artist.isPerson ? "muzyk" : artist.type?.toLowerCase(),
@@ -225,6 +231,8 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
   ].filter(Boolean).join(" · ");
 
   return (
+    <>
+    {dbDown && <DbWarning />}
     <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
       <div>
         <header className="flex gap-4">
@@ -276,5 +284,6 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
         </p>
       </aside>
     </div>
+    </>
   );
 }

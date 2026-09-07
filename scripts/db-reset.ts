@@ -16,12 +16,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
-const url = process.env.DATABASE_URL ?? "";
-if (url && !url.startsWith("pglite:")) {
+import { usingPglite, pgliteDir } from "../src/db/paths";
+
+if (!usingPglite) {
   console.error("DATABASE_URL wskazuje na prawdziwy Postgres — ten skrypt dotyczy tylko lokalnej PGlite.");
   process.exit(1);
 }
-const dir = path.resolve(url.replace(/^pglite:/, "") || "./data/pglite");
+const dir = path.resolve(pgliteDir!);
+console.log(`Baza: ${dir}`);
 const lockPath = `${dir}.lock`;
 
 if (fs.existsSync(dir)) {
