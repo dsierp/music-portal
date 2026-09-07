@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { currentUser } from "@/lib/auth";
 import { getFavoriteArtists, getGenres, getLikedAlbums, myRatings } from "@/lib/user-data";
 import { setGenreAction, toggleFavorite, toggleLike } from "@/app/actions";
-import { GENRE_GROUPS, WEIGHT_LABELS } from "@/lib/genres";
+import { GENRE_GROUPS, MAIN_CATEGORIES, WEIGHT_LABELS } from "@/lib/genres";
 import { genreImage } from "@/lib/genre-art";
 import { Cover } from "@/components/cover";
 
@@ -18,7 +18,7 @@ export default async function MePage() {
     getGenres(user.id), getLikedAlbums(user.id), getFavoriteArtists(user.id), myRatings(user.id, "ALBUM"), myRatings(user.id, "ARTIST"),
   ]);
   const weightOf = new Map(genres.map((g) => [g.genre, g.weight]));
-  const custom = genres.filter((g) => !GENRE_GROUPS.some((gr) => gr.genres.includes(g.genre)));
+  const custom = genres.filter((g) => !MAIN_CATEGORIES.some((c) => c.slug === g.genre));
 
   return (
     <div className="space-y-10">
@@ -30,7 +30,7 @@ export default async function MePage() {
 
       <section id="style">
         <h2 className="text-2xl">Style muzyczne</h2>
-        <p className="mb-4 text-sm text-muted">Wybierz swoje style z listy — klikasz, żeby dodać (waga 3), potem ustawiasz wagę 1–5. Style z wagą ≥3 filtrują premiery i stronę główną.</p>
+        <p className="mb-4 text-sm text-muted">Wybierz główne kategorie, których słuchasz — klikasz, żeby dodać (waga 3), potem ustawiasz wagę 1–5. Kategoria z najwyższą wagą jest Twoim stylem wiodącym: pod nią dobieramy oprawę graficzną portalu, a kategorie z wagą ≥3 filtrują premiery.</p>
         {genres.length > 0 && (
           <div className="card mb-4">
             <div className="label mb-2">Twoje style</div>
@@ -51,43 +51,53 @@ export default async function MePage() {
             </ul>
           </div>
         )}
-        <div className="space-y-3">
-          {GENRE_GROUPS.map((grp) => (
-            <div key={grp.label}>
-              <div className="label relative mb-2 overflow-hidden rounded border border-rule px-3 py-2">
-                {genreImage(grp.label) && (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={genreImage(grp.label)!} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover opacity-25" />
-                )}
-                <span className="absolute inset-0 bg-gradient-to-r from-bg via-bg/80 to-transparent" />
-                <span className="relative">{grp.label}</span>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {grp.genres.map((g) => (
-                  <form key={g} action={setGenreAction}>
-                    <input type="hidden" name="genre" value={g} />
-                    <input type="hidden" name="weight" value={weightOf.has(g) ? "0" : "3"} />
-                    <button className={`chip ${weightOf.has(g) ? "chip-on" : ""}`}>{g}{weightOf.has(g) ? ` · ${weightOf.get(g)}` : ""}</button>
-                  </form>
-                ))}
-              </div>
-            </div>
-          ))}
-          {custom.length > 0 && (
-            <div>
-              <div className="label mb-1">Spoza listy (z wcześniejszych ustawień)</div>
-              <div className="flex flex-wrap gap-1.5">
-                {custom.map((c) => (
-                  <form key={c.genre} action={setGenreAction}>
-                    <input type="hidden" name="genre" value={c.genre} />
-                    <input type="hidden" name="weight" value="0" />
-                    <button className="chip chip-on" title="kliknij, żeby usunąć">{c.genre} · {c.weight} ✕</button>
-                  </form>
-                ))}
-              </div>
-            </div>
-          )}
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {MAIN_CATEGORIES.map((c) => {
+            const on = weightOf.has(c.slug);
+            const img = genreImage(c.label, c.slug, c.tags[0] ?? "");
+            return (
+              <form key={c.slug} action={setGenreAction}>
+                <input type="hidden" name="genre" value={c.slug} />
+                <input type="hidden" name="weight" value={on ? "0" : "3"} />
+                <button
+                  className={`relative flex h-24 w-full items-end overflow-hidden rounded-lg border p-3 text-left transition-colors ${
+                    on ? "border-accent" : "border-rule hover:border-accent/60"
+                  }`}
+                >
+                  {img && (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={img} alt="" aria-hidden className={`absolute inset-0 h-full w-full object-cover ${on ? "opacity-45" : "opacity-25"}`} />
+                  )}
+                  <span className="absolute inset-0 bg-gradient-to-t from-bg via-bg/70 to-transparent" />
+                  <span className="relative">
+                    <span className="display block text-lg leading-tight">{c.label}</span>
+                    <span className="font-mono text-[10px] text-muted">
+                      {on ? `w profilu · waga ${weightOf.get(c.slug)}` : "kliknij, żeby dodać"}
+                    </span>
+                  </span>
+                </button>
+              </form>
+            );
+          })}
         </div>
+        {custom.length > 0 && (
+          <div className="mt-4">
+            <div className="label mb-1">Z wcześniejszych ustawień (podgatunki)</div>
+            <div className="flex flex-wrap gap-1.5">
+              {custom.map((c) => (
+                <form key={c.genre} action={setGenreAction}>
+                  <input type="hidden" name="genre" value={c.genre} />
+                  <input type="hidden" name="weight" value="0" />
+                  <button className="chip" title="kliknij, żeby usunąć">{c.genre} ✕</button>
+                </form>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-faint">
+              Wybór zawęziliśmy do głównych kategorii — dla podgatunków nie da się co tydzień budować osobnych list.
+              Podgatunki dalej służą do klasyfikowania płyt.
+            </p>
+          </div>
+        )}
       </section>
 
       <section id="plyty">

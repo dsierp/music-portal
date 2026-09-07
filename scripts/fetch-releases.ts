@@ -14,7 +14,7 @@
  * powtórzony przebieg nadpisuje zestawienie, a nie dokłada duplikatów.
  */
 import "dotenv/config";
-import { STYLES_FROM_MB } from "../src/lib/genres";
+import { STYLES_FROM_MB_BY_CATEGORY } from "../src/lib/genres";
 
 async function main() {
   const { db, schema } = await import("../src/db");
@@ -24,9 +24,18 @@ async function main() {
   const arg = process.argv[2];
   const week = weekOf(arg ? new Date(arg) : new Date());
   console.log(`Tydzień ${week.from} … ${week.to} (piątek ${week.friday})`);
-  console.log(`Style spoza importu: ${STYLES_FROM_MB.join(", ")}`);
+  const cats = STYLES_FROM_MB_BY_CATEGORY;
+  console.log(`Kategorie spoza importu: ${cats.map((c) => c.label).join(", ")}`);
 
-  const found = await releasesForStyles(STYLES_FROM_MB, week);
+  // Pytamy MB tagami kategorii, a zapisujemy pod jej slugiem — dzięki temu
+  // premiery trafiają do tej samej kategorii, którą człowiek wybrał w profilu.
+  const found: { style: string; albums: Awaited<ReturnType<typeof releasesForStyles>>[number]["albums"] }[] = [];
+  for (const c of cats) {
+    const byTag = await releasesForStyles(c.tags, week);
+    const seen = new Set<string>();
+    const albums = byTag.flatMap((x) => x.albums).filter((a) => (seen.has(a.mbid) ? false : (seen.add(a.mbid), true)));
+    if (albums.length) found.push({ style: c.slug, albums });
+  }
   const total = found.reduce((n, s) => n + s.albums.length, 0);
   if (!total) {
     console.log("Brak premier dla tych stylów w tym tygodniu — nic nie zapisuję.");
@@ -65,7 +74,7 @@ async function main() {
         artist: a.artistText,
         album: a.title,
         label: null,
-        description: `${style} — premiera ${a.firstReleaseDate ?? week.friday}.`,
+        description: `Premiera ${a.firstReleaseDate ?? week.friday} — z MusicBrainz.`,
         reviews: null,
         flag: a.secondaryTypes.includes("Compilation") ? "comp" : a.secondaryTypes.includes("Live") ? "live" : null,
         dayLabel: a.firstReleaseDate,

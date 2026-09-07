@@ -1,7 +1,7 @@
 /** Zapytania do list z importu (premiery, best of). */
 import { asc, desc, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { genreToSection } from "./genres";
+import { genreToSection, MAIN_BY_SLUG } from "./genres";
 import { genreImage } from "./genre-art";
 
 export const GENRE_LABELS: Record<string, string> = {
@@ -42,6 +42,8 @@ export function splitDb(genre: string, description: string): string {
  */
 export function styleToCategory(style: string): string {
   const s = style.toLowerCase();
+  // Profil trzyma teraz wprost slugi głównych kategorii — te przechodzą bez zmian.
+  if (MAIN_BY_SLUG.has(s)) return s;
   if (s.includes("black")) return "black";
   if (s.includes("death")) return "death";
   const section = genreToSection(style);
@@ -50,7 +52,7 @@ export function styleToCategory(style: string): string {
 }
 
 export function genreLabel(genre: string): string {
-  return GENRE_LABELS[genre] ?? genre.charAt(0).toUpperCase() + genre.slice(1);
+  return GENRE_LABELS[genre] ?? MAIN_BY_SLUG.get(genre)?.label ?? genre.charAt(0).toUpperCase() + genre.slice(1);
 }
 
 /**
