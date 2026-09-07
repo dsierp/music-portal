@@ -17,6 +17,7 @@
     "import:pns": "tsx scripts/import-pns.ts",
     "fetch:releases": "tsx scripts/fetch-releases.ts",
     "resolve:mbids": "tsx scripts/resolve-mbids.ts",
+    "neon:setup": "tsx scripts/neon-setup.ts",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "setup": "npm run db:migrate && npm run import:pns -- data/purenewshit.html"
