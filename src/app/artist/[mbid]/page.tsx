@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getArtist, getDiscography, getPlayedOn, MbError } from "@/lib/musicbrainz";
-import { wikiFromLinks } from "@/lib/wikipedia";
+import { wikiFromLinks, wikiLogo } from "@/lib/wikipedia";
 import { MbUnavailable } from "@/components/mb-unavailable";
 import { currentUser } from "@/lib/auth";
 import { commentTree, favoriteCount, isFavorite, ratingAverages, ratingSummary } from "@/lib/user-data";
@@ -255,12 +255,13 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
   }
   const user = await currentUser();
   // Przez dbSafe: padnięta baza ma nie zabierać treści z MusicBrainz/Wikipedii.
-  const [summaryS, treeS, favS, favsS, wiki] = await Promise.all([
+  const [summaryS, treeS, favS, favsS, wiki, logo] = await Promise.all([
     dbSafe(ratingSummary("ARTIST", mbid, user?.id), EMPTY_SUMMARY),
     dbSafe(commentTree("ARTIST", mbid), []),
     dbSafe(user ? isFavorite(user.id, mbid) : Promise.resolve(false), false),
     dbSafe(favoriteCount(mbid), 0),
     wikiFromLinks(artist.links).catch(() => null),
+    wikiLogo(artist.links).catch(() => null),
   ]);
   const [summary, tree, fav, favs] = [summaryS.value, treeS.value, favS.value, favsS.value];
   const dbDown = summaryS.failed || treeS.failed || favS.failed || favsS.failed;
@@ -280,7 +281,14 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
           {wiki?.thumbnail && <img src={wiki.thumbnail} alt="" className="h-36 w-36 shrink-0 rounded object-cover" />}
           <div className="min-w-0">
             <div className="label">{meta}</div>
-            <h1 className="text-4xl leading-tight">{artist.name}</h1>
+            {logo ? (
+              // Logo zespołu (Wikidata P154) — dla metalu często nieczytelne w małym
+              // rozmiarze, więc dajemy mu miejsce; nazwa zostaje dla czytników ekranu.
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={logo} alt={artist.name} className="my-1 h-auto max-h-24 w-auto max-w-full" />
+            ) : (
+              <h1 className="text-4xl leading-tight">{artist.name}</h1>
+            )}
             {artist.disambiguation && <div className="text-sm text-muted">{artist.disambiguation}</div>}
             {artist.aliases.length > 0 && <div className="text-xs text-faint">aka {artist.aliases.join(", ")}</div>}
             {artist.genres.length > 0 && (
