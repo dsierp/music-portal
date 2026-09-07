@@ -7,10 +7,21 @@ import { currentUser } from "@/lib/auth";
 import { commentTree, favoriteCount, isFavorite, ratingAverages, ratingSummary } from "@/lib/user-data";
 import { toggleFavorite } from "@/app/actions";
 import { LinksRow } from "@/components/links";
-import { RatingPanel } from "@/components/rating";
+import { RatingBadge, RatingPanel } from "@/components/rating";
 import { Comments } from "@/components/comments";
 import { AlbumCard } from "@/components/cards";
-import type { Membership } from "@/lib/musicbrainz";
+import type { Membership, PlayedOn } from "@/lib/musicbrainz";
+
+/** Grupuje "Grał(a) na płytach" wg zespołu (do rozwijania przy pozycji w Zespoły). */
+function groupByBand(played: PlayedOn[]) {
+  const map = new Map<string, PlayedOn[]>();
+  for (const p of played) {
+    if (!p.withBand) continue;
+    if (!map.has(p.withBand)) map.set(p.withBand, []);
+    map.get(p.withBand)!.push(p);
+  }
+  return map;
+}
 
 export const dynamic = "force-dynamic";
 const UUID = /^[0-9a-f-]{36}$/;
@@ -25,19 +36,53 @@ export async function generateMetadata({ params }: { params: Promise<{ mbid: str
   }
 }
 
-function MemberList({ title, items }: { title: string; items: Membership[] }) {
+function MemberList({
+  title,
+  items,
+  playedByBand,
+  ratings,
+}: {
+  title: string;
+  items: Membership[];
+  playedByBand?: Map<string, PlayedOn[]>;
+  ratings?: Map<string, { avg: number; count: number }>;
+}) {
   if (!items.length) return null;
   return (
     <div>
       <h3 className="label mb-1">{title}</h3>
       <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
-        {items.map((m, i) => (
-          <li key={m.mbid + i} className="flex flex-wrap items-baseline gap-x-2 text-sm">
-            <Link href={`/artist/${m.mbid}`} className="font-medium hover:text-accent2 hover:underline">{m.name}</Link>
-            {m.roles.length > 0 && <span className="text-muted">{m.roles.join(", ")}</span>}
-            {(m.begin || m.end) && <span className="font-mono text-[10px] text-faint">{m.begin?.slice(0, 4) ?? "?"}–{m.current ? "" : m.end?.slice(0, 4) ?? "?"}</span>}
-          </li>
-        ))}
+        {items.map((m, i) => {
+          const albums = playedByBand?.get(m.name);
+          return (
+            <li key={m.mbid + i} className="text-sm">
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <Link href={`/artist/${m.mbid}`} className="font-medium hover:text-accent2 hover:underline">{m.name}</Link>
+                {m.roles.length > 0 && <span className="text-muted">{m.roles.join(", ")}</span>}
+                {(m.begin || m.end) && <span className="font-mono text-[10px] text-faint">{m.begin?.slice(0, 4) ?? "?"}–{m.current ? "" : m.end?.slice(0, 4) ?? "?"}</span>}
+              </div>
+              {albums && albums.length > 0 && (
+                <details className="mt-0.5">
+                  <summary className="cursor-pointer text-xs text-muted hover:text-accent2">
+                    płyty z {m.name} ({albums.length})
+                  </summary>
+                  <ul className="mt-1 space-y-0.5 border-l border-rule/60 pl-3">
+                    {albums.map((p) => (
+                      <li key={p.album.mbid} className="flex flex-wrap items-baseline gap-x-2">
+                        <Link href={`/album/${p.album.mbid}`} className="hover:text-accent2 hover:underline">{p.album.title}</Link>
+                        {p.album.year && <span className="font-mono text-[10px] text-faint">{p.album.year}</span>}
+                        {p.roles.length > 0 && <span className="text-xs text-muted">{p.roles.join(", ")}</span>}
+                        {ratings?.get(p.album.mbid) && (
+                          <RatingBadge avg={ratings.get(p.album.mbid)!.avg} count={ratings.get(p.album.mbid)!.count} />
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
@@ -69,6 +114,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
   const ratings = await ratingAverages("ALBUM", [...disco.map((a) => a.mbid), ...played.map((p) => p.album.mbid)]);
   const current = artist.members.filter((m) => m.current);
   const former = artist.members.filter((m) => !m.current);
+  const playedByBand = artist.isPerson ? groupByBand(played) : undefined;
 
   const meta = [
     artist.isPerson ? "muzyk" : artist.type?.toLowerCase(),
@@ -118,8 +164,18 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
         {(artist.members.length > 0 || artist.memberOf.length > 0) && (
           <section className="mt-8 space-y-4">
             <h2 className="text-2xl">{artist.isPerson ? "Zespoły" : "Skład"}</h2>
-            <MemberList title="Obecnie" items={artist.isPerson ? artist.memberOf.filter((m) => m.current) : current} />
-            <MemberList title="Dawniej" items={artist.isPerson ? artist.memberOf.filter((m) => !m.current) : former} />
+            <MemberList
+              title="Obecnie"
+              items={artist.isPerson ? artist.memberOf.filter((m) => m.current) : current}
+              playedByBand={playedByBand}
+              ratings={ratings}
+            />
+            <MemberList
+              title="Dawniej"
+              items={artist.isPerson ? artist.memberOf.filter((m) => !m.current) : former}
+              playedByBand={playedByBand}
+              ratings={ratings}
+            />
           </section>
         )}
 
