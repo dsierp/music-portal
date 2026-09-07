@@ -10,26 +10,16 @@
  * obsługuje i zespół, i człowieka, a "podróż" po składach to zwykłe linki.
  */
 import { cached, TTL } from "./cache";
+import { createThrottle } from "./throttle";
 
 const MB_BASE = "https://musicbrainz.org/ws/2";
 const UA = process.env.MUSICBRAINZ_USER_AGENT ?? "MusicPortal/0.1 (dev)";
 
 // ---------- rate limiter ----------
-let chain: Promise<unknown> = Promise.resolve();
-let lastCall = 0;
+// Odstęp między wysłaniami zapytań (MusicBrainz: 1/s; 1,1 s daje zapas na
+// nierówności sieci). Szczegóły działania kolejki: throttle.ts.
 const MIN_GAP_MS = 1100;
-
-function throttle<T>(fn: () => Promise<T>): Promise<T> {
-  const run = async () => {
-    const wait = Math.max(0, lastCall + MIN_GAP_MS - Date.now());
-    if (wait) await new Promise((r) => setTimeout(r, wait));
-    lastCall = Date.now();
-    return fn();
-  };
-  const p = chain.then(run, run);
-  chain = p.catch(() => undefined);
-  return p;
-}
+const throttle = createThrottle(MIN_GAP_MS);
 
 export class MbError extends Error {
   constructor(message: string, public status?: number) {

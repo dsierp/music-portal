@@ -14,6 +14,7 @@ import { Comments } from "@/components/comments";
 import { AlbumCard } from "@/components/cards";
 import { YoutubeVideos } from "@/components/youtube";
 import { relatedBands } from "@/lib/related";
+import { LineupTimeline } from "@/components/lineup-timeline";
 import { dbSafe } from "@/lib/db-safe";
 import { DbWarning } from "@/components/db-warning";
 import type { Artist, Membership, PlayedOn } from "@/lib/musicbrainz";
@@ -219,6 +220,8 @@ async function ArtistDeepContent({ artist, mbid }: { artist: Artist; mbid: strin
         </details>
       )}
       {!disco.length && !played.length && <p className="mt-8 text-sm text-muted">MusicBrainz nie ma wydawnictw dla tego artysty.</p>}
+
+      {!artist.isPerson && <LineupTimeline members={artist.members} albums={albums} />}
 
       <Suspense fallback={<p className="mt-10 font-mono text-xs text-muted">Szukam powiązanych zespołów…</p>}>
         <RelatedSection artist={artist} />
