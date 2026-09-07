@@ -8,14 +8,16 @@
     "start": "next start",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "tsx scripts/migrate.ts",
     "db:studio": "drizzle-kit studio",
     "import:pns": "tsx scripts/import-pns.ts",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/*.test.ts"
+    "test": "tsx --test tests/*.test.ts",
+    "setup": "npm run db:migrate && npm run import:pns -- data/purenewshit.html"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.3",
+    "@electric-sql/pglite": "^0.5.8",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "next": "15.5.25",

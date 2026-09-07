@@ -29,16 +29,19 @@ Odpowiedzi API są buforowane w tabeli `api_cache` (wyszukiwanie 1 dzień, looku
 
 Next.js 15 (App Router, server actions, TypeScript) · Tailwind 4 · Drizzle ORM + PostgreSQL · Auth.js v5.
 
-## Uruchomienie lokalne
+## Uruchomienie lokalne (bez Dockera, bez instalowania Postgresa)
+
+Potrzebny tylko Node.js 20+.
 
 ```bash
-cp .env.example .env         # uzupełnij AUTH_SECRET (npx auth secret) i ewentualnie klucze OAuth
-docker compose up -d         # Postgres na localhost:5432
+cp .env.example .env         # domyślnie DATABASE_URL="" → baza PGlite w pliku ./data/pglite
 npm install
-npm run db:migrate           # tworzy tabele
-npm run import:pns -- data/purenewshit.html   # premiery + best of
+npm run setup                # migracje + import premier/best of z data/purenewshit.html
 npm run dev                  # http://localhost:3000
 ```
+
+Prawdziwy Postgres (docker compose, Homebrew, Neon): ustaw `DATABASE_URL="postgresql://…"` — te same komendy.
+PGlite to Postgres skompilowany do WASM; dane siedzą w `data/pglite`. Wystarcza na własny użytek; na serwer bierz zwykłego Postgresa.
 
 Bez kluczy OAuth działa **logowanie deweloperskie** (`AUTH_DEV_LOGIN=true`, tylko poza produkcją): na `/login` wpisujesz sam e-mail.
 
