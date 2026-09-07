@@ -57,6 +57,45 @@ async function summary(lang: string, title: string): Promise<WikiSummary | null>
   });
 }
 
+const PERSONNEL_HEADING = /skład|twórcy|muzycy|personel|obsada|personnel|musicians?|credits?|line-?up/i;
+
+function cleanWikitext(s: string): string {
+  return s
+    .replace(/<ref[^>]*\/>/gi, "")
+    .replace(/<ref[^>]*>[\s\S]*?<\/ref>/gi, "")
+    .replace(/\{\{[^{}]*\}\}/g, "") // proste szablony (bez zagnieżdżeń)
+    .replace(/\[\[(?:[^|\]]*\|)?([^\]]+)\]\]/g, "$1") // [[link|tekst]] / [[tekst]] → tekst
+    .replace(/'''?([^']*)'''?/g, "$1") // '''pogrubienie''' / ''kursywa''
+    .replace(/<[^>]+>/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Skład/personel z sekcji Wikipedii (np. "Skład"/"Twórcy" pl, "Personnel" en) —
+ * gdy MusicBrainz nie ma jeszcze credits na poziomie nagrań. Zwraca surowe,
+ * nieustandaryzowane linie (bez dopasowania do MBID artystów).
+ */
+export async function wikiPersonnel(lang: string, title: string): Promise<string[] | null> {
+  return cached(`wiki:personnel:${lang}:${title}`, TTL.wiki, async () => {
+    const sections = await getJson<{ parse?: { sections?: { index: string; line: string; anchor: string }[] } }>(
+      `https://${lang}.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}&prop=sections&format=json&formatversion=2`,
+    );
+    const section = sections?.parse?.sections?.find((s) => PERSONNEL_HEADING.test(s.line));
+    if (!section) return null;
+    const body = await getJson<{ parse?: { wikitext?: string } }>(
+      `https://${lang}.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}&section=${section.index}&prop=wikitext&format=json&formatversion=2`,
+    );
+    const wikitext = body?.parse?.wikitext ?? "";
+    const lines = wikitext
+      .split("\n")
+      .filter((l) => /^\*/.test(l.trim()))
+      .map((l) => cleanWikitext(l.replace(/^\*+/, "")))
+      .filter((l) => l.length > 1 && l.length < 200);
+    return lines.length ? lines.slice(0, 40) : null;
+  });
+}
+
 /** Opis dla artysty/płyty na podstawie linków z MusicBrainz. */
 export async function wikiFromLinks(links: Links, preferred: string[] = ["pl", "en"]): Promise<WikiSummary | null> {
   const titles: Record<string, string> = {};

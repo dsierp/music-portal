@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getAlbum, getDiscography, isMusicianRole, fmtLength, MbError } from "@/lib/musicbrainz";
-import { wikiFromLinks } from "@/lib/wikipedia";
+import { wikiFromLinks, wikiPersonnel } from "@/lib/wikipedia";
 import { currentUser } from "@/lib/auth";
 import { commentTree, isLiked, likeCount, ratingAverages, ratingSummary } from "@/lib/user-data";
 import { toggleLike } from "@/app/actions";
@@ -52,6 +52,9 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
   const musicians = album.credits.filter((c) => c.roles.some(isMusicianRole));
   const staff = album.credits.filter((c) => !c.roles.some(isMusicianRole));
   const discs = [...new Set(album.tracks.map((t) => t.disc))];
+  // MusicBrainz nierzadko nie ma jeszcze składu na poziomie nagrań — wtedy próbujemy
+  // wyciągnąć listę z sekcji "Skład"/"Personnel" na Wikipedii (surowy tekst, bez linków do MBID).
+  const wikiCredits = !musicians.length && wiki ? await wikiPersonnel(wiki.lang, wiki.title).catch(() => null) : null;
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
@@ -110,6 +113,15 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
                 </li>
               ))}
             </ul>
+          ) : wikiCredits?.length ? (
+            <div>
+              <ul className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+                {wikiCredits.map((line, i) => <li key={i}>{line}</li>)}
+              </ul>
+              <p className="mt-2 text-xs text-faint">
+                Źródło: <a href={wiki?.url} target="_blank" rel="noopener" className="underline hover:text-accent2">Wikipedia</a> — MusicBrainz nie ma jeszcze tego składu na poziomie nagrań, więc nazwiska tutaj nie linkują do profili artystów w portalu.
+              </p>
+            </div>
           ) : (
             <p className="text-sm text-muted">
               MusicBrainz nie ma jeszcze składu tej płyty. Zajrzyj do zespołu {mainArtist && <Link href={`/artist/${mainArtist.mbid}`} className="underline">{mainArtist.name}</Link>} (członkowie) albo {album.links.metalArchives && <a href={album.links.metalArchives} className="underline" target="_blank" rel="noopener">Metal-Archives</a>}{album.links.allmusic && <a href={album.links.allmusic} className="underline" target="_blank" rel="noopener">AllMusic</a>}.
