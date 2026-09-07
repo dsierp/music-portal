@@ -23,7 +23,9 @@ export function ReleaseSection({ section, releases, filter }: { section: Section
   });
   // Płyta tygodnia: wskazana w imporcie, a gdy jej nie ma — pierwsze wyróżnienie.
   const pick = releases.find((r) => r.id === `${section.id}:${section.pickId}`) ?? releases.find((r) => r.star === 1);
-  const rest = visible.filter((r) => r.id !== pick?.id);
+  // Płyta tygodnia zostaje TAKŻE w liście swojego gatunku — tak jest w oryginalnym
+  // zestawieniu i tak to ma sens: pick to wyróżnienie, a nie wyjęcie z zestawu.
+  const rest = visible;
   // Gatunki w kolejności: najpierw te z importu PNS, potem style dobrane z MB.
   const gOf = (r: Release) => splitDb(r.genre, r.description);
   const present = [...new Set(rest.map(gOf))];
@@ -45,7 +47,8 @@ export function ReleaseSection({ section, releases, filter }: { section: Section
         count={visible.length}
         variant={lead === "db" ? "red" : lead === "other" ? "morgue" : "other"}
       />
-      {pick && !filter.genres.length && <PickCard r={pick} />}
+      {/* pick pokazujemy też przy aktywnych filtrach — o ile do nich pasuje */}
+      {pick && visible.some((r) => r.id === pick.id) && <PickCard r={pick} />}
       {groups.map(({ g, items }) => (
         <div key={g} className="mt-6">
           <h3 className="label relative mb-3 overflow-hidden rounded border border-rule px-3 py-2 text-xs">

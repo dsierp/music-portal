@@ -76,7 +76,6 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
         <div className="flex flex-col gap-1.5 text-sm">
           <Link href={qs({ ...base, g: sp.g, all: sp.all, star: filter.starOnly ? undefined : "1" })} className={`chip ${filter.starOnly ? "chip-on" : ""}`}>Tylko ★</Link>
           <Link href={qs({ ...base, g: sp.g, all: sp.all, re: filter.showFlagged ? undefined : "1" })} className={`chip ${filter.showFlagged ? "chip-on" : ""}`}>Pokaż reedycje / EP / live</Link>
-          <Link href={qs({ ...base, g: sp.g, all: sp.all, sekcja: sp.sekcja === "archiwum" ? undefined : "archiwum" })} className={`chip ${sp.sekcja === "archiwum" ? "chip-on" : ""}`}>Archiwum tygodni</Link>
         </div>
         <p className="mt-5 text-xs text-faint">Lista powstaje co piątek z zestawienia „Pure New Shit”. Kliknięcie w tytuł otwiera stronę płyty ze składem — stamtąd ruszasz w podróż.</p>
       </aside>
