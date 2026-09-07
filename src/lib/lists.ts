@@ -1,6 +1,7 @@
 /** Zapytania do list z importu (premiery, best of). */
 import { asc, desc, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { genreImage } from "./genre-art";
 
 export const GENRE_LABELS: Record<string, string> = {
   db: "Death / black metal",
@@ -11,16 +12,20 @@ export const GENRE_LABELS: Record<string, string> = {
 export const GENRE_ORDER = ["db", "prog", "other", "jazz"];
 
 /**
- * Grafika nagłówka dla gatunku. Na razie ze zdjęć w public/img — żeby dołożyć
- * własną (np. dedykowaną grafikę death metalową), wystarczy wrzucić plik do
- * public/img i podmienić ścieżkę tutaj.
+ * Grafika nagłówka sekcji premier. Szukamy pliku po nazwie w
+ * public/img/genres (patrz genre-art.ts) — żeby dorzucić własną, wystarczy
+ * wrzucić tam plik, bez zmian w kodzie.
  */
-export const GENRE_IMAGES: Record<string, string> = {
-  db: "/img/studio.jpg",
-  prog: "/img/konsola.jpg",
-  other: "/img/talerz.jpg",
-  jazz: "/img/winyl.jpg",
-};
+export function sectionImage(genre: string): string | null {
+  const names: Record<string, string[]> = {
+    db: ["death-black-metal", "death metal", "black metal", "metal"],
+    prog: ["prog", "progressive rock", "progressive metal"],
+    other: ["inne metal", "metal"],
+    jazz: ["jazz"],
+  };
+  const [first, ...rest] = names[genre] ?? [genre];
+  return genreImage(first, ...rest);
+}
 export const FLAG_LABELS: Record<string, string> = { ep: "EP", comp: "kompilacja", reissue: "reedycja", live: "live", instr: "instrumental" };
 
 export async function latestSections(limit = 2) {

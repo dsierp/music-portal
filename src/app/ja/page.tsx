@@ -5,6 +5,7 @@ import { currentUser } from "@/lib/auth";
 import { getFavoriteArtists, getGenres, getLikedAlbums, myRatings } from "@/lib/user-data";
 import { setGenreAction, toggleFavorite, toggleLike } from "@/app/actions";
 import { GENRE_GROUPS, WEIGHT_LABELS } from "@/lib/genres";
+import { genreImage } from "@/lib/genre-art";
 import { Cover } from "@/components/cover";
 
 export const metadata: Metadata = { title: "Mój profil" };
@@ -29,7 +30,7 @@ export default async function MePage() {
 
       <section id="style">
         <h2 className="text-2xl">Style muzyczne</h2>
-        <p className="mb-4 text-sm text-muted">Kliknij styl, żeby dodać (waga 3), potem ustaw wagę 1–5. Wagi ≥3 filtrują premiery na stronie głównej.</p>
+        <p className="mb-4 text-sm text-muted">Wybierz swoje style z listy — klikasz, żeby dodać (waga 3), potem ustawiasz wagę 1–5. Style z wagą ≥3 filtrują premiery i stronę główną.</p>
         {genres.length > 0 && (
           <div className="card mb-4">
             <div className="label mb-2">Twoje style</div>
@@ -53,7 +54,14 @@ export default async function MePage() {
         <div className="space-y-3">
           {GENRE_GROUPS.map((grp) => (
             <div key={grp.label}>
-              <div className="label mb-1">{grp.label}</div>
+              <div className="label relative mb-2 overflow-hidden rounded border border-rule px-3 py-2">
+                {genreImage(grp.label) && (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={genreImage(grp.label)!} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover opacity-25" />
+                )}
+                <span className="absolute inset-0 bg-gradient-to-r from-bg via-bg/80 to-transparent" />
+                <span className="relative">{grp.label}</span>
+              </div>
               <div className="flex flex-wrap gap-1.5">
                 {grp.genres.map((g) => (
                   <form key={g} action={setGenreAction}>
@@ -65,12 +73,20 @@ export default async function MePage() {
               </div>
             </div>
           ))}
-          <form action={setGenreAction} className="flex max-w-md gap-2">
-            <input name="genre" placeholder="własny styl, np. zeuhl" className="input" maxLength={60} />
-            <input type="hidden" name="weight" value="3" />
-            <button className="btn">Dodaj</button>
-          </form>
-          {custom.length > 0 && <p className="text-xs text-muted">Własne: {custom.map((c) => c.genre).join(", ")}</p>}
+          {custom.length > 0 && (
+            <div>
+              <div className="label mb-1">Spoza listy (z wcześniejszych ustawień)</div>
+              <div className="flex flex-wrap gap-1.5">
+                {custom.map((c) => (
+                  <form key={c.genre} action={setGenreAction}>
+                    <input type="hidden" name="genre" value={c.genre} />
+                    <input type="hidden" name="weight" value="0" />
+                    <button className="chip chip-on" title="kliknij, żeby usunąć">{c.genre} · {c.weight} ✕</button>
+                  </form>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
