@@ -102,3 +102,8 @@ a:hover { color: var(--accent2); }
 @media (prefers-reduced-motion: reduce) {
   .skeleton, .spinner, .nav-progress-bar { animation: none; }
 }
+
+/* Znaczniki albumów na osi czasu składu — podświetlenie pod kursorem. */
+.album-mark { cursor: pointer; }
+.album-mark:hover circle { stroke: var(--accent2); }
+.album-mark:hover line { stroke: var(--accent2); opacity: 1; }

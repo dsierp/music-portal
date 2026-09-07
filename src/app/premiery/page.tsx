@@ -23,12 +23,10 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
   const user = await currentUser();
   // domyślne filtry z preferencji użytkownika (jeśli nie wybrał ręcznie)
   let genres = sp.g ? sp.g.split(",").filter(Boolean) : [];
-  let fromPrefs = false;
   const prefs = user ? await getGenres(user.id) : [];
-  if (!sp.g && sp.all !== "1" && user) {
-    const secs = new Set(prefs.filter((p) => p.weight >= 3).map((p) => genreToSection(p.genre)).filter(Boolean) as string[]);
-    if (secs.size && secs.size < GENRE_ORDER.length) { genres = GENRE_ORDER.filter((g) => secs.has(g)); fromPrefs = true; }
-  }
+  // Preferencje NIE odznaczają kategorii — domyślnie widać wszystko, co jest
+  // w tym tygodniu. Wpływają tylko na kolejność chipów (najpierw Twoje style)
+  // i na oprawę graficzną. Zawężanie zostaje w rękach klikającego.
   const filter = { genres, starOnly: sp.star === "1", showFlagged: sp.re === "1" };
   const sections = sp.sekcja === "archiwum" ? await allSections() : await latestSections(2);
   const rel = await releasesFor(sections.map((s) => s.id));
@@ -87,7 +85,6 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
             );
           })}
         </div>
-        {fromPrefs && <p className="mt-2 text-xs text-muted">Filtr z Twoich preferencji. <Link href={qs({ ...base, all: "1" })} className="underline">Pokaż wszystko</Link></p>}
         <div className="label mt-5 mb-2">Widok</div>
         <div className="flex flex-col gap-1.5 text-sm">
           <Link href={qs({ ...base, g: sp.g, all: sp.all, star: filter.starOnly ? undefined : "1" })} className={`chip ${filter.starOnly ? "chip-on" : ""}`}>Tylko ★</Link>

@@ -221,6 +221,29 @@ async function ArtistDeepContent({ artist, mbid }: { artist: Artist; mbid: strin
       )}
       {!disco.length && !played.length && <p className="mt-8 text-sm text-muted">MusicBrainz nie ma wydawnictw dla tego artysty.</p>}
 
+      {artist.workedOn.length > 0 && (
+        <section className="mt-8">
+          <h2 className="mb-1 text-2xl">Produkcja, realizacja, okładki <span className="font-mono text-sm text-muted">{artist.workedOn.length}</span></h2>
+          <p className="mb-3 text-xs text-muted">
+            Praca przy płytach, która nie jest graniem — w MusicBrainz wisi przy wydaniu, nie przy utworze. Stąd też da się ruszyć w podróż.
+          </p>
+          <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
+            {artist.workedOn.slice(0, 60).map((w) => (
+              <li key={w.releaseMbid} className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                <Link href={`/go/mb-release/${encodeURIComponent(w.releaseMbid)}`} className="font-medium hover:text-accent2 hover:underline">
+                  {w.artistText ? `${w.artistText} – ` : ""}<i>{w.title}</i>
+                </Link>
+                <span className="font-mono text-[10px] text-muted">{w.roles.join(", ")}</span>
+                {w.date && <span className="font-mono text-[10px] text-faint">{w.date.slice(0, 4)}</span>}
+              </li>
+            ))}
+          </ul>
+          {artist.workedOn.length > 60 && (
+            <p className="mt-2 text-xs text-faint">Pokazujemy 60 najnowszych z {artist.workedOn.length}.</p>
+          )}
+        </section>
+      )}
+
       {!artist.isPerson && <LineupTimeline members={artist.members} albums={albums} />}
 
       <Suspense fallback={<p className="mt-10 font-mono text-xs text-muted">Szukam powiązanych zespołów…</p>}>

@@ -45,10 +45,11 @@ export function LineupTimeline({ members, albums }: { members: Membership[]; alb
   const people = members.filter((m) => m.begin || m.end);
   if (people.length < 2) return null; // przy jednym pasku wykres niczego nie pokazuje
 
-  const albumYears = albums
-    .map((a) => toYear(a.firstReleaseDate, NaN))
-    .filter((y) => Number.isFinite(y))
-    .sort((a, b) => a - b);
+  const albumPoints = albums
+    .map((a) => ({ album: a, year: toYear(a.firstReleaseDate, NaN) }))
+    .filter((p) => Number.isFinite(p.year))
+    .sort((a, b) => a.year - b.year);
+  const albumYears = albumPoints.map((p) => p.year);
 
   const starts = people.map((m) => toYear(m.begin, now));
   const ends = people.map((m) => (m.current ? now : toYear(m.end, now)));
@@ -61,7 +62,7 @@ export function LineupTimeline({ members, albums }: { members: Membership[]; alb
   const ROW_H = 22;
   const AXIS_H = 26;
   const W = 900;
-  const H = people.length * ROW_H + AXIS_H + 6;
+  const H = people.length * ROW_H + AXIS_H + 18;
   const plotW = W - LABEL_W - 12;
   const x = (year: number) => LABEL_W + ((year - from) / span) * plotW;
 
@@ -81,13 +82,21 @@ export function LineupTimeline({ members, albums }: { members: Membership[]; alb
       <summary className="cursor-pointer text-muted hover:text-accent2">Oś czasu składu ({people.length} osób)</summary>
       <div className="mt-3 overflow-x-auto">
         <svg viewBox={`0 0 ${W} ${H}`} width={W} className="min-w-[680px] max-w-full" role="img" aria-label="Oś czasu składu zespołu">
-          {/* pionowe kreski = albumy studyjne */}
-          {albumYears.map((y, i) => (
-            <line key={`al-${i}`} x1={x(y)} x2={x(y)} y1={0} y2={people.length * ROW_H} stroke="var(--text)" strokeWidth={1.5} opacity={0.55} />
+          {/* Pionowe kreski = albumy. Kółko na górze jest klikalne i ma podpowiedź
+              (SVG <title> = natywny dymek przeglądarki, bez javascriptu). */}
+          {albumPoints.map((p, i) => (
+            <a key={`al-${i}`} href={`/album/${p.album.mbid}`} className="album-mark">
+              <title>{`${p.album.artistText} – ${p.album.title}${p.album.year ? ` (${p.album.year})` : ""}`}</title>
+              <line x1={x(p.year)} x2={x(p.year)} y1={10} y2={people.length * ROW_H + 12} stroke="var(--text)" strokeWidth={1.5} opacity={0.5} />
+              <circle cx={x(p.year)} cy={7} r={5} fill="var(--bg)" stroke="var(--text)" strokeWidth={1.5} />
+              <circle cx={x(p.year)} cy={7} r={1.7} fill="var(--text)" />
+              {/* powiększone pole trafienia — w 5-pikselowe kółko trudno celować */}
+              <rect x={x(p.year) - 9} y={0} width={18} height={people.length * ROW_H + 12} fill="transparent" />
+            </a>
           ))}
           {people.map((m, i) => {
             const s = roleStyle(m.roles);
-            const y = i * ROW_H;
+            const y = i * ROW_H + 12;
             const x1 = x(toYear(m.begin, from));
             const x2 = x(m.current ? now : toYear(m.end, now));
             return (
@@ -101,11 +110,11 @@ export function LineupTimeline({ members, albums }: { members: Membership[]; alb
             );
           })}
           {/* oś lat */}
-          <line x1={LABEL_W} x2={W - 12} y1={people.length * ROW_H} y2={people.length * ROW_H} stroke="var(--rule)" />
+          <line x1={LABEL_W} x2={W - 12} y1={people.length * ROW_H + 12} y2={people.length * ROW_H + 12} stroke="var(--rule)" />
           {ticks.map((t) => (
             <g key={t}>
-              <line x1={x(t)} x2={x(t)} y1={people.length * ROW_H} y2={people.length * ROW_H + 4} stroke="var(--rule)" />
-              <text x={x(t)} y={people.length * ROW_H + 17} textAnchor="middle" fontSize="11" fill="var(--muted)" fontFamily="var(--font-mono)">
+              <line x1={x(t)} x2={x(t)} y1={people.length * ROW_H + 12} y2={people.length * ROW_H + 16} stroke="var(--rule)" />
+              <text x={x(t)} y={people.length * ROW_H + 29} textAnchor="middle" fontSize="11" fill="var(--muted)" fontFamily="var(--font-mono)">
                 {t}
               </text>
             </g>
@@ -121,7 +130,7 @@ export function LineupTimeline({ members, albums }: { members: Membership[]; alb
           {albumYears.length > 0 && (
             <span className="flex items-center gap-1.5">
               <span className="inline-block h-3 w-0.5 bg-text" />
-              album
+              album — najedź po tytuł, kliknij po stronę płyty
             </span>
           )}
         </div>

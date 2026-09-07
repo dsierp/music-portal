@@ -53,6 +53,15 @@ test("artysta-osoba: zespoły i płyty, na których grał (bez własnych)", asyn
   assert.equal(played[1].withBand, "Sigh");
 });
 
+test("producent: praca przy wydaniach, nie tylko granie", async () => {
+  const a = await getArtist(ID.mirai);
+  const w = a.workedOn.find((x) => x.title === "Goh-Ka");
+  assert.ok(w, "relacja przy wydaniu powinna trafić do workedOn");
+  assert.deepEqual(w!.roles, ["producer"]);
+  assert.equal(w!.artistText, "Sigh");
+  assert.equal(w!.date, "1993-05-01");
+});
+
 test("dyskografia: sortowanie albumów od najnowszego", async () => {
   const d = await getDiscography(ID.band);
   assert.deepEqual(d.map((x) => x.title), ["Goh-Ka", "Scorn Defeat"]);

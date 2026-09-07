@@ -88,6 +88,8 @@ interface MbArtistRel {
   end?: string | null;
   ended?: boolean;
   artist?: { id: string; name: string; type?: string; disambiguation?: string };
+  release?: { id: string; title: string; date?: string; "artist-credit"?: MbArtistCreditPart[] };
+  "release-group"?: { id: string; title: string; "first-release-date"?: string; "artist-credit"?: MbArtistCreditPart[] };
   "target-type": string;
   url?: { resource: string };
 }
@@ -241,7 +243,24 @@ export interface Artist {
   members: Membership[]; // dla zespołu: ludzie
   memberOf: Membership[]; // dla osoby: zespoły
   aliases: string[];
+  /** produkcja, realizacja, okładki — praca przy wydaniach, nie granie */
+  workedOn: WorkedOn[];
 }
+/**
+ * Praca przy wydaniu, która NIE jest graniem: produkcja, realizacja dźwięku,
+ * miks, mastering, okładka. W MusicBrainz takie relacje wiszą przy wydaniu,
+ * a nie przy nagraniu — dlatego producent w rodzaju Scotta Burnsa miał do tej
+ * pory pustą stronę, mimo setek płyt na koncie.
+ */
+export interface WorkedOn {
+  /** id wydania (release) — nie release-group; rozwiązujemy je dopiero po kliknięciu */
+  releaseMbid: string;
+  title: string;
+  artistText: string;
+  date: string | null;
+  roles: string[];
+}
+
 export interface PlayedOn {
   album: AlbumSummary;
   roles: string[];
@@ -360,6 +379,14 @@ export async function mbSearchReleaseGroups(query: string, limit = 25): Promise<
     mbFetch<{ "release-groups": MbReleaseGroup[] }>("/release-group/", { query, limit }),
   );
   return (data["release-groups"] ?? []).map((rg) => normReleaseGroup(rg));
+}
+
+/** release → release-group (nasze strony płyt stoją na release-group). */
+export async function releaseGroupOfRelease(releaseMbid: string): Promise<string | null> {
+  return cached(`mb:rel2rg:${releaseMbid}`, TTL.lookup, async () => {
+    const r = await mbFetch<{ "release-group"?: { id: string } }>(`/release/${releaseMbid}`, { inc: "release-groups" });
+    return r["release-group"]?.id ?? null;
+  });
 }
 
 export async function searchArtists(query: string, limit = 20): Promise<Pick<Artist, "mbid" | "name" | "type" | "country" | "disambiguation" | "isPerson">[]> {
@@ -482,7 +509,7 @@ function normMembership(r: MbArtistRel): Membership | null {
 
 export async function getArtist(mbid: string): Promise<Artist> {
   const a = await cached(`mb:artist:${mbid}`, TTL.lookup, () =>
-    mbFetch<MbArtist>(`/artist/${mbid}`, { inc: "artist-rels+url-rels+genres+tags+aliases" }),
+    mbFetch<MbArtist>(`/artist/${mbid}`, { inc: "artist-rels+release-rels+release-group-rels+url-rels+genres+tags+aliases" }),
   );
   const members: Membership[] = [];
   const memberOf: Membership[] = [];
@@ -498,6 +525,25 @@ export async function getArtist(mbid: string): Promise<Artist> {
   const byCurrent = (x: Membership, y: Membership) => Number(y.current) - Number(x.current) || (x.begin ?? "").localeCompare(y.begin ?? "");
   members.sort(byCurrent);
   memberOf.sort(byCurrent);
+  // Produkcja, realizacja, okładki — relacje przypięte do wydań.
+  const workedMap = new Map<string, WorkedOn>();
+  for (const r of a.relations ?? []) {
+    const rel = r.release ?? r["release-group"];
+    if (!rel || (r["target-type"] !== "release" && r["target-type"] !== "release_group")) continue;
+    const credit = normCredit(rel["artist-credit"]);
+    const relDate = ("date" in rel ? rel.date : undefined) ?? ("first-release-date" in rel ? rel["first-release-date"] : undefined) ?? null;
+    const e: WorkedOn = workedMap.get(rel.id) ?? {
+      releaseMbid: rel.id,
+      title: rel.title,
+      artistText: creditText(credit),
+      date: relDate,
+      roles: [],
+    };
+    for (const role of rolesOf(r)) if (!e.roles.includes(role)) e.roles.push(role);
+    workedMap.set(rel.id, e);
+  }
+  const workedOn = [...workedMap.values()].sort((x, y) => (y.date ?? "").localeCompare(x.date ?? ""));
+
   const genres = topNames(a.genres);
   const isJazz = genres.some((g) => g.includes("jazz"));
   return {
@@ -518,6 +564,7 @@ export async function getArtist(mbid: string): Promise<Artist> {
     members,
     memberOf,
     aliases: (a.aliases ?? []).map((x) => x.name).filter((n) => n !== a.name).slice(0, 5),
+    workedOn,
   };
 }
 
