@@ -1,4 +1,5 @@
 import type { Links } from "@/lib/musicbrainz";
+import type { ExternalRating } from "@/lib/externalRatings";
 
 /** Pasek linków zewnętrznych — Spotify i Tidal zawsze, reszta gdy jest. */
 export function LinksRow({ links, compact = false }: { links: Links; compact?: boolean }) {
@@ -17,8 +18,14 @@ export function LinksRow({ links, compact = false }: { links: Links; compact?: b
   );
 }
 
-/** Oceny i recenzje zewnętrzne — osobno od "gdzie słuchać", bo to inny cel kliknięcia. */
-export function ReviewLinks({ links }: { links: Links }) {
+/**
+ * Oceny i recenzje zewnętrzne — osobno od "gdzie słuchać", bo to inny cel kliknięcia.
+ * `ratings` (opcjonalne, patrz externalRatings.ts) dokłada faktyczną liczbę przy
+ * serwisach, dla których udało się ją wyciągnąć — best-effort, więc część linków
+ * i tak zostanie samym linkiem.
+ */
+export function ReviewLinks({ links, ratings }: { links: Links; ratings?: ExternalRating[] }) {
+  const byLabel = new Map((ratings ?? []).map((r) => [r.source, r]));
   const items: { href?: string; label: string }[] = [
     { href: links.rateYourMusic, label: "RateYourMusic" },
     { href: links.albumOfTheYear, label: "Album of the Year" },
@@ -32,13 +39,29 @@ export function ReviewLinks({ links }: { links: Links }) {
   return (
     <div>
       <h3 className="label mb-1">Oceny i recenzje</h3>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-sm">
-        {items.map((i) => (
-          <a key={i.label} href={i.href} target="_blank" rel="noopener" className="text-text2 hover:text-accent2 hover:underline">
-            {i.label} ↗
-          </a>
-        ))}
+      <div className="flex flex-col gap-1 font-mono text-sm">
+        {items.map((i) => {
+          const r = byLabel.get(i.label);
+          return (
+            <div key={i.label} className="flex flex-wrap items-baseline gap-x-2">
+              <a href={i.href} target="_blank" rel="noopener" className="text-text2 hover:text-accent2 hover:underline">
+                {i.label} ↗
+              </a>
+              {r && (
+                <span className="text-accent2">
+                  {r.display}
+                  {r.count != null && <span className="text-faint"> ({r.count})</span>}
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
+      {ratings && items.some((i) => !byLabel.get(i.label)) && (
+        <p className="mt-1 text-[10px] text-faint">
+          Oceny wyciągnięte automatycznie, gdy się udało — bez liczby obok, serwis zwykle i tak ją ma, tylko nie dało się jej stąd pobrać.
+        </p>
+      )}
     </div>
   );
 }

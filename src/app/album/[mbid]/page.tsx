@@ -7,6 +7,7 @@ import { currentUser } from "@/lib/auth";
 import { commentTree, isLiked, likeCount, ratingAverages, ratingSummary } from "@/lib/user-data";
 import { toggleLike } from "@/app/actions";
 import { LinksRow, ReviewLinks } from "@/components/links";
+import { getExternalRatings } from "@/lib/externalRatings";
 import { RatingPanel } from "@/components/rating";
 import { Comments } from "@/components/comments";
 import { AlbumCard, CreditLinks, typeLabel } from "@/components/cards";
@@ -39,13 +40,14 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
   }
   const user = await currentUser();
   const mainArtist = album.credit[0];
-  const [summary, tree, liked, likes, wiki, more] = await Promise.all([
+  const [summary, tree, liked, likes, wiki, more, externalRatings] = await Promise.all([
     ratingSummary("ALBUM", mbid, user?.id),
     commentTree("ALBUM", mbid),
     user ? isLiked(user.id, mbid) : false,
     likeCount(mbid),
     wikiFromLinks(album.links).catch(() => null),
     mainArtist ? getDiscography(mainArtist.mbid).catch(() => []) : Promise.resolve([]),
+    getExternalRatings(album.links).catch(() => []),
   ]);
   const others = more.filter((a) => a.mbid !== mbid && a.primaryType === "Album" && !a.secondaryTypes.length).slice(0, 8);
   const otherRatings = await ratingAverages("ALBUM", others.map((a) => a.mbid));
@@ -175,7 +177,7 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
       <aside className="flex flex-col gap-4">
         <RatingPanel type="ALBUM" mbid={mbid} summary={summary} loggedIn={!!user} label={`${album.artistText} – ${album.title}`} />
         <div className="card p-4">
-          <ReviewLinks links={album.links} />
+          <ReviewLinks links={album.links} ratings={externalRatings} />
         </div>
         <Comments type="ALBUM" mbid={mbid} tree={tree} userId={user?.id ?? null} />
         <p className="text-xs text-faint">

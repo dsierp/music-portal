@@ -177,6 +177,12 @@ export interface Links {
   albumOfTheYear?: string;
   sputnikmusic?: string;
   progArchives?: string;
+  /**
+   * Klucze linków, które przyszły z realnej relacji MusicBrainz (a nie z wyszukiwania-fallback).
+   * Tylko takie linki wskazują na dokładnie tę płytę/artystę — warto próbować z nich
+   * wyciągać oceny (patrz externalRatings.ts). Fallbacki (wyszukiwarka) tego nie gwarantują.
+   */
+  exact?: (keyof Links)[];
 }
 export interface Track {
   disc: number;
@@ -275,24 +281,30 @@ export function buildLinks(rels: MbArtistRel[] | undefined, query: string, isJaz
     spotify: `https://open.spotify.com/search/${q}`,
     tidal: `https://listen.tidal.com/search?q=${q}`,
   };
+  const exact: (keyof Links)[] = [];
+  const setExact = (key: keyof Links, url: string) => {
+    (links as unknown as Record<string, string>)[key] = url;
+    exact.push(key);
+  };
   for (const r of rels ?? []) {
     const u = r.url?.resource;
     if (!u) continue;
-    if (u.includes("open.spotify.com")) links.spotify = u;
-    else if (u.includes("tidal.com")) links.tidal = u;
-    else if (u.includes("bandcamp.com")) links.bandcamp = u;
-    else if (u.includes("wikipedia.org")) links.wikipedia = u;
-    else if (u.includes("wikidata.org")) links.wikidata = u;
-    else if (u.includes("discogs.com")) links.discogs = u;
-    else if (u.includes("metal-archives.com")) links.metalArchives = u;
-    else if (u.includes("allmusic.com")) links.allmusic = u;
-    else if (u.includes("youtube.com")) links.youtube = u;
-    else if (u.includes("rateyourmusic.com")) links.rateYourMusic = u;
-    else if (u.includes("albumoftheyear.org")) links.albumOfTheYear = u;
-    else if (u.includes("sputnikmusic.com")) links.sputnikmusic = u;
-    else if (u.includes("progarchives.com")) links.progArchives = u;
-    else if (r.type === "official homepage") links.official = u;
+    if (u.includes("open.spotify.com")) setExact("spotify", u);
+    else if (u.includes("tidal.com")) setExact("tidal", u);
+    else if (u.includes("bandcamp.com")) setExact("bandcamp", u);
+    else if (u.includes("wikipedia.org")) setExact("wikipedia", u);
+    else if (u.includes("wikidata.org")) setExact("wikidata", u);
+    else if (u.includes("discogs.com")) setExact("discogs", u);
+    else if (u.includes("metal-archives.com")) setExact("metalArchives", u);
+    else if (u.includes("allmusic.com")) setExact("allmusic", u);
+    else if (u.includes("youtube.com")) setExact("youtube", u);
+    else if (u.includes("rateyourmusic.com")) setExact("rateYourMusic", u);
+    else if (u.includes("albumoftheyear.org")) setExact("albumOfTheYear", u);
+    else if (u.includes("sputnikmusic.com")) setExact("sputnikmusic", u);
+    else if (u.includes("progarchives.com")) setExact("progArchives", u);
+    else if (r.type === "official homepage") setExact("official", u);
   }
+  links.exact = exact;
   if (!links.bandcamp) links.bandcamp = `https://bandcamp.com/search?q=${q}&item_type=a`;
   if (!links.metalArchives && !isJazz) links.metalArchives = `https://www.metal-archives.com/search?searchString=${q}&type=band_name`;
   if (!links.allmusic) links.allmusic = `https://www.allmusic.com/search/all/${q}`;
