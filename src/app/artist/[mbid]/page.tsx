@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getArtist, getDiscography, getPlayedOn, MbError } from "@/lib/musicbrainz";
@@ -11,7 +12,7 @@ import { RatingBadge, RatingPanel } from "@/components/rating";
 import { Comments } from "@/components/comments";
 import { AlbumCard } from "@/components/cards";
 import { YoutubeVideos } from "@/components/youtube";
-import type { Membership, PlayedOn } from "@/lib/musicbrainz";
+import type { Artist, Membership, PlayedOn } from "@/lib/musicbrainz";
 
 /** Grupuje "Grał(a) na płytach" wg zespołu (do rozwijania przy pozycji w Zespoły). */
 function groupByBand(played: PlayedOn[]) {
@@ -89,6 +90,115 @@ function MemberList({
   );
 }
 
+/**
+ * Dyskografia + "grał(a) na płytach" — najwolniejsza część strony (MusicBrainz:
+ * 1 zapytanie/s, a dla płodnych muzyków to kilka-kilkanaście zapytań). Osobny
+ * komponent, żeby reszta strony (nagłówek, bio, oceny, komentarze) wyrenderowała
+ * się od razu, a to doładowało się w tle pod własnym spinnerem.
+ */
+async function ArtistDeepContent({ artist, mbid }: { artist: Artist; mbid: string }) {
+  const [disco, played] = await Promise.all([
+    getDiscography(mbid).catch(() => []),
+    artist.isPerson ? getPlayedOn(mbid, artist.memberOf).catch(() => []) : Promise.resolve([]),
+  ]);
+  const albums = disco.filter((a) => a.primaryType === "Album" && !a.secondaryTypes.length);
+  const eps = disco.filter((a) => a.primaryType === "EP" && !a.secondaryTypes.length);
+  const rest = disco.filter((a) => !albums.includes(a) && !eps.includes(a));
+  const ratings = await ratingAverages("ALBUM", [...disco.map((a) => a.mbid), ...played.map((p) => p.album.mbid)]);
+  const current = artist.members.filter((m) => m.current);
+  const former = artist.members.filter((m) => !m.current);
+  const playedByBand = artist.isPerson ? groupByBand(played) : undefined;
+  // Nie żywym czasie: skoro artysty już nie ma, nikt nie gra w zespole "obecnie".
+  const deceased = artist.isPerson && artist.ended;
+
+  return (
+    <>
+      {(artist.members.length > 0 || artist.memberOf.length > 0) && (
+        <section className="mt-8 space-y-4">
+          <h2 className="text-2xl">{artist.isPerson ? "Zespoły" : "Skład"}</h2>
+          {artist.isPerson && deceased ? (
+            <MemberList title="Grał w zespołach" items={artist.memberOf} playedByBand={playedByBand} ratings={ratings} />
+          ) : (
+            <>
+              <MemberList
+                title="Obecnie"
+                items={artist.isPerson ? artist.memberOf.filter((m) => m.current) : current}
+                playedByBand={playedByBand}
+                ratings={ratings}
+              />
+              <MemberList
+                title="Dawniej"
+                items={artist.isPerson ? artist.memberOf.filter((m) => !m.current) : former}
+                playedByBand={playedByBand}
+                ratings={ratings}
+              />
+            </>
+          )}
+        </section>
+      )}
+
+      {played.length > 0 && (
+        <section className="mt-8">
+          <h2 className="mb-2 text-2xl">Grał(a) na płytach</h2>
+          <p className="mb-3 text-xs text-muted">Wg składów w MusicBrainz — najpierw gościnnie i sesyjnie, potem z własnymi zespołami.</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {played.slice(0, 40).map((p) => (
+              <AlbumCard
+                key={p.album.mbid}
+                album={p.album}
+                rating={ratings.get(p.album.mbid)}
+                extra={
+                  <div className="text-xs">
+                    {p.roles.length > 0 && <span className="text-accent2">{p.roles.join(", ")}</span>}
+                    {p.withBand ? <span className="ml-2 text-muted">z {p.withBand}</span> : <span className="ml-2 rounded bg-surface2 px-1 font-mono text-[10px] uppercase text-muted">gościnnie</span>}
+                  </div>
+                }
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {albums.length > 0 && (
+        <section className="mt-8">
+          <h2 className="mb-2 text-2xl">Albumy</h2>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {albums.map((a) => <AlbumCard key={a.mbid} album={a} rating={ratings.get(a.mbid)} />)}
+          </div>
+        </section>
+      )}
+      {eps.length > 0 && (
+        <section className="mt-8">
+          <h2 className="mb-2 text-2xl">EP</h2>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {eps.map((a) => <AlbumCard key={a.mbid} album={a} rating={ratings.get(a.mbid)} />)}
+          </div>
+        </section>
+      )}
+      {rest.length > 0 && (
+        <details className="mt-8">
+          <summary className="cursor-pointer text-lg text-muted hover:text-accent2">Pozostałe wydawnictwa — single, live, kompilacje, dema ({rest.length})</summary>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {rest.map((a) => <AlbumCard key={a.mbid} album={a} rating={ratings.get(a.mbid)} />)}
+          </div>
+        </details>
+      )}
+      {!disco.length && !played.length && <p className="mt-8 text-sm text-muted">MusicBrainz nie ma wydawnictw dla tego artysty.</p>}
+
+      <YoutubeVideos query={artist.isPerson ? artist.name : `${artist.name} band`} />
+    </>
+  );
+}
+
+function DeepContentLoading() {
+  return (
+    <div className="mt-8 flex items-center gap-3 text-sm text-muted">
+      <div className="h-4 w-4 animate-spin rounded-full border-2 border-rule border-t-accent" />
+      Wczytuję dyskografię i skład grania (MusicBrainz — 1 zapytanie/s, przy płodnych artystach to potrwa)…
+    </div>
+  );
+}
+
 export default async function ArtistPage({ params }: { params: Promise<{ mbid: string }> }) {
   const { mbid } = await params;
   if (!UUID.test(mbid)) notFound();
@@ -100,22 +210,13 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
     throw e;
   }
   const user = await currentUser();
-  const [summary, tree, fav, favs, wiki, disco, played] = await Promise.all([
+  const [summary, tree, fav, favs, wiki] = await Promise.all([
     ratingSummary("ARTIST", mbid, user?.id),
     commentTree("ARTIST", mbid),
     user ? isFavorite(user.id, mbid) : false,
     favoriteCount(mbid),
     wikiFromLinks(artist.links).catch(() => null),
-    getDiscography(mbid).catch(() => []),
-    artist.isPerson ? getPlayedOn(mbid, artist.memberOf).catch(() => []) : Promise.resolve([]),
   ]);
-  const albums = disco.filter((a) => a.primaryType === "Album" && !a.secondaryTypes.length);
-  const eps = disco.filter((a) => a.primaryType === "EP" && !a.secondaryTypes.length);
-  const rest = disco.filter((a) => !albums.includes(a) && !eps.includes(a));
-  const ratings = await ratingAverages("ALBUM", [...disco.map((a) => a.mbid), ...played.map((p) => p.album.mbid)]);
-  const current = artist.members.filter((m) => m.current);
-  const former = artist.members.filter((m) => !m.current);
-  const playedByBand = artist.isPerson ? groupByBand(played) : undefined;
 
   const meta = [
     artist.isPerson ? "muzyk" : artist.type?.toLowerCase(),
@@ -162,73 +263,9 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
           </section>
         )}
 
-        {(artist.members.length > 0 || artist.memberOf.length > 0) && (
-          <section className="mt-8 space-y-4">
-            <h2 className="text-2xl">{artist.isPerson ? "Zespoły" : "Skład"}</h2>
-            <MemberList
-              title="Obecnie"
-              items={artist.isPerson ? artist.memberOf.filter((m) => m.current) : current}
-              playedByBand={playedByBand}
-              ratings={ratings}
-            />
-            <MemberList
-              title="Dawniej"
-              items={artist.isPerson ? artist.memberOf.filter((m) => !m.current) : former}
-              playedByBand={playedByBand}
-              ratings={ratings}
-            />
-          </section>
-        )}
-
-        {played.length > 0 && (
-          <section className="mt-8">
-            <h2 className="mb-2 text-2xl">Grał(a) na płytach</h2>
-            <p className="mb-3 text-xs text-muted">Wg składów w MusicBrainz — najpierw gościnnie i sesyjnie, potem z własnymi zespołami.</p>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {played.slice(0, 40).map((p) => (
-                <AlbumCard
-                  key={p.album.mbid}
-                  album={p.album}
-                  rating={ratings.get(p.album.mbid)}
-                  extra={
-                    <div className="text-xs">
-                      {p.roles.length > 0 && <span className="text-accent2">{p.roles.join(", ")}</span>}
-                      {p.withBand ? <span className="ml-2 text-muted">z {p.withBand}</span> : <span className="ml-2 rounded bg-surface2 px-1 font-mono text-[10px] uppercase text-muted">gościnnie</span>}
-                    </div>
-                  }
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {albums.length > 0 && (
-          <section className="mt-8">
-            <h2 className="mb-2 text-2xl">Albumy</h2>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {albums.map((a) => <AlbumCard key={a.mbid} album={a} rating={ratings.get(a.mbid)} />)}
-            </div>
-          </section>
-        )}
-        {eps.length > 0 && (
-          <section className="mt-8">
-            <h2 className="mb-2 text-2xl">EP</h2>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {eps.map((a) => <AlbumCard key={a.mbid} album={a} rating={ratings.get(a.mbid)} />)}
-            </div>
-          </section>
-        )}
-        {rest.length > 0 && (
-          <details className="mt-8">
-            <summary className="cursor-pointer text-lg text-muted hover:text-accent2">Pozostałe wydawnictwa — single, live, kompilacje, dema ({rest.length})</summary>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {rest.map((a) => <AlbumCard key={a.mbid} album={a} rating={ratings.get(a.mbid)} />)}
-            </div>
-          </details>
-        )}
-        {!disco.length && !played.length && <p className="mt-8 text-sm text-muted">MusicBrainz nie ma wydawnictw dla tego artysty.</p>}
-
-        <YoutubeVideos query={artist.isPerson ? artist.name : `${artist.name} band`} />
+        <Suspense fallback={<DeepContentLoading />}>
+          <ArtistDeepContent artist={artist} mbid={mbid} />
+        </Suspense>
       </div>
 
       <aside className="flex flex-col gap-4">
