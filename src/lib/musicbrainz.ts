@@ -173,6 +173,10 @@ export interface Links {
   allmusic?: string;
   official?: string;
   youtube?: string;
+  rateYourMusic?: string;
+  albumOfTheYear?: string;
+  sputnikmusic?: string;
+  progArchives?: string;
 }
 export interface Track {
   disc: number;
@@ -283,11 +287,20 @@ export function buildLinks(rels: MbArtistRel[] | undefined, query: string, isJaz
     else if (u.includes("metal-archives.com")) links.metalArchives = u;
     else if (u.includes("allmusic.com")) links.allmusic = u;
     else if (u.includes("youtube.com")) links.youtube = u;
+    else if (u.includes("rateyourmusic.com")) links.rateYourMusic = u;
+    else if (u.includes("albumoftheyear.org")) links.albumOfTheYear = u;
+    else if (u.includes("sputnikmusic.com")) links.sputnikmusic = u;
+    else if (u.includes("progarchives.com")) links.progArchives = u;
     else if (r.type === "official homepage") links.official = u;
   }
   if (!links.bandcamp) links.bandcamp = `https://bandcamp.com/search?q=${q}&item_type=a`;
   if (!links.metalArchives && !isJazz) links.metalArchives = `https://www.metal-archives.com/search?searchString=${q}&type=band_name`;
-  if (!links.allmusic && isJazz) links.allmusic = `https://www.allmusic.com/search/all/${q}`;
+  if (!links.allmusic) links.allmusic = `https://www.allmusic.com/search/all/${q}`;
+  if (!links.discogs) links.discogs = `https://www.discogs.com/search/?q=${q}`;
+  // strony z ocenami/recenzjami — MB rzadko zna bezpośredni link, więc zawsze przynajmniej wyszukiwanie
+  if (!links.rateYourMusic) links.rateYourMusic = `https://rateyourmusic.com/search?searchterm=${q}`;
+  if (!links.albumOfTheYear) links.albumOfTheYear = `https://www.albumoftheyear.org/search/?q=${q}`;
+  if (!links.sputnikmusic && !isJazz) links.sputnikmusic = `https://www.sputnikmusic.com/search/?searchTerm=${q}`;
   return links;
 }
 

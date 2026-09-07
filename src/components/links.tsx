@@ -17,6 +17,32 @@ export function LinksRow({ links, compact = false }: { links: Links; compact?: b
   );
 }
 
+/** Oceny i recenzje zewnętrzne — osobno od "gdzie słuchać", bo to inny cel kliknięcia. */
+export function ReviewLinks({ links }: { links: Links }) {
+  const items: { href?: string; label: string }[] = [
+    { href: links.rateYourMusic, label: "RateYourMusic" },
+    { href: links.albumOfTheYear, label: "Album of the Year" },
+    { href: links.sputnikmusic, label: "Sputnikmusic" },
+    { href: links.progArchives, label: "ProgArchives" },
+    { href: links.metalArchives, label: "Metal-Archives" },
+    { href: links.allmusic, label: "AllMusic" },
+    { href: links.discogs, label: "Discogs" },
+  ].filter((i) => i.href);
+  if (!items.length) return null;
+  return (
+    <div>
+      <h3 className="label mb-1">Oceny i recenzje</h3>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-sm">
+        {items.map((i) => (
+          <a key={i.label} href={i.href} target="_blank" rel="noopener" className="text-text2 hover:text-accent2 hover:underline">
+            {i.label} ↗
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Linki wyszukiwania dla pozycji bez MBID (premiery, best of). */
 export function searchLinks(artist: string, album: string): Links {
   const q = encodeURIComponent(`${artist} ${album}`);

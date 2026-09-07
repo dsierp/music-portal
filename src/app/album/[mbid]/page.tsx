@@ -6,7 +6,7 @@ import { wikiFromLinks } from "@/lib/wikipedia";
 import { currentUser } from "@/lib/auth";
 import { commentTree, isLiked, likeCount, ratingAverages, ratingSummary } from "@/lib/user-data";
 import { toggleLike } from "@/app/actions";
-import { LinksRow } from "@/components/links";
+import { LinksRow, ReviewLinks } from "@/components/links";
 import { RatingPanel } from "@/components/rating";
 import { Comments } from "@/components/comments";
 import { AlbumCard, CreditLinks, typeLabel } from "@/components/cards";
@@ -159,6 +159,9 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
 
       <aside className="flex flex-col gap-4">
         <RatingPanel type="ALBUM" mbid={mbid} summary={summary} loggedIn={!!user} label={`${album.artistText} – ${album.title}`} />
+        <div className="card p-4">
+          <ReviewLinks links={album.links} />
+        </div>
         <Comments type="ALBUM" mbid={mbid} tree={tree} userId={user?.id ?? null} />
         <p className="text-xs text-faint">
           <a href={`https://musicbrainz.org/release-group/${mbid}`} target="_blank" rel="noopener" className="hover:text-accent2">MusicBrainz</a> · brakuje składu? Uzupełnij go tam — portal zaciągnie zmiany w ciągu tygodnia.
