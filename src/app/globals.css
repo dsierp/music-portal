@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./pns.css";
 
 /* Paleta jak w Pure New Shit: ciemno, kościany tekst, krwista czerwień. */
 :root {

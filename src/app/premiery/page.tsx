@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ReleaseSection } from "@/components/release-list";
-import { Banner } from "@/components/banner";
+import { Masthead } from "@/components/masthead";
+import { heroArt, leadStyle } from "@/lib/lead-style";
 import { GENRE_LABELS, GENRE_ORDER, allSections, latestSections, releasesFor } from "@/lib/lists";
 import { currentUser } from "@/lib/auth";
 import { getGenres } from "@/lib/user-data";
@@ -23,8 +24,8 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
   // domyślne filtry z preferencji użytkownika (jeśli nie wybrał ręcznie)
   let genres = sp.g ? sp.g.split(",").filter(Boolean) : [];
   let fromPrefs = false;
+  const prefs = user ? await getGenres(user.id) : [];
   if (!sp.g && sp.all !== "1" && user) {
-    const prefs = await getGenres(user.id);
     const secs = new Set(prefs.filter((p) => p.weight >= 3).map((p) => genreToSection(p.genre)).filter(Boolean) as string[]);
     if (secs.size && secs.size < GENRE_ORDER.length) { genres = GENRE_ORDER.filter((g) => secs.has(g)); fromPrefs = true; }
   }
@@ -33,8 +34,22 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
   const rel = await releasesFor(sections.map((s) => s.id));
   const base = { star: sp.star, re: sp.re, sekcja: sp.sekcja };
 
+  const lead = leadStyle(prefs);
   return (
-    <div className="grid gap-8 md:grid-cols-[220px_1fr]">
+    <>
+    <Masthead
+      art={heroArt(lead)}
+      eyebrow="Premiery płytowe co piątek"
+      title="Pure New Shit"
+      meta={
+        <>
+          {sections[0]?.date && <span>Piątek {sections[0].date}</span>}
+          {lead && <span className="ml-4">Twój styl wiodący: <b className="text-accent2">{lead.genre}</b></span>}
+          {!lead && <span className="ml-4"><Link href="/ja#style" className="underline">Ustaw swoje style</Link>, żeby portal dobrał oprawę i filtry pod Ciebie.</span>}
+        </>
+      }
+    />
+    <div className="mt-8 grid gap-8 md:grid-cols-[220px_1fr]">
       <aside className="md:sticky md:top-20 md:self-start">
         <div className="label mb-2">Gatunki</div>
         <div className="flex flex-wrap gap-1.5">
@@ -58,13 +73,13 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
         <p className="mt-5 text-xs text-faint">Lista powstaje co piątek z zestawienia „Pure New Shit”. Kliknięcie w tytuł otwiera stronę płyty ze składem — stamtąd ruszasz w podróż.</p>
       </aside>
       <div>
-        <Banner image="/img/konsola.jpg" title="Premiery" position="center 55%" compact />
-        <div className="mb-6" />
+
         {sections.map((s) => (
           <ReleaseSection key={s.id} section={s} releases={rel.filter((r) => r.sectionId === s.id)} filter={filter} />
         ))}
         {!sections.length && <p className="text-muted">Brak zaimportowanych premier. Uruchom <code>npm run import:pns</code>.</p>}
       </div>
     </div>
+    </>
   );
 }
