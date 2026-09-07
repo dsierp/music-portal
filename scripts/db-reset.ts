@@ -26,6 +26,17 @@ const dir = path.resolve(pgliteDir!);
 console.log(`Baza: ${dir}`);
 const lockPath = `${dir}.lock`;
 
+// Zanim cokolwiek ruszymy: kopia ocen, komentarzy i preferencji. To jedyne dane,
+// których nie da się odtworzyć — reszta wraca z importu i z MusicBrainz.
+if (fs.existsSync(dir)) {
+  console.log("Najpierw kopia Twoich danych (oceny, komentarze, preferencje)…");
+  const r = spawnSync("npm", ["run", "db:backup"], { stdio: "inherit", shell: process.platform === "win32" });
+  if (r.status !== 0) {
+    console.log("Kopia się nie udała — to zwykle znaczy, że baza jest nie do odczytania.");
+    console.log("Idziemy dalej: i tak nie dało się z niej nic wyciągnąć.\n");
+  }
+}
+
 if (fs.existsSync(dir)) {
   const backup = `${dir}-corrupt-${Math.floor(Date.now() / 1000)}`;
   fs.renameSync(dir, backup);
@@ -51,3 +62,5 @@ function run(args: string[]) {
 run(["db:migrate"]);
 run(["import:pns", "--", "data/purenewshit.html"]);
 console.log("\nGotowe. Odpal `npm run dev`.");
+console.log("Kopia Twoich ocen leży w katalogu backups obok bazy — przywrócisz ją przez:");
+console.log("  npm run db:restore -- <ścieżka do pliku .json>");
