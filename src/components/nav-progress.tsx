@@ -9,17 +9,30 @@ import { usePathname, useSearchParams } from "next/navigation";
  * się zmieni. Bez tego jedyną wskazówką, że coś się dzieje, jest ikonka
  * ładowania na karcie przeglądarki — łatwo to przeoczyć.
  */
+// Formularze akcji serwera (ocena, lubię, ulubione, komentarz) odświeżają dane
+// przez revalidatePath — URL się NIE zmienia, więc samo śledzenie ścieżki nie
+// wystarczy, żeby wiedzieć, kiedy pasek schować (inaczej wisi już na zawsze).
+const MAX_ACTIVE_MS = 5000;
+
 export function NavProgress() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [active, setActive] = useState(false);
   const showTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Zmiana ścieżki/query = nawigacja się zakończyła (albo strona się przerenderowała).
+  function clearTimers() {
+    if (showTimer.current) clearTimeout(showTimer.current);
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+  }
+
+  // Zmiana ścieżki/query = nawigacja się zakończyła.
   useEffect(() => {
     setActive(false);
-    if (showTimer.current) clearTimeout(showTimer.current);
+    clearTimers();
   }, [pathname, searchParams]);
+
+  useEffect(() => clearTimers, []);
 
   useEffect(() => {
     function isInternalLink(el: Element | null): el is HTMLAnchorElement {
@@ -29,17 +42,24 @@ export function NavProgress() {
       if (el.target === "_blank") return false;
       return true;
     }
+    function show() {
+      setActive(true);
+      // Zabezpieczenie: bez tego pasek potrafił zostać widoczny bezterminowo
+      // po akcji serwera (formularz), bo tam nie ma zmiany ścieżki, która by go schowała.
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+      hideTimer.current = setTimeout(() => setActive(false), MAX_ACTIVE_MS);
+    }
     function onClick(e: MouseEvent) {
       if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const a = (e.target as HTMLElement)?.closest("a");
       if (!isInternalLink(a)) return;
       if (a.getAttribute("href") === pathname) return;
       // małe opóźnienie, żeby nie migało przy błyskawicznych (już zbuforowanych) przejściach
-      showTimer.current = setTimeout(() => setActive(true), 150);
+      showTimer.current = setTimeout(show, 150);
     }
     function onSubmit(e: SubmitEvent) {
       const form = e.target as HTMLFormElement;
-      if (form?.tagName === "FORM") showTimer.current = setTimeout(() => setActive(true), 150);
+      if (form?.tagName === "FORM") showTimer.current = setTimeout(show, 150);
     }
     document.addEventListener("click", onClick);
     document.addEventListener("submit", onSubmit);
