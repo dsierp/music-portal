@@ -236,7 +236,7 @@ function DeepContentLoading() {
   return (
     <div className="mt-8 flex items-center gap-3 text-sm text-muted">
       <div className="h-4 w-4 animate-spin rounded-full border-2 border-rule border-t-accent" />
-      Wczytuję dyskografię i skład grania (MusicBrainz — 1 zapytanie/s, przy płodnych artystach to potrwa)…
+      Wczytuję dyskografię i skład — przy artystach z długim dorobkiem chwilę to trwa…
     </div>
   );
 }
