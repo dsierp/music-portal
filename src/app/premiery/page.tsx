@@ -6,7 +6,6 @@ import { heroArt, leadStyle } from "@/lib/lead-style";
 import { GENRE_ORDER, allSections, genreLabel, latestSections, releasesFor, splitDb, styleToCategory } from "@/lib/lists";
 import { currentUser } from "@/lib/auth";
 import { getGenres } from "@/lib/user-data";
-import { genreToSection } from "@/lib/genres";
 
 export const metadata: Metadata = { title: "Premiery" };
 export const dynamic = "force-dynamic";
@@ -22,7 +21,7 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const user = await currentUser();
   // domyślne filtry z preferencji użytkownika (jeśli nie wybrał ręcznie)
-  let genres = sp.g ? sp.g.split(",").filter(Boolean) : [];
+  const genres = sp.g ? sp.g.split(",").filter(Boolean) : [];
   const prefs = user ? await getGenres(user.id) : [];
   // Preferencje NIE odznaczają kategorii — domyślnie widać wszystko, co jest
   // w tym tygodniu. Wpływają tylko na kolejność chipów (najpierw Twoje style)

@@ -1,8 +1,6 @@
-import Link from "next/link";
 import type { InferSelectModel } from "drizzle-orm";
 import { schema } from "@/db";
 import { GENRE_ORDER, genreLabel, sectionImage, splitDb } from "@/lib/lists";
-import { searchLinks } from "./links";
 import { PickCard, ReleaseCard } from "./release-card";
 import { SectionHead } from "./masthead";
 import { sectionHeroArt } from "@/lib/lead-style";

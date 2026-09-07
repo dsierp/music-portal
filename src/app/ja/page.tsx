@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { currentUser } from "@/lib/auth";
 import { getFavoriteArtists, getGenres, getLikedAlbums, myRatings } from "@/lib/user-data";
 import { setGenreAction, toggleFavorite, toggleLike } from "@/app/actions";
-import { GENRE_GROUPS, MAIN_CATEGORIES, WEIGHT_LABELS } from "@/lib/genres";
+import { MAIN_CATEGORIES, WEIGHT_LABELS } from "@/lib/genres";
 import { genreImage } from "@/lib/genre-art";
 import { Cover } from "@/components/cover";
 
