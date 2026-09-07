@@ -1,4 +1,4 @@
-import { genreImage } from "./genre-art";
+import { avatarImage, genreImage } from "./genre-art";
 import { genreToSection } from "./genres";
 
 /**
@@ -48,9 +48,21 @@ const DEFAULT_ART: HeroArt = { bg: "/img/genres/pop.jpg", ghoul: null, pns: fals
 export function heroArt(lead: UserGenre | null): HeroArt {
   if (!lead) return DEFAULT_ART;
   const section = genreToSection(lead.genre);
-  if (section === "db" || section === "other") return PNS;
+  const figure = ghoulFor(lead.genre, section);
+  if (section === "db" || section === "other") return { ...PNS, ghoul: figure ?? PNS.ghoul };
   const img = genreImage(lead.genre, section ?? "", "pop");
-  return img ? { bg: img, ghoul: null, pns: false } : DEFAULT_ART;
+  if (!img) return figure ? { ...DEFAULT_ART, ghoul: figure } : DEFAULT_ART;
+  return { bg: img, ghoul: figure, pns: false };
+}
+
+/**
+ * Postać dla stylu wiodącego. Nazwa pliku = slug kategorii (punk.svg,
+ * country.svg…), a death i black schodzą do wspólnego metal.svg — to jeden
+ * i ten sam demon, nie ma sensu trzymać go dwa razy.
+ */
+function ghoulFor(genre: string, section: ReturnType<typeof genreToSection>): string | null {
+  const wider = section === "db" ? "metal" : section === "other" ? "metal" : (section ?? "");
+  return avatarImage(genre, wider);
 }
 
 /** Tło nagłówka sekcji premier — grafika gatunku sekcji (metal dostaje oprawę PNS). */

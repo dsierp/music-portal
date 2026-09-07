@@ -18,7 +18,11 @@ async function main() {
 }
 main()
   .then(() => process.exit(0))
-  .catch((e) => {
-    console.error(e instanceof PgliteLockedError ? `\n${e.message}\n` : e);
+  .catch(async (e) => {
+    if (e instanceof PgliteLockedError) { console.error(`
+${e.message}
+`); process.exit(1); }
+    const { describeDbError } = await import("../src/lib/db-error");
+    console.error(describeDbError(e));
     process.exit(1);
   });

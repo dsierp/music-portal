@@ -18,7 +18,8 @@ import path from "node:path";
  * nie pokazujemy nic. Nigdzie nie ma sztywnej listy ścieżek do pilnowania.
  */
 const DIR = path.join(process.cwd(), "public", "img", "genres");
-const EXTS = [".jpg", ".jpeg", ".png", ".webp", ".avif"];
+const AVATAR_DIR = path.join(process.cwd(), "public", "img", "avatars");
+const EXTS = [".jpg", ".jpeg", ".png", ".webp", ".avif", ".svg"];
 
 export function genreSlug(genre: string): string {
   return genre
@@ -29,22 +30,26 @@ export function genreSlug(genre: string): string {
     .replace(/^-|-$/g, "");
 }
 
-/** Nazwy plików w public/img/genres (czytane raz — katalog nie zmienia się w trakcie działania). */
-let cache: Map<string, string> | null = null;
-function index(): Map<string, string> {
-  if (cache) return cache;
+/** Nazwy plików w katalogu (czytane raz — katalog nie zmienia się w trakcie działania). */
+const caches = new Map<string, Map<string, string>>();
+function indexOf(dir: string, urlBase: string): Map<string, string> {
+  const cached = caches.get(dir);
+  if (cached) return cached;
   const map = new Map<string, string>();
   try {
-    for (const file of fs.readdirSync(DIR)) {
+    for (const file of fs.readdirSync(dir)) {
       const ext = path.extname(file).toLowerCase();
       if (!EXTS.includes(ext)) continue;
-      map.set(path.basename(file, ext).toLowerCase(), `/img/genres/${file}`);
+      map.set(path.basename(file, ext).toLowerCase(), `${urlBase}/${file}`);
     }
   } catch {
     // katalog jeszcze nie istnieje — nic się nie dzieje, po prostu brak grafik
   }
-  cache = map;
+  caches.set(dir, map);
   return map;
+}
+function index(): Map<string, string> {
+  return indexOf(DIR, "/img/genres");
 }
 
 /**
@@ -53,6 +58,22 @@ function index(): Map<string, string> {
  */
 export function genreImage(genre: string, ...fallbacks: string[]): string | null {
   const idx = index();
+  for (const name of [genre, ...fallbacks]) {
+    const hit = idx.get(genreSlug(name));
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/**
+ * Postać gatunku — sylwetka na wierzchu nagłówka (jak demon z Pure New Shit).
+ *
+ * ŻEBY DODAĆ POSTAĆ: wrzuć plik do `public/img/avatars/` i nazwij go jak
+ * kategorię ze slugu (`public/img/avatars/punk.svg`). Rysunki są ciemne, na
+ * przezroczystym tle — leżą na tle nagłówka, nie zamiast niego.
+ */
+export function avatarImage(genre: string, ...fallbacks: string[]): string | null {
+  const idx = indexOf(AVATAR_DIR, "/img/avatars");
   for (const name of [genre, ...fallbacks]) {
     const hit = idx.get(genreSlug(name));
     if (hit) return hit;

@@ -70,7 +70,8 @@ async function main() {
 
 main()
   .then(() => process.exit(0))
-  .catch((e) => {
-    console.error(e instanceof Error ? e.message : e);
+  .catch(async (e) => {
+    const { describeDbError } = await import("../src/lib/db-error");
+    console.error(describeDbError(e));
     process.exit(1);
   });

@@ -71,4 +71,8 @@ async function main() {
 
 main()
   .then(() => process.exit(0))
-  .catch((e) => { console.error(e); process.exit(1); });
+  .catch(async (e) => {
+    const { describeDbError } = await import("../src/lib/db-error");
+    console.error(describeDbError(e));
+    process.exit(1);
+  });

@@ -28,8 +28,15 @@ export function Masthead({
         style={art.pns ? undefined : { backgroundImage: `url(${art.bg})`, filter: "none", opacity: 0.55 }}
       />
       {art.ghoul && (
+        /* Postacie gatunków są czarne na przezroczystym tle — klasa `figure`
+           dokłada im poświatę, żeby nie zlały się z ciemnym nagłówkiem. */
         /* eslint-disable-next-line @next/next/no-img-element */
-        <img className="ghoul" src={art.ghoul} alt="" aria-hidden />
+        <img
+          className={art.ghoul.startsWith("/img/avatars/") ? `ghoul figure${art.pns ? " hot" : ""}` : "ghoul"}
+          src={art.ghoul}
+          alt=""
+          aria-hidden
+        />
       )}
       <div className="masthead-in">
         <div>
