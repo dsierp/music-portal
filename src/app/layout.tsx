@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import { Nav } from "@/components/nav";
+import { NavProgress } from "@/components/nav-progress";
 
 export const metadata: Metadata = {
   title: { default: "Pure New Shit — portal", template: "%s · Pure New Shit" },
@@ -19,6 +21,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         />
       </head>
       <body className="min-h-screen antialiased">
+        <Suspense fallback={null}>
+          <NavProgress />
+        </Suspense>
         <Nav />
         <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
         <footer className="mx-auto max-w-6xl px-4 py-10 text-xs text-faint">

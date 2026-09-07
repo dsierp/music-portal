@@ -67,3 +67,13 @@ a:hover { color: var(--accent2); }
 .card { @apply rounded-lg border border-rule bg-surface p-4; }
 .label { @apply font-mono text-[11px] uppercase tracking-widest text-muted; }
 .input { @apply w-full rounded border border-rule bg-bg px-3 py-2 text-text placeholder:text-faint focus:border-accent focus:outline-none; }
+
+/* Pasek postępu nawigacji — widać, że coś się ładuje, zanim strona się zmieni. */
+@keyframes nav-progress-slide {
+  0% { transform: translateX(-40%) scaleX(0.4); }
+  60% { transform: translateX(60%) scaleX(0.6); }
+  100% { transform: translateX(120%) scaleX(0.5); }
+}
+.nav-progress-bar {
+  animation: nav-progress-slide 0.9s ease-in-out infinite;
+}

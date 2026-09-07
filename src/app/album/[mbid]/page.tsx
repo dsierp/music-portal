@@ -11,6 +11,7 @@ import { RatingPanel } from "@/components/rating";
 import { Comments } from "@/components/comments";
 import { AlbumCard, CreditLinks, typeLabel } from "@/components/cards";
 import { Cover } from "@/components/cover";
+import { YoutubeVideos } from "@/components/youtube";
 
 export const dynamic = "force-dynamic";
 const UUID = /^[0-9a-f-]{36}$/;
@@ -146,6 +147,8 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
             ))}
           </section>
         )}
+
+        <YoutubeVideos query={`${album.artistText} ${album.title}`} />
 
         {others.length > 0 && mainArtist && (
           <section className="mt-8">

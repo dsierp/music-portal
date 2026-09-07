@@ -10,6 +10,7 @@ import { LinksRow } from "@/components/links";
 import { RatingBadge, RatingPanel } from "@/components/rating";
 import { Comments } from "@/components/comments";
 import { AlbumCard } from "@/components/cards";
+import { YoutubeVideos } from "@/components/youtube";
 import type { Membership, PlayedOn } from "@/lib/musicbrainz";
 
 /** Grupuje "Grał(a) na płytach" wg zespołu (do rozwijania przy pozycji w Zespoły). */
@@ -226,6 +227,8 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
           </details>
         )}
         {!disco.length && !played.length && <p className="mt-8 text-sm text-muted">MusicBrainz nie ma wydawnictw dla tego artysty.</p>}
+
+        <YoutubeVideos query={artist.isPerson ? artist.name : `${artist.name} band`} />
       </div>
 
       <aside className="flex flex-col gap-4">
