@@ -5,11 +5,38 @@ import { genreImage } from "./genre-art";
 
 export const GENRE_LABELS: Record<string, string> = {
   db: "Death / black metal",
+  death: "Death metal",
+  black: "Black metal",
   prog: "Prog metal / prog rock",
   other: "Inne metal / ciężkie brzmienia",
   jazz: "Jazz",
 };
-export const GENRE_ORDER = ["db", "prog", "other", "jazz"];
+export const GENRE_ORDER = ["death", "black", "db", "prog", "other", "jazz"];
+
+/**
+ * Etykieta gatunku. Sekcje z importu PNS mają swoje nazwy (db/prog/other/jazz);
+ * premiery dobrane z MusicBrainz trzymają w tym polu wprost nazwę stylu
+ * („country", „hip hop"), więc dla nich wystarczy ją ładnie pokazać.
+ */
+/**
+ * Import PNS trzyma death i black w jednym worku („db"), ale to dwa różne
+ * światy i w zestawieniu były rozbite. Rozdzielamy je po opisie — PNS zaczyna
+ * go od gatunku („avant-garde black metal — …", „dysonansowy death metal — …").
+ * Gdy z opisu nic nie wynika, zostawiamy wspólną kategorię.
+ */
+export function splitDb(genre: string, description: string): string {
+  if (genre !== "db") return genre;
+  const d = description.toLowerCase().replace(/<[^>]+>/g, " ").slice(0, 220);
+  const black = d.indexOf("black");
+  const death = d.indexOf("death");
+  if (black < 0 && death < 0) return "db";
+  if (black >= 0 && (death < 0 || black < death)) return "black";
+  return "death";
+}
+
+export function genreLabel(genre: string): string {
+  return GENRE_LABELS[genre] ?? genre.charAt(0).toUpperCase() + genre.slice(1);
+}
 
 /**
  * Grafika nagłówka sekcji premier. Szukamy pliku po nazwie w

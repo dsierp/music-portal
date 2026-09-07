@@ -55,7 +55,7 @@ export function heroArt(lead: UserGenre | null): HeroArt {
 
 /** Tło nagłówka sekcji premier — grafika gatunku sekcji (metal dostaje oprawę PNS). */
 export function sectionHeroArt(genre: string): string {
-  if (genre === "db") return "/img/pns/friday-red.jpg";
-  if (genre === "other") return "/img/pns/friday-morgue.jpg";
+  if (genre === "db" || genre === "death") return "/img/pns/friday-red.jpg";
+  if (genre === "black" || genre === "other") return "/img/pns/friday-morgue.jpg";
   return genreImage(genre === "prog" ? "prog" : "jazz") ?? "/img/pns/friday-morgue.jpg";
 }

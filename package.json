@@ -13,6 +13,7 @@
     "db:reset": "tsx scripts/db-reset.ts",
     "db:studio": "drizzle-kit studio",
     "import:pns": "tsx scripts/import-pns.ts",
+    "fetch:releases": "tsx scripts/fetch-releases.ts",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "setup": "npm run db:migrate && npm run import:pns -- data/purenewshit.html"

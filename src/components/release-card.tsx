@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { InferSelectModel } from "drizzle-orm";
 import { schema } from "@/db";
-import { FLAG_LABELS, GENRE_LABELS } from "@/lib/lists";
+import { FLAG_LABELS, genreLabel } from "@/lib/lists";
 import { searchLinks } from "./links";
 
 type Release = InferSelectModel<typeof schema.releases>;
@@ -29,7 +29,7 @@ export function PickCard({ r }: { r: Release }) {
         )}
       </Link>
       <div>
-        <p className="eyebrow">Płyta tygodnia{r.genre && ` · ${GENRE_LABELS[r.genre] ?? r.genre}`}</p>
+        <p className="eyebrow">Płyta tygodnia{r.genre && ` · ${genreLabel(r.genre)}`}</p>
         <p className="who">{r.artist}</p>
         <h3 className="what">
           <Link href={href} className="hover:text-accent2">{r.album}</Link>
@@ -54,7 +54,7 @@ export function ReleaseCard({ r }: { r: Release }) {
   if (r.star === -1) {
     return (
       <li className="rel">
-        <span />
+        <span className="text-faint">·</span>
         <div className="body">
           <p className="desc rich" dangerouslySetInnerHTML={{ __html: r.description }} />
         </div>
@@ -65,28 +65,17 @@ export function ReleaseCard({ r }: { r: Release }) {
   const href = `/go/release/${encodeURIComponent(r.id)}`;
   return (
     <li className={`rel ${r.star === 1 ? "star" : ""}`}>
-      <Link href={href} className="shrink-0" aria-hidden tabIndex={-1}>
-        {r.mbid ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={CAA(r.mbid, 250)} alt="" loading="lazy" className="h-[76px] w-[76px] rounded object-cover shadow-lg" />
-        ) : (
-          <span className="display flex h-[76px] w-[76px] items-center justify-center rounded border border-rule bg-surface2 text-2xl text-faint">
-            {(r.artist ?? "?").trim().charAt(0).toUpperCase()}
-          </span>
-        )}
-      </Link>
+      {/* wąska kolumna na gwiazdkę — jak w oryginalnym zestawieniu */}
+      <span className={r.star === 1 ? "text-accent2" : "text-faint"}>{r.star === 1 ? "★" : "·"}</span>
       <div className="body">
-        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
-          {r.star === 1 && <span className="text-accent2">★ wyróżnienie · </span>}
-          {GENRE_LABELS[r.genre] ?? r.genre}
-          {r.flag && <span className="ml-2 text-warn">{FLAG_LABELS[r.flag] ?? r.flag}</span>}
-          {r.dayLabel && <span className="ml-2 text-faint">{r.dayLabel}</span>}
-        </p>
-        <p className="mt-0.5 font-mono text-[11px] uppercase tracking-wider text-text2">{r.artist}</p>
-        <h3 className="display text-2xl italic leading-tight">
-          <Link href={href} className="hover:text-accent2">{r.album}</Link>
+        <h3 className="title display">
+          <Link href={href} className="font-semibold hover:text-accent2">{r.artist}</Link>
+          <span className="sep">–</span>
+          <Link href={href} className="italic hover:text-accent2">{r.album}</Link>
+          {r.label && <span className="label-inline">{r.label}</span>}
+          {r.flag && <span className="ml-2 rounded bg-warn/20 px-1.5 font-mono text-[10px] uppercase text-warn">{FLAG_LABELS[r.flag] ?? r.flag}</span>}
+          {r.dayLabel && <span className="ml-2 font-mono text-[11px] text-faint">{r.dayLabel}</span>}
         </h3>
-        {r.label && <p className="text-xs text-muted">{r.label}</p>}
         <p className="desc rich" dangerouslySetInnerHTML={{ __html: r.description }} />
         {r.reviews && (
           <p className="rev rich">
@@ -94,9 +83,9 @@ export function ReleaseCard({ r }: { r: Release }) {
             <span dangerouslySetInnerHTML={{ __html: r.reviews }} />
           </p>
         )}
-        <div className="side">
-          <Actions links={links} href={href} small />
-        </div>
+      </div>
+      <div className="side">
+        <Actions links={links} href={href} small />
       </div>
     </li>
   );

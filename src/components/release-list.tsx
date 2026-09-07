@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { InferSelectModel } from "drizzle-orm";
 import { schema } from "@/db";
-import { FLAG_LABELS, GENRE_LABELS, GENRE_ORDER, sectionImage } from "@/lib/lists";
+import { GENRE_ORDER, genreLabel, sectionImage, splitDb } from "@/lib/lists";
 import { searchLinks } from "./links";
 import { PickCard, ReleaseCard } from "./release-card";
 import { SectionHead } from "./masthead";
@@ -16,7 +16,7 @@ export { ReleaseCard as ReleaseRow } from "./release-card";
 
 export function ReleaseSection({ section, releases, filter }: { section: Section; releases: Release[]; filter: ReleaseFilter }) {
   const visible = releases.filter((r) => {
-    if (filter.genres.length && !filter.genres.includes(r.genre)) return false;
+    if (filter.genres.length && !filter.genres.includes(splitDb(r.genre, r.description))) return false;
     if (filter.starOnly && r.star !== 1) return false;
     if (!filter.showFlagged && r.flag && ["comp", "reissue", "live", "ep"].includes(r.flag)) return false;
     return true;
@@ -24,7 +24,14 @@ export function ReleaseSection({ section, releases, filter }: { section: Section
   // Płyta tygodnia: wskazana w imporcie, a gdy jej nie ma — pierwsze wyróżnienie.
   const pick = releases.find((r) => r.id === `${section.id}:${section.pickId}`) ?? releases.find((r) => r.star === 1);
   const rest = visible.filter((r) => r.id !== pick?.id);
-  const groups = GENRE_ORDER.map((g) => ({ g, items: rest.filter((r) => r.genre === g) })).filter((x) => x.items.length);
+  // Gatunki w kolejności: najpierw te z importu PNS, potem style dobrane z MB.
+  const gOf = (r: Release) => splitDb(r.genre, r.description);
+  const present = [...new Set(rest.map(gOf))];
+  const order = [
+    ...GENRE_ORDER.filter((g) => present.includes(g)),
+    ...present.filter((g) => !GENRE_ORDER.includes(g)).sort((a, b) => a.localeCompare(b, "pl")),
+  ];
+  const groups = order.map((g) => ({ g, items: rest.filter((r) => gOf(r) === g) })).filter((x) => x.items.length);
   // Tło nagłówka bierzemy z gatunku, który w tym tygodniu dominuje.
   const lead = groups[0]?.g ?? "db";
 
@@ -47,7 +54,7 @@ export function ReleaseSection({ section, releases, filter }: { section: Section
               <img src={sectionImage(g)!} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover opacity-25" />
             )}
             <span className="absolute inset-0 bg-gradient-to-r from-bg via-bg/80 to-transparent" />
-            <span className="relative">{GENRE_LABELS[g]}</span>
+            <span className="relative">{genreLabel(g)}</span>
           </h3>
           <ul className="space-y-3">{items.map((r) => <ReleaseCard key={r.id} r={r} />)}</ul>
         </div>

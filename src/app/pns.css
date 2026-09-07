@@ -96,3 +96,7 @@ h1 .logo{display:block;width:min(620px,100%);height:auto;filter:drop-shadow(0 6p
 }
 .notes li a{color:var(--muted);text-decoration:none;border-bottom:1px solid var(--rule2)}
 .notes li a:hover{color:var(--text)}
+
+/* Wytwórnia w tytule wiersza — w oryginale zwykły, przygaszony dopisek. */
+.rel .title .label-inline{color:var(--muted);font-family:var(--font-sans);font-size:13px;margin-left:8px;white-space:nowrap}
+.rel .title .sep{color:var(--faint);margin:0 6px}

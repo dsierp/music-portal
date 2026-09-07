@@ -361,6 +361,17 @@ export async function searchAlbums(query: string, limit = 20): Promise<AlbumSumm
   return data["release-groups"].map((rg) => normReleaseGroup(rg));
 }
 
+/**
+ * Surowe wyszukiwanie release-group składnią Lucene MB (bez czyszczenia zapytania —
+ * używamy go tam, gdzie sami budujemy query z operatorami, np. premiery tygodnia).
+ */
+export async function mbSearchReleaseGroups(query: string, limit = 25): Promise<AlbumSummary[]> {
+  const data = await cached(`mb:rg-raw:${query}:${limit}`, TTL.search, () =>
+    mbFetch<{ "release-groups": MbReleaseGroup[] }>("/release-group/", { query, limit }),
+  );
+  return (data["release-groups"] ?? []).map((rg) => normReleaseGroup(rg));
+}
+
 export async function searchArtists(query: string, limit = 20): Promise<Pick<Artist, "mbid" | "name" | "type" | "country" | "disambiguation" | "isPerson">[]> {
   const q = lucene(query);
   if (!q) return [];

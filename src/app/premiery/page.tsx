@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { ReleaseSection } from "@/components/release-list";
 import { Masthead } from "@/components/masthead";
 import { heroArt, leadStyle } from "@/lib/lead-style";
-import { GENRE_LABELS, GENRE_ORDER, allSections, latestSections, releasesFor } from "@/lib/lists";
+import { GENRE_ORDER, allSections, genreLabel, latestSections, releasesFor, splitDb } from "@/lib/lists";
 import { currentUser } from "@/lib/auth";
 import { getGenres } from "@/lib/user-data";
 import { genreToSection } from "@/lib/genres";
@@ -35,6 +35,14 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
   const base = { star: sp.star, re: sp.re, sekcja: sp.sekcja };
 
   const lead = leadStyle(prefs);
+  // Kategorie biorą się z tego, co faktycznie jest w tym tygodniu — łącznie ze
+  // stylami dobranymi z MusicBrainz. Sztywna czwórka z importu PNS to za mało,
+  // gdy ktoś słucha country albo klasyki.
+  const present = [...new Set(rel.map((r) => splitDb(r.genre, r.description)))];
+  const available = [
+    ...GENRE_ORDER.filter((g) => present.includes(g)),
+    ...present.filter((g) => !GENRE_ORDER.includes(g)).sort((a, b) => a.localeCompare(b, "pl")),
+  ];
   return (
     <>
     <Masthead
@@ -53,12 +61,12 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
       <aside className="md:sticky md:top-20 md:self-start">
         <div className="label mb-2">Gatunki</div>
         <div className="flex flex-wrap gap-1.5">
-          {GENRE_ORDER.map((g) => {
+          {available.map((g) => {
             const on = genres.includes(g);
             const next = on ? genres.filter((x) => x !== g) : [...genres, g];
             return (
               <Link key={g} href={qs({ ...base, g: next.join(","), all: next.length ? undefined : "1" })} className={`chip ${on ? "chip-on" : ""}`}>
-                {GENRE_LABELS[g]}
+                {genreLabel(g)}
               </Link>
             );
           })}

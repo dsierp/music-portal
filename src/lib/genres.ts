@@ -12,6 +12,27 @@ export const GENRE_GROUPS: { label: string; genres: string[] }[] = [
 
 export const ALL_GENRES = GENRE_GROUPS.flatMap((g) => g.genres);
 
+/**
+ * Style, których import „Pure New Shit" nie pokrywa (PNS to death/black, prog
+ * i jazz) — dla nich premiery dobieramy z MusicBrainz (scripts/fetch-releases.ts).
+ * Świadomie krótka lista szerokich tagów: im węższy tag, tym częściej MB nie ma
+ * go jeszcze na świeżej płycie.
+ */
+export const STYLES_FROM_MB = [
+  "country",
+  "americana",
+  "punk",
+  "post-punk",
+  "hardcore punk",
+  "pop",
+  "electronic",
+  "hip hop",
+  "classical",
+  "contemporary classical",
+  "singer-songwriter",
+  "folk",
+];
+
 /** Mapowanie stylu użytkownika → sekcje premier (db/prog/other/jazz) do personalizacji. */
 export function genreToSection(genre: string): "db" | "prog" | "other" | "jazz" | null {
   const g = genre.toLowerCase();
