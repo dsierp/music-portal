@@ -57,17 +57,28 @@ async function mbFetch<T>(path: string, params: Record<string, string | number>)
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
   url.searchParams.set("fmt", "json");
   return throttle(async () => {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json" }, cache: "no-store" });
+    // MusicBrainz przy przeciążeniu odpowiada 503 i oczekuje, że odpuścimy na chwilę.
+    // Cztery podejścia z rosnącą przerwą (1s, 2s, 4s) + losowy rozrzut, żeby kilka
+    // równoległych zapytań nie wracało dokładnie w tej samej sekundzie.
+    for (let attempt = 0; attempt < 4; attempt++) {
+      let res: Response;
+      try {
+        res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json" }, cache: "no-store" });
+      } catch {
+        // zerwane połączenie / brak sieci — traktujemy jak chwilową niedostępność
+        if (attempt === 3) throw new MbError("Brak połączenia z MusicBrainz", 503);
+        await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
+        continue;
+      }
       if (res.status === 503 || res.status === 429) {
-        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+        await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt + Math.random() * 400));
         continue;
       }
       if (res.status === 404) throw new MbError("Nie znaleziono w MusicBrainz", 404);
       if (!res.ok) throw new MbError(`MusicBrainz ${res.status}`, res.status);
       return (await res.json()) as T;
     }
-    throw new MbError("MusicBrainz przeciążony (503)", 503);
+    throw new MbError("MusicBrainz jest chwilowo przeciążony", 503);
   });
 }
 

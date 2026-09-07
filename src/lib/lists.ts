@@ -9,6 +9,18 @@ export const GENRE_LABELS: Record<string, string> = {
   jazz: "Jazz",
 };
 export const GENRE_ORDER = ["db", "prog", "other", "jazz"];
+
+/**
+ * Grafika nagłówka dla gatunku. Na razie ze zdjęć w public/img — żeby dołożyć
+ * własną (np. dedykowaną grafikę death metalową), wystarczy wrzucić plik do
+ * public/img i podmienić ścieżkę tutaj.
+ */
+export const GENRE_IMAGES: Record<string, string> = {
+  db: "/img/studio.jpg",
+  prog: "/img/konsola.jpg",
+  other: "/img/talerz.jpg",
+  jazz: "/img/winyl.jpg",
+};
 export const FLAG_LABELS: Record<string, string> = { ep: "EP", comp: "kompilacja", reissue: "reedycja", live: "live", instr: "instrumental" };
 
 export async function latestSections(limit = 2) {

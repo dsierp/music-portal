@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getArtist, getDiscography, getPlayedOn, MbError } from "@/lib/musicbrainz";
 import { wikiFromLinks } from "@/lib/wikipedia";
+import { MbUnavailable } from "@/components/mb-unavailable";
 import { currentUser } from "@/lib/auth";
 import { commentTree, favoriteCount, isFavorite, ratingAverages, ratingSummary } from "@/lib/user-data";
 import { toggleFavorite } from "@/app/actions";
@@ -210,6 +211,8 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
     artist = await getArtist(mbid);
   } catch (e) {
     if (e instanceof MbError && e.status === 404) notFound();
+    // 503/limit zapytań: spokojny komunikat zamiast czerwonego ekranu.
+    if (e instanceof MbError) return <MbUnavailable what="artysty" />;
     throw e;
   }
   const user = await currentUser();

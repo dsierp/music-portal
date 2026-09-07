@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { getAlbum, getArtist, getDiscography, isMusicianRole, fmtLength, MbError } from "@/lib/musicbrainz";
 import { wikiAlbumRatings, wikiFromLinks, wikiPersonnel } from "@/lib/wikipedia";
 import { nameKeys } from "@/lib/names";
+import { MbUnavailable } from "@/components/mb-unavailable";
 import { currentUser } from "@/lib/auth";
 import { commentTree, isLiked, likeCount, ratingAverages, ratingSummary } from "@/lib/user-data";
 import { toggleLike } from "@/app/actions";
@@ -41,6 +42,8 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
     album = await getAlbum(mbid);
   } catch (e) {
     if (e instanceof MbError && e.status === 404) notFound();
+    // 503/limit zapytań: spokojny komunikat zamiast czerwonego ekranu.
+    if (e instanceof MbError) return <MbUnavailable what="płyty" />;
     throw e;
   }
   const user = await currentUser();

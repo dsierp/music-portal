@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { InferSelectModel } from "drizzle-orm";
 import { schema } from "@/db";
-import { FLAG_LABELS, GENRE_LABELS, GENRE_ORDER } from "@/lib/lists";
+import { FLAG_LABELS, GENRE_IMAGES, GENRE_LABELS, GENRE_ORDER } from "@/lib/lists";
 import { searchLinks } from "./links";
 
 type Section = InferSelectModel<typeof schema.releaseSections>;
@@ -71,7 +71,14 @@ export function ReleaseSection({ section, releases, filter }: { section: Section
       )}
       {groups.map(({ g, items }) => (
         <div key={g} className="mt-5">
-          <h3 className="label mb-2 border-b border-rule pb-1 text-xs">{GENRE_LABELS[g]}</h3>
+          <h3 className="label relative mb-2 overflow-hidden rounded border border-rule px-3 py-2 text-xs">
+            {GENRE_IMAGES[g] && (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={GENRE_IMAGES[g]} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover opacity-25" />
+            )}
+            <span className="absolute inset-0 bg-gradient-to-r from-bg via-bg/80 to-transparent" />
+            <span className="relative">{GENRE_LABELS[g]}</span>
+          </h3>
           <ul className="space-y-3">{items.map((r) => <ReleaseRow key={r.id} r={r} />)}</ul>
         </div>
       ))}
