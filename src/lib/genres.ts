@@ -5,6 +5,7 @@ export const GENRE_GROUPS: { label: string; genres: string[] }[] = [
   { label: "Inne metal", genres: ["doom metal", "funeral doom", "sludge", "thrash metal", "heavy metal", "post-metal", "grindcore", "folk metal", "stoner / psych", "gothic metal", "industrial metal"] },
   { label: "Prog", genres: ["progressive metal", "progressive rock", "post-progressive", "avant-prog / RIO", "krautrock", "canterbury", "symphonic prog", "jazz rock / fusion", "post-rock"] },
   { label: "Jazz", genres: ["modern jazz", "free jazz", "spiritual jazz", "hard bop", "cool jazz", "modal jazz", "nu jazz", "big band", "ECM / chamber jazz", "avant-garde jazz"] },
+  { label: "Country / americana", genres: ["country", "alt-country", "americana", "country rock", "honky-tonk", "bluegrass", "singer-songwriter"] },
   { label: "Poza", genres: ["hardcore punk", "crust", "dark ambient", "neofolk", "classical / contemporary", "electronic", "hip-hop", "pop"] },
 ];
 
