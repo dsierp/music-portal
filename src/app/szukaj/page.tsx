@@ -160,9 +160,36 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
             <h2 className="label mb-3">{f === "zespoly" ? "Zespoły" : f === "ludzie" ? "Ludzie" : "Artyści i muzycy"}</h2>
             {artists.length ? (
               <div className="grid gap-2">
-                {artists.map((a) => (
-                  <ArtistCard key={a.mbid} mbid={a.mbid} name={a.name} sub={[a.isPerson ? "osoba" : a.type?.toLowerCase(), a.country, a.disambiguation].filter(Boolean).join(" · ")} />
-                ))}
+                {artists.map((a) => {
+                  // Sama nazwa nie wystarcza: „Cynic" to w MusicBrainz kilka
+                  // zespołów. Lata, miejsce i gatunki przychodzą w tej samej
+                  // odpowiedzi wyszukiwarki, więc pokazujemy je od razu.
+                  const lata = a.begin || a.end ? `${a.begin?.slice(0, 4) ?? "?"}–${a.ended ? (a.end?.slice(0, 4) ?? "?") : ""}` : null;
+                  const skad = [a.city, a.area ?? a.country].filter(Boolean).join(", ");
+                  return (
+                    <ArtistCard
+                      key={a.mbid}
+                      mbid={a.mbid}
+                      name={a.name}
+                      sub={[a.isPerson ? "osoba" : a.type?.toLowerCase(), skad || null, lata].filter(Boolean).join(" · ")}
+                      extra={
+                        <>
+                          {a.disambiguation && <div className="mt-0.5 text-xs text-text2">{a.disambiguation}</div>}
+                          {a.tags.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {a.tags.map((t) => (
+                                <span key={t} className="chip text-[10px]">{t}</span>
+                              ))}
+                            </div>
+                          )}
+                          {a.aliases.length > 0 && (
+                            <div className="mt-1 text-[10px] text-faint">znany też jako: {a.aliases.join(", ")}</div>
+                          )}
+                        </>
+                      }
+                    />
+                  );
+                })}
               </div>
             ) : (
               <Empty>{f === "zespoly" ? "Brak zespołów." : f === "ludzie" ? "Brak osób." : "Brak artystów."}</Empty>
