@@ -125,7 +125,31 @@ function MemberList({
  * Powiązane zespoły — w osobnym strumieniu, bo to kilkanaście zapytań do
  * MusicBrainz (limit 1/s). Reszta strony nie ma na nie czekać.
  */
-async function RelatedSection({ artist, t }: { artist: Artist; t: Dict }) {
+/**
+ * Osłona sekcji: awaria jednego kawałka strony ma zostać w tym kawałku.
+ *
+ * Bez tego wygląda to tak, jak zgłosił użytkownik: treść mignie i cała strona
+ * znika, zastąpiona ekranem błędu — bo błąd w strumieniowanej sekcji leci do
+ * granicy błędu całej trasy. A produkcyjny Next nie pokazuje komunikatu, więc
+ * nie wiadomo nawet, co padło. Dlatego łapiemy tutaj i piszemy wprost, która
+ * sekcja i dlaczego.
+ */
+async function osłona(nazwa: string, render: () => Promise<React.ReactElement | null>, t: Dict) {
+  try {
+    return await render();
+  } catch (e) {
+    const powod = e instanceof Error ? e.message : String(e);
+    console.error(`[sekcja ${nazwa}]`, e);
+    return (
+      <section className="mt-10 rounded-lg border border-rule bg-surface2 p-3">
+        <p className="text-sm text-muted">{fmt(t.artist.sectionFailed, { name: nazwa })}</p>
+        <p className="mt-1 font-mono text-[10px] text-faint">{powod.slice(0, 200)}</p>
+      </section>
+    );
+  }
+}
+
+async function RelatedSectionWewn({ artist, t }: { artist: Artist; t: Dict }) {
   const related = await relatedBands(artist).catch(() => []);
   if (!related.length) return null;
   return (
@@ -174,7 +198,7 @@ async function RelatedSection({ artist, t }: { artist: Artist; t: Dict }) {
  * Świadomie ograniczone do kilku albumów: chodzi o rozpoznanie „ich" ekipy,
  * a nie o kompletny spis techniczny.
  */
-async function CrewSection({ albums, t }: { albums: AlbumSummary[]; t: Dict }) {
+async function CrewSectionWewn({ albums, t }: { albums: AlbumSummary[]; t: Dict }) {
   if (!albums.length) return null;
   const crew = await albumCrew(albums).catch(() => []);
   if (!crew.length) {
@@ -224,7 +248,7 @@ async function CrewSection({ albums, t }: { albums: AlbumSummary[]; t: Dict }) {
  * katalogiem nagrań, nie afiszem — więc gdy milczy, mówimy to wprost zamiast
  * udawać, że zespół nie koncertuje.
  */
-async function ConcertsSection({ mbid, name, locale, t }: { mbid: string; name: string; locale: Locale; t: Dict }) {
+async function ConcertsSectionWewn({ mbid, name, locale, t }: { mbid: string; name: string; locale: Locale; t: Dict }) {
   const items = await concertsByArtist({ mbid, name }).catch(() => []);
   return (
     <details className="mt-10">
@@ -264,7 +288,7 @@ async function ConcertsSection({ mbid, name, locale, t }: { mbid: string; name: 
   );
 }
 
-async function ArtistDeepContent({ artist: raw, mbid, locale, t, odNajnowszych }: { artist: Artist; mbid: string; locale: Locale; t: Dict; odNajnowszych: boolean }) {
+async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, odNajnowszych }: { artist: Artist; mbid: string; locale: Locale; t: Dict; odNajnowszych: boolean }) {
   // MusicBrainz nagminnie gubi daty przy członkostwie (Inferno w Behemocie od
   // 1997 — relacja jest, dat nie ma). Wikidane trzymają to samo strukturalnie,
   // więc zanim cokolwiek narysujemy, łatamy dziury stamtąd. Pytamy tylko wtedy,
@@ -289,11 +313,12 @@ async function ArtistDeepContent({ artist: raw, mbid, locale, t, odNajnowszych }
   const albums = disco.filter((a) => a.primaryType === "Album" && !a.secondaryTypes.length);
   const eps = disco.filter((a) => a.primaryType === "EP" && !a.secondaryTypes.length);
   const rest = disco.filter((a) => !albums.includes(a) && !eps.includes(a));
-  const ratings = await ratingAverages("ALBUM", [
+  const ratingsS = await dbSafe(ratingAverages("ALBUM", [
     ...disco.map((a) => a.mbid),
     ...played.map((p) => p.album.mbid),
     ...produced.map((p) => p.album.mbid),
-  ]);
+  ]), new Map<string, { avg: number; count: number }>());
+  const ratings = ratingsS.value;
   const current = artist.members.filter((m) => m.current);
   const former = artist.members.filter((m) => !m.current);
   const playedByBand = artist.isPerson ? groupByBand(played) : undefined;
@@ -706,4 +731,18 @@ export default async function ArtistPage({
     </div>
     </>
   );
+}
+
+/** Sekcje w osłonach — patrz komentarz przy `osłona`. */
+function RelatedSection(p: { artist: Artist; t: Dict }) {
+  return osłona("Powiązane zespoły", () => RelatedSectionWewn(p), p.t);
+}
+function CrewSection(p: { albums: AlbumSummary[]; t: Dict }) {
+  return osłona("Kto to nagrywał", () => CrewSectionWewn(p), p.t);
+}
+function ConcertsSection(p: { mbid: string; name: string; locale: Locale; t: Dict }) {
+  return osłona("Koncerty", () => ConcertsSectionWewn(p), p.t);
+}
+function ArtistDeepContent(p: { artist: Artist; mbid: string; locale: Locale; t: Dict; odNajnowszych: boolean }) {
+  return osłona("Dyskografia i skład", () => ArtistDeepContentWewn(p), p.t);
 }

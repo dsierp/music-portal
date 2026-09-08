@@ -8,6 +8,7 @@
 import type { Locale } from "@/lib/i18n";
 
 const pl = {
+  sectionFailed: "Sekcja „{name}” się nie wczytała. Reszta strony działa — to tylko ten kawałek.",
   concertsHeading: "Koncerty",
   concertsLoading: "Sprawdzam, czy i gdzie grają…",
   concertsNone: "MusicBrainz nie ma zapowiedzi koncertów tego artysty. To katalog nagrań, nie afisz — brak wpisu nie znaczy, że nie grają.",
@@ -102,6 +103,7 @@ const pl = {
 type T = typeof pl;
 
 const en: T = {
+  sectionFailed: "The “{name}” section failed to load. The rest of the page is fine — it is only this piece.",
   concertsHeading: "Concerts",
   concertsLoading: "Checking whether and where they play…",
   concertsNone: "MusicBrainz has no upcoming shows for this artist. It's a recording catalogue, not a listings site — no entry doesn't mean no gigs.",
@@ -195,6 +197,7 @@ const en: T = {
 };
 
 const es: T = {
+  sectionFailed: "La sección «{name}» no se ha cargado. El resto de la página funciona — es solo este trozo.",
   concertsHeading: "Conciertos",
   concertsLoading: "Miro si tocan y dónde…",
   concertsNone: "MusicBrainz no tiene conciertos anunciados de este artista. Es un catálogo de grabaciones, no una cartelera — que no haya entrada no significa que no toquen.",
@@ -288,6 +291,7 @@ const es: T = {
 };
 
 const de: T = {
+  sectionFailed: "Der Abschnitt „{name}“ konnte nicht geladen werden. Der Rest der Seite läuft — es ist nur dieses Stück.",
   concertsHeading: "Konzerte",
   concertsLoading: "Schaue nach, ob und wo sie spielen…",
   concertsNone: "MusicBrainz kennt keine angekündigten Konzerte dieses Artists. Es ist ein Aufnahmekatalog, kein Veranstaltungskalender — kein Eintrag heißt nicht, dass nichts läuft.",
