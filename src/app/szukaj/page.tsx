@@ -5,6 +5,8 @@ import { searchAlbums, searchArtists } from "@/lib/musicbrainz";
 import { ratingAverages } from "@/lib/user-data";
 import { currentUser } from "@/lib/auth";
 import { addLikedFromSearch } from "@/app/actions";
+import { localAlbums } from "@/lib/local-search";
+import Link from "next/link";
 
 export const metadata: Metadata = { title: "Szukaj" };
 export const dynamic = "force-dynamic";
@@ -15,6 +17,9 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   let albums: Awaited<ReturnType<typeof searchAlbums>> = [];
   let artists: Awaited<ReturnType<typeof searchArtists>> = [];
   let error: string | null = null;
+  // Najpierw to, co portal ma u siebie — ta część działa nawet wtedy, gdy
+  // MusicBrainz nie odpowiada.
+  const mine = q.trim() ? await localAlbums(q).catch(() => []) : [];
   if (q.trim()) {
     try {
       [albums, artists] = await Promise.all([searchAlbums(q, 15), searchArtists(q, 10)]);
@@ -29,7 +34,25 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       <SearchBox defaultValue={q} big />
       {miss && <p className="mt-3 text-sm text-warn">Nie udało się automatycznie dopasować tej pozycji w MusicBrainz — wybierz właściwą płytę z wyników.</p>}
       {lubie && <p className="mt-3 text-sm text-muted">Wybierz płytę, którą mam zapamiętać jako lubianą.</p>}
-      {error && <p className="mt-3 text-sm text-warn">{error}</p>}
+      {error && (
+        <p className="mt-3 text-sm text-warn">
+          {error}
+          {mine.length > 0 && " — poniżej to, co portal ma u siebie."}
+        </p>
+      )}
+      {mine.length > 0 && (
+        <section className="mt-6">
+          <h2 className="label mb-3">W portalu</h2>
+          <div className="grid gap-2">
+            {mine.map((h) => (
+              <Link key={h.href} href={h.href} className="block rounded-lg border border-rule bg-surface2 px-3 py-2 hover:border-accent">
+                <span className="display text-lg leading-tight">{h.artist} — <em>{h.album}</em></span>
+                <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-muted">{h.sub}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
       {q && (
         <div className="mt-8 grid gap-8 md:grid-cols-[1fr_320px]">
           <section>

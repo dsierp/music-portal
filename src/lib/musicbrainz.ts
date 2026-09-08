@@ -65,7 +65,14 @@ async function mbFetch<T>(path: string, params: Record<string, string | number>)
         continue;
       }
       if (res.status === 404) throw new MbError("Nie znaleziono w MusicBrainz", 404);
-      if (!res.ok) throw new MbError(`MusicBrainz ${res.status}`, res.status);
+      if (!res.ok) {
+        // Przy 403 samo „MusicBrainz 403" nic nie mówi: to może być blokada
+        // adresu IP (serwerownie bywają blokowane hurtem) albo zły User-Agent.
+        // MB pisze powód w treści odpowiedzi — zabieramy jej początek, bo bez
+        // tego zgadywanie trwa tyle, co kolejne wdrożenia.
+        const why = await res.text().then((t) => t.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160)).catch(() => "");
+        throw new MbError(`MusicBrainz ${res.status}${why ? ` — ${why}` : ""}`, res.status);
+      }
       return (await res.json()) as T;
     }
     throw new MbError("MusicBrainz jest chwilowo przeciążony", 503);
