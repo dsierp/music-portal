@@ -11,8 +11,8 @@ import Link from "next/link";
 export const metadata: Metadata = { title: "Szukaj" };
 export const dynamic = "force-dynamic";
 
-export default async function SearchPage({ searchParams }: { searchParams: Promise<{ q?: string; a?: string; t?: string; miss?: string; lubie?: string }> }) {
-  const { q = "", a: artistQ = "", t: titleQ = "", miss, lubie } = await searchParams;
+export default async function SearchPage({ searchParams }: { searchParams: Promise<{ q?: string; a?: string; t?: string; f?: string; miss?: string; lubie?: string }> }) {
+  const { q = "", a: artistQ = "", t: titleQ = "", f = "", miss, lubie } = await searchParams;
   // Zawężanie ma pierwszeństwo: jak ktoś wypełnił „artysta" albo „tytuł",
   // pytamy MusicBrainz dokładnie o to pole, zamiast szukać słowa wszędzie.
   const narrowed = artistQ.trim().length > 1 || titleQ.trim().length > 1;
@@ -40,10 +40,40 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
     }
   }
   const ratings = await ratingAverages("ALBUM", albums.map((a) => a.mbid));
+
+  // Filtr typu wyniku — jak w odtwarzaczach: „wszystko" i zawężenia.
+  // Trzyma się w adresie, więc wynik da się wysłać linkiem.
+  const showAlbums = f === "" || f === "plyty";
+  const showArtists = f === "" || f === "artysci";
+  const showMine = f === "" || f === "portal";
+  const params = (kind: string) => {
+    const sp = new URLSearchParams();
+    if (q) sp.set("q", q);
+    if (artistQ) sp.set("a", artistQ);
+    if (titleQ) sp.set("t", titleQ);
+    if (kind) sp.set("f", kind);
+    return `/szukaj?${sp.toString()}`;
+  };
+  const FILTERS: { id: string; label: string; count: number }[] = [
+    { id: "", label: "Wszystko", count: albums.length + artists.length + mine.length },
+    { id: "plyty", label: "Płyty", count: albums.length },
+    { id: "artysci", label: "Artyści", count: artists.length },
+    { id: "portal", label: "W portalu", count: mine.length },
+  ];
   return (
     <div>
       <h1 className="mb-4 text-4xl">Szukaj</h1>
       <SearchBox defaultValue={q} big />
+      {(q || narrowed) && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {FILTERS.map((x) => (
+            <Link key={x.id || "all"} href={params(x.id)} className={`chip ${f === x.id ? "chip-on" : ""}`}>
+              {x.label}
+              {x.id !== "" && <span className="ml-1.5 font-mono text-[10px] text-muted">{x.count}</span>}
+            </Link>
+          ))}
+        </div>
+      )}
       <form action="/szukaj" className="mt-3 flex flex-wrap items-end gap-2">
         <label className="text-xs text-muted">
           <span className="label block">Artysta</span>
@@ -64,7 +94,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
           {mine.length > 0 && " — poniżej to, co portal ma u siebie."}
         </p>
       )}
-      {mine.length > 0 && (
+      {showMine && mine.length > 0 && (
         <section className="mt-6">
           <h2 className="label mb-3">W portalu</h2>
           <div className="grid gap-2">
@@ -78,7 +108,8 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
         </section>
       )}
       {(q || narrowed) && (
-        <div className="mt-8 grid gap-8 md:grid-cols-[1fr_320px]">
+        <div className={`mt-8 grid gap-8 ${showAlbums && showArtists ? "md:grid-cols-[1fr_320px]" : ""}`}>
+          {showAlbums && (
           <section>
             <h2 className="label mb-3">Płyty</h2>
             {albums.length ? (
@@ -106,6 +137,8 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
               <Empty>Brak płyt dla „{shown}”.</Empty>
             )}
           </section>
+          )}
+          {showArtists && (
           <section>
             <h2 className="label mb-3">Artyści i muzycy</h2>
             {artists.length ? (
@@ -118,6 +151,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
               <Empty>Brak artystów.</Empty>
             )}
           </section>
+          )}
         </div>
       )}
     </div>
