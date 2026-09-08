@@ -2,20 +2,39 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { currentUser } from "@/lib/auth";
-import { getAreas, getFavoriteArtists, getGenres, getLikedAlbums, myRatings } from "@/lib/user-data";
+import { getAreas, getFavoriteArtists, getGenres, getLikedAlbums, getUserLocale, myRatings } from "@/lib/user-data";
 import { addAreaAction, removeAreaAction, setGenreAction, skipOnboarding, toggleFavorite, toggleLike } from "@/app/actions";
-import { MAIN_CATEGORIES, WEIGHT_LABELS } from "@/lib/genres";
+import { MAIN_CATEGORIES } from "@/lib/genres";
 import { orderByPopularity } from "@/lib/popularity";
 import { genreImage } from "@/lib/genre-art";
 import { Cover } from "@/components/cover";
+import { LanguagePicker } from "@/components/language-picker";
+import { i18n } from "@/lib/t";
+import { fmt } from "@/lib/i18n";
+import { genreLabel } from "@/lib/dict";
 
-export const metadata: Metadata = { title: "Mój profil" };
+/** Tytuł w zakładce też idzie w języku czytelnika. */
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await i18n();
+  return { title: t.profile.profileLabel };
+}
 export const dynamic = "force-dynamic";
 
 export default async function MePage({ searchParams }: { searchParams: Promise<{ witaj?: string }> }) {
   const witaj = (await searchParams).witaj === "1";
   const user = await currentUser();
   if (!user) redirect("/login?callbackUrl=/ja");
+  const profileLocale = await getUserLocale(user.id).catch(() => null);
+  const { locale, t } = await i18n(profileLocale);
+  // Etykiety wag (1–5) trzymamy w słowniku profilu, nie w lib/genres.ts —
+  // ten plik jest wspólny i nie tłumaczymy go tutaj.
+  const weightLabels: Record<number, string> = {
+    1: t.profile.weight1,
+    2: t.profile.weight2,
+    3: t.profile.weight3,
+    4: t.profile.weight4,
+    5: t.profile.weight5,
+  };
   const [genres, liked, favs, albumRatings, artistRatings, areas] = await Promise.all([
     getGenres(user.id), getLikedAlbums(user.id), getFavoriteArtists(user.id), myRatings(user.id, "ALBUM"), myRatings(user.id, "ARTIST"), getAreas(user.id),
   ]);
@@ -32,35 +51,36 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
     <div className="space-y-10">
       {witaj && (
         <section className="card border-accent/60">
-          <div className="label mb-1">Witaj w portalu</div>
-          <h2 className="text-2xl">Zacznijmy od tego, czego słuchasz</h2>
-          <p className="mt-2 max-w-2xl text-sm text-text2">
-            Wybierz poniżej kategorie, które lubisz — klikasz w kafelek, żeby dodać. Od nich zależy,
-            czym portal Cię wita, w jakiej kolejności układa premiery i o czyich zmianach w składach
-            Ci mówi. Zawsze możesz to zmienić na tej stronie.
-          </p>
+          <div className="label mb-1">{t.profile.welcomeEyebrow}</div>
+          <h2 className="text-2xl">{t.profile.welcomeTitle}</h2>
+          <p className="mt-2 max-w-2xl text-sm text-text2">{t.profile.welcomeBody}</p>
           <form action={skipOnboarding} className="mt-3">
-            <button className="text-xs text-muted underline hover:text-accent2">wybiorę później</button>
+            <button className="text-xs text-muted underline hover:text-accent2">{t.profile.chooseLater}</button>
           </form>
         </section>
       )}
       <header>
-        <div className="label">Profil</div>
+        <div className="label">{t.profile.profileLabel}</div>
         <h1 className="text-4xl">{user.name || user.email}</h1>
         <p className="text-sm text-muted">{user.email}</p>
       </header>
 
+      <section id="jezyk">
+        <h2 className="text-2xl">{t.profile.languageTitle}</h2>
+        <p className="mb-3 text-sm text-muted">{t.profile.languageExplain}</p>
+        <LanguagePicker locale={locale} label={t.nav.language} />
+      </section>
+
       <section id="obszary">
-        <h2 className="text-2xl">Koncerty — moje obszary</h2>
+        <h2 className="text-2xl">{t.profile.areasTitle}</h2>
         <p className="mb-4 text-sm text-muted">
-          Dwie osobne listy, bo to dwa różne apetyty: po ulubiony zespół jedzie się przez pół kraju, a &bdquo;coś w moich
-          gatunkach&rdquo; ogląda się u siebie. Zostaw miasto puste, żeby śledzić cały kraj. Na tej podstawie buduję{" "}
-          <Link href="/koncerty" className="underline">listę koncertów</Link> na najbliższe trzy miesiące.
+          {t.profile.areasIntro1}{" "}
+          <Link href="/koncerty" className="underline">{t.profile.areasIntroLink}</Link> {t.profile.areasIntro2}
         </p>
         <div className="grid gap-6 sm:grid-cols-2">
           {([
-            { scope: "genres" as const, title: "Dla moich gatunków", hint: "np. Kraków, Warszawa" },
-            { scope: "favorites" as const, title: "Dla ulubionych zespołów", hint: "np. cała Polska" },
+            { scope: "genres" as const, title: t.profile.genresScopeTitle, hint: t.profile.genresScopeHint },
+            { scope: "favorites" as const, title: t.profile.favoritesScopeTitle, hint: t.profile.favoritesScopeHint },
           ]).map(({ scope, title, hint }) => {
             const list = areas.filter((a) => a.scope === scope);
             return (
@@ -74,43 +94,40 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
                           <input type="hidden" name="scope" value={scope} />
                           <input type="hidden" name="country" value={a.country} />
                           <input type="hidden" name="city" value={a.city ?? ""} />
-                          <span className="chip chip-on">{a.city ? `${a.city} · ${a.country}` : `cały kraj: ${a.country}`}</span>
-                          <button className="text-xs text-muted hover:text-accent2" title="Usuń obszar">×</button>
+                          <span className="chip chip-on">{a.city ? `${a.city} · ${a.country}` : fmt(t.profile.wholeCountry, { country: a.country })}</span>
+                          <button className="text-xs text-muted hover:text-accent2" title={t.profile.removeAreaTitle}>×</button>
                         </form>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="mb-3 text-xs text-muted">Nic jeszcze nie wybrałeś ({hint}).</p>
+                  <p className="mb-3 text-xs text-muted">{fmt(t.profile.noAreaChosen, { hint })}</p>
                 )}
                 <form action={addAreaAction} className="flex flex-wrap items-end gap-2">
                   <input type="hidden" name="scope" value={scope} />
                   <label className="text-xs text-muted">
-                    <span className="label block">Miasto</span>
-                    <input name="city" placeholder="puste = cały kraj" className="input w-44 py-1 text-sm" autoComplete="off" />
+                    <span className="label block">{t.profile.cityLabel}</span>
+                    <input name="city" placeholder={t.profile.cityPlaceholder} className="input w-44 py-1 text-sm" autoComplete="off" />
                   </label>
                   <label className="text-xs text-muted">
-                    <span className="label block">Kraj</span>
+                    <span className="label block">{t.profile.countryLabel}</span>
                     <input name="country" maxLength={2} defaultValue="PL" className="input w-16 py-1 text-sm uppercase" autoComplete="off" />
                   </label>
-                  <button className="btn">Dodaj</button>
+                  <button className="btn">{t.profile.addButton}</button>
                 </form>
               </div>
             );
           })}
         </div>
-        <p className="mt-2 text-xs text-faint">
-          Kraj podaje się dwuliterowym kodem: PL, DE, CZ, GB. Miasto wpisz tak, jak nazywa się lokalnie
-          (Warszawa, Kraków, Berlin).
-        </p>
+        <p className="mt-2 text-xs text-faint">{t.profile.areaFootnote}</p>
       </section>
 
       <section id="style">
-        <h2 className="text-2xl">Style muzyczne</h2>
-        <p className="mb-4 text-sm text-muted">Wybierz główne kategorie, których słuchasz — klikasz, żeby dodać (waga 3), potem ustawiasz wagę 1–5. Kategoria z najwyższą wagą jest Twoim stylem wiodącym: pod nią dobieramy oprawę graficzną portalu, a kategorie z wagą ≥3 filtrują premiery.</p>
+        <h2 className="text-2xl">{t.profile.stylesTitle}</h2>
+        <p className="mb-4 text-sm text-muted">{t.profile.stylesIntro}</p>
         {genres.length > 0 && (
           <div className="card mb-4">
-            <div className="label mb-2">Twoje style</div>
+            <div className="label mb-2">{t.profile.yourStyles}</div>
             <ul className="space-y-2">
               {genres.map((g) => (
                 <li key={g.genre} className="flex flex-wrap items-center gap-3 text-sm">
@@ -118,10 +135,10 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
                   <form action={setGenreAction} className="flex items-center gap-1">
                     <input type="hidden" name="genre" value={g.genre} />
                     {[1, 2, 3, 4, 5].map((w) => (
-                      <button key={w} name="weight" value={w} title={WEIGHT_LABELS[w]} className={`h-7 w-7 rounded border font-mono text-xs ${g.weight === w ? "border-accent bg-accent text-white" : "border-rule bg-surface2 hover:border-accent"}`}>{w}</button>
+                      <button key={w} name="weight" value={w} title={weightLabels[w]} className={`h-7 w-7 rounded border font-mono text-xs ${g.weight === w ? "border-accent bg-accent text-white" : "border-rule bg-surface2 hover:border-accent"}`}>{w}</button>
                     ))}
-                    <span className="ml-2 text-xs text-muted">{WEIGHT_LABELS[g.weight]}</span>
-                    <button name="weight" value="0" className="ml-3 text-xs text-muted hover:text-accent2">usuń</button>
+                    <span className="ml-2 text-xs text-muted">{weightLabels[g.weight]}</span>
+                    <button name="weight" value="0" className="ml-3 text-xs text-muted hover:text-accent2">{t.profile.removeWeight}</button>
                   </form>
                 </li>
               ))}
@@ -147,9 +164,9 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
                   )}
                   <span className="absolute inset-0 bg-gradient-to-t from-bg via-bg/70 to-transparent" />
                   <span className="relative">
-                    <span className="display block text-lg leading-tight">{c.label}</span>
+                    <span className="display block text-lg leading-tight">{genreLabel(c.slug, t, c.label)}</span>
                     <span className="font-mono text-[10px] text-muted">
-                      {on ? `w profilu · waga ${weightOf.get(c.slug)}` : "kliknij, żeby dodać"}
+                      {on ? fmt(t.profile.tileOnHint, { w: weightOf.get(c.slug)! }) : t.profile.tileAddHint}
                     </span>
                   </span>
                 </button>
@@ -159,28 +176,25 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         </div>
         {custom.length > 0 && (
           <div className="mt-4">
-            <div className="label mb-1">Z wcześniejszych ustawień (podgatunki)</div>
+            <div className="label mb-1">{t.profile.customGenresTitle}</div>
             <div className="flex flex-wrap gap-1.5">
               {custom.map((c) => (
                 <form key={c.genre} action={setGenreAction}>
                   <input type="hidden" name="genre" value={c.genre} />
                   <input type="hidden" name="weight" value="0" />
-                  <button className="chip" title="kliknij, żeby usunąć">{c.genre} ✕</button>
+                  <button className="chip" title={t.profile.removeCustomGenreTitle}>{c.genre} ✕</button>
                 </form>
               ))}
             </div>
-            <p className="mt-1 text-xs text-faint">
-              Wybór zawęziliśmy do głównych kategorii — dla podgatunków nie da się co tydzień budować osobnych list.
-              Podgatunki dalej służą do klasyfikowania płyt.
-            </p>
+            <p className="mt-1 text-xs text-faint">{t.profile.customGenresFootnote}</p>
           </div>
         )}
       </section>
 
       <section id="plyty">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-2xl">Płyty, które lubię <span className="font-mono text-sm text-muted">{liked.length}</span></h2>
-          <Link href="/szukaj?lubie=1" className="btn">+ dodaj płytę</Link>
+          <h2 className="text-2xl">{t.profile.likedAlbumsTitle} <span className="font-mono text-sm text-muted">{liked.length}</span></h2>
+          <Link href="/szukaj?lubie=1" className="btn">{t.profile.addAlbum}</Link>
         </div>
         {liked.length ? (
           <ul className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -194,18 +208,18 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
                 <form action={toggleLike}>
                   <input type="hidden" name="mbid" value={a.mbid} />
                   <input type="hidden" name="liked" value="1" />
-                  <button className="text-xs text-muted hover:text-accent2">usuń</button>
+                  <button className="text-xs text-muted hover:text-accent2">{t.profile.removeAlbum}</button>
                 </form>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="mt-2 text-sm text-muted">Jeszcze nic. Na stronie płyty kliknij „Lubię tę płytę” albo dodaj z wyszukiwarki.</p>
+          <p className="mt-2 text-sm text-muted">{t.profile.noLikedAlbums}</p>
         )}
       </section>
 
       <section id="artysci">
-        <h2 className="text-2xl">Ulubieni artyści <span className="font-mono text-sm text-muted">{favs.length}</span></h2>
+        <h2 className="text-2xl">{t.profile.favoriteArtistsTitle} <span className="font-mono text-sm text-muted">{favs.length}</span></h2>
         {favs.length ? (
           <ul className="mt-3 flex flex-wrap gap-2">
             {favs.map((f) => (
@@ -221,13 +235,13 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
             ))}
           </ul>
         ) : (
-          <p className="mt-2 text-sm text-muted">Na stronie artysty kliknij „Do ulubionych”.</p>
+          <p className="mt-2 text-sm text-muted">{t.profile.noFavoriteArtists}</p>
         )}
       </section>
 
       <section id="oceny" className="grid gap-6 sm:grid-cols-2">
         <div>
-          <h2 className="text-2xl">Moje oceny płyt <span className="font-mono text-sm text-muted">{albumRatings.length}</span></h2>
+          <h2 className="text-2xl">{t.profile.myAlbumRatings} <span className="font-mono text-sm text-muted">{albumRatings.length}</span></h2>
           <ul className="mt-2 space-y-1 text-sm">
             {albumRatings.slice(0, 30).map((r) => (
               <li key={r.targetMbid} className="flex gap-2"><span className="w-8 font-mono text-accent2">{r.score}</span><Link href={`/album/${r.targetMbid}`} className="truncate text-text2 hover:text-accent2">{r.label ?? r.targetMbid}</Link></li>
@@ -235,7 +249,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           </ul>
         </div>
         <div>
-          <h2 className="text-2xl">Moje oceny artystów <span className="font-mono text-sm text-muted">{artistRatings.length}</span></h2>
+          <h2 className="text-2xl">{t.profile.myArtistRatings} <span className="font-mono text-sm text-muted">{artistRatings.length}</span></h2>
           <ul className="mt-2 space-y-1 text-sm">
             {artistRatings.slice(0, 30).map((r) => (
               <li key={r.targetMbid} className="flex gap-2"><span className="w-8 font-mono text-accent2">{r.score}</span><Link href={`/artist/${r.targetMbid}`} className="truncate text-text2 hover:text-accent2">{r.label ?? r.targetMbid}</Link></li>

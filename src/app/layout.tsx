@@ -3,15 +3,21 @@ import { Suspense } from "react";
 import "./globals.css";
 import { Nav } from "@/components/nav";
 import { NavProgress } from "@/components/nav-progress";
+import { i18n } from "@/lib/t";
 
-export const metadata: Metadata = {
-  title: { default: "Pure New Shit — portal", template: "%s · Pure New Shit" },
-  description: "Premiery, best of i podróż po płytach, zespołach i muzykach. Metal, prog, jazz.",
-};
+/** Tytuł zostaje wspólny (to nazwa własna), opis idzie w języku czytelnika. */
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await i18n();
+  return {
+    title: { default: "Pure New Shit — portal", template: "%s · Pure New Shit" },
+    description: t.nav.siteDescription,
+  };
+}
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const { locale, t } = await i18n();
   return (
-    <html lang="pl">
+    <html lang={locale}>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -26,9 +32,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         </Suspense>
         <Nav />
         <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
-        <footer className="mx-auto max-w-6xl px-4 py-10 text-xs text-faint">
-          Dane: MusicBrainz · Wikipedia · Cover Art Archive. Oceny i komentarze należą do użytkowników portalu.
-        </footer>
+        <footer className="mx-auto max-w-6xl px-4 py-10 text-xs text-faint">{t.nav.footer}</footer>
       </body>
     </html>
   );

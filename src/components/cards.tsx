@@ -16,9 +16,14 @@ export function CreditLinks({ credit, className = "" }: { credit: CreditPart[]; 
   );
 }
 
-export function typeLabel(a: AlbumSummary) {
+/**
+ * `fallback` przychodzi od wywołującego, bo ten komponent współdzielą ekrany
+ * spoza tego zestawu plików (płyta, artysta, szukaj) — nie narzucamy im tu
+ * własnego słownika, tylko dajemy sensowną wartość domyślną po polsku.
+ */
+export function typeLabel(a: AlbumSummary, fallback = "wydawnictwo") {
   const t = [a.primaryType, ...a.secondaryTypes].filter(Boolean).join(" · ");
-  return t || "wydawnictwo";
+  return t || fallback;
 }
 
 export function AlbumCard({ album, rating, extra }: { album: AlbumSummary; rating?: { avg: number; count: number }; extra?: React.ReactNode }) {

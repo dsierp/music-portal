@@ -1,0 +1,283 @@
+/** Napisy powtarzające się na wielu ekranach: oceny, komentarze, błędy, puste stany. */
+import type { Locale } from "@/lib/i18n";
+
+const pl = {
+  detailLoading: "Czytam skład i dyskografię z MusicBrainz — pierwsze wejście trwa chwilę, kolejne są natychmiastowe.",
+  loading: "Wczytuję…",
+  nothingFound: "Nic nie znalazłam.",
+  showAll: "Pokaż wszystko",
+  more: "więcej",
+  all: "Wszystko",
+  albums: "Płyty",
+  bands: "Zespoły",
+  people: "Ludzie",
+  album: "Płyta",
+  band: "Zespół",
+  musician: "Muzyk",
+  year: "Rok",
+  favorite: "Ulubiony",
+  addFavorite: "Do ulubionych",
+  inFavorites: "w ulubionych",
+  rating: "Ocena",
+  ratings: "oceny",
+  yourRating: "Twoja ocena",
+  rate: "Oceń",
+  comments: "Komentarze",
+  comment: "Komentarz",
+  addComment: "Dodaj komentarz",
+  reply: "Odpowiedz",
+  edit: "Edytuj",
+  save: "Zapisz",
+  cancel: "Anuluj",
+  delete: "Usuń",
+  dbDown: "Baza chwilowo nie odpowiada — treści z MusicBrainz i Wikipedii działają, Twoje oceny i komentarze wrócą za chwilę.",
+  mbDown: "MusicBrainz chwilowo nie odpowiada. Spróbuj za chwilę.",
+  loginToDo: "Zaloguj się, żeby oceniać i komentować.",
+
+  // --- Panel ocen (rating.tsx) ---
+  noRatings: "bez ocen",
+  /** Dymek przy plakietce oceny — liczba głosów. */
+  ratingsCount: { one: "{n} ocena", few: "{n} oceny", many: "{n} ocen" } as { one: string; few?: string; many: string },
+  ratingsPanelTitle: "Oceny",
+  /** "Twoja ocena: 7/10" — {n} podstawia plural(), reszty pilnuje fmt(). */
+  yourRatingValue: "Twoja ocena: {n}/10",
+  loginToRate: "Zaloguj się, żeby ocenić.",
+  /** Wspólne dla "usuń ocenę" i "usuń komentarz" — w polskim to jedno słowo. */
+  removeAction: "usuń",
+
+  // --- Komentarze (comments.tsx) ---
+  replyToggle: "odpowiedz",
+  editToggle: "edytuj",
+  replyPlaceholder: "Odpowiedź dla {name}…",
+  commentPlaceholder: "Co o tym myślisz?",
+  edited: "(edytowany)",
+  commentDeleted: "[komentarz usunięty]",
+  logInCta: "Zaloguj się",
+  loginToCommentSuffix: ", żeby komentować.",
+
+  // --- Linki do recenzji (links.tsx) ---
+  reviewsTitle: "Oceny i recenzje",
+  reviewsAutoNote: "Oceny wyciągnięte automatycznie, gdy się udało — bez liczby obok, serwis zwykle i tak ją ma, tylko nie dało się jej stąd pobrać.",
+
+  // --- MusicBrainz chwilowo nie odpowiada (mb-unavailable.tsx) ---
+  mbUnavailableTitle: "MusicBrainz chwilowo nie odpowiada",
+  mbUnavailableBody: "Nie udało się pobrać danych ({what}). MusicBrainz ogranicza liczbę zapytań i czasem bywa przeciążony — to mija samo. Ta strona spróbuje ponownie za 15 sekund.",
+  home: "Strona główna",
+
+  // --- Baza lokalna nie odpowiada (db-warning.tsx) ---
+  dbWarningTitle: "Lokalna baza nie odpowiada.",
+  dbWarningDetails: "Oceny, komentarze i ulubione są chwilowo niedostępne — opis płyty i skład czytamy z MusicBrainz, więc widać je normalnie.",
+  dbWarningIntro: "Najczęstsza przyczyna: serwer był ubity w trakcie zapisu albo dwa procesy pisały do jednej bazy. Naprawa:",
+  dbWarningThen: "potem",
+
+  // --- Filmiki z YouTube (youtube.tsx) ---
+  ytHeading: "Filmiki (YouTube)",
+  ytMore: "więcej wyników na YouTube ↗",
+
+  // --- Odnośnik do artykułu Wikipedii (artist/album page) ---
+  wikipediaLink: "Wikipedia ({lang}) →",
+};
+type T = typeof pl;
+
+const en: T = {
+  detailLoading: "Reading the line-up and discography from MusicBrainz — the first visit takes a moment, the next ones are instant.",
+  loading: "Loading…",
+  nothingFound: "Nothing found.",
+  showAll: "Show everything",
+  more: "more",
+  all: "Everything",
+  albums: "Albums",
+  bands: "Bands",
+  people: "People",
+  album: "Album",
+  band: "Band",
+  musician: "Musician",
+  year: "Year",
+  favorite: "Favourite",
+  addFavorite: "Add to favourites",
+  inFavorites: "have it in favourites",
+  rating: "Rating",
+  ratings: "ratings",
+  yourRating: "Your rating",
+  rate: "Rate",
+  comments: "Comments",
+  comment: "Comment",
+  addComment: "Add a comment",
+  reply: "Reply",
+  edit: "Edit",
+  save: "Save",
+  cancel: "Cancel",
+  delete: "Delete",
+  dbDown: "The database is not answering right now — MusicBrainz and Wikipedia still work, your ratings and comments will be back shortly.",
+  mbDown: "MusicBrainz is not answering right now. Try again in a moment.",
+  loginToDo: "Sign in to rate and comment.",
+
+  noRatings: "no ratings yet",
+  ratingsCount: { one: "{n} rating", many: "{n} ratings" },
+  ratingsPanelTitle: "Ratings",
+  yourRatingValue: "Your rating: {n}/10",
+  loginToRate: "Sign in to rate this.",
+  removeAction: "remove",
+
+  replyToggle: "reply",
+  editToggle: "edit",
+  replyPlaceholder: "Reply to {name}…",
+  commentPlaceholder: "What do you think?",
+  edited: "(edited)",
+  commentDeleted: "[comment deleted]",
+  logInCta: "Sign in",
+  loginToCommentSuffix: " to comment.",
+
+  reviewsTitle: "Ratings and reviews",
+  reviewsAutoNote: "Ratings pulled in automatically where we could — without a number next to it, the site usually still has one, we just couldn't scrape it from there.",
+
+  mbUnavailableTitle: "MusicBrainz isn't answering right now",
+  mbUnavailableBody: "We couldn't fetch the data ({what}). MusicBrainz caps how many requests it takes and gets overloaded sometimes — it clears up on its own. This page will retry in 15 seconds.",
+  home: "Home",
+
+  dbWarningTitle: "The local database isn't answering.",
+  dbWarningDetails: "Ratings, comments and favourites are briefly unavailable — the album write-up and lineup still come straight from MusicBrainz, so those show up as usual.",
+  dbWarningIntro: "Usual cause: the server got killed mid-write, or two processes were writing to the same database. Fix:",
+  dbWarningThen: "then",
+
+  ytHeading: "Videos (YouTube)",
+  ytMore: "more results on YouTube ↗",
+
+  wikipediaLink: "Wikipedia ({lang}) →",
+};
+
+const es: T = {
+  detailLoading: "Leyendo la formación y la discografía de MusicBrainz: la primera visita tarda un poco, las siguientes son instantáneas.",
+  loading: "Cargando…",
+  nothingFound: "No he encontrado nada.",
+  showAll: "Mostrar todo",
+  more: "más",
+  all: "Todo",
+  albums: "Discos",
+  bands: "Bandas",
+  people: "Personas",
+  album: "Disco",
+  band: "Banda",
+  musician: "Músico",
+  year: "Año",
+  favorite: "Favorito",
+  addFavorite: "Añadir a favoritos",
+  inFavorites: "lo tienen en favoritos",
+  rating: "Valoración",
+  ratings: "valoraciones",
+  yourRating: "Tu valoración",
+  rate: "Valorar",
+  comments: "Comentarios",
+  comment: "Comentario",
+  addComment: "Añadir un comentario",
+  reply: "Responder",
+  edit: "Editar",
+  save: "Guardar",
+  cancel: "Cancelar",
+  delete: "Borrar",
+  dbDown: "La base de datos no responde ahora mismo: MusicBrainz y Wikipedia siguen funcionando, tus valoraciones y comentarios volverán enseguida.",
+  mbDown: "MusicBrainz no responde ahora mismo. Inténtalo en un momento.",
+  loginToDo: "Inicia sesión para valorar y comentar.",
+
+  noRatings: "sin valoraciones",
+  ratingsCount: { one: "{n} valoración", many: "{n} valoraciones" },
+  ratingsPanelTitle: "Valoraciones",
+  yourRatingValue: "Tu valoración: {n}/10",
+  loginToRate: "Inicia sesión para valorar.",
+  removeAction: "quitar",
+
+  replyToggle: "responder",
+  editToggle: "editar",
+  replyPlaceholder: "Responder a {name}…",
+  commentPlaceholder: "¿Qué te parece?",
+  edited: "(editado)",
+  commentDeleted: "[comentario eliminado]",
+  logInCta: "Inicia sesión",
+  loginToCommentSuffix: " para comentar.",
+
+  reviewsTitle: "Valoraciones y reseñas",
+  reviewsAutoNote: "Valoraciones extraídas automáticamente cuando ha sido posible — si no aparece un número al lado, el sitio suele tenerlo igualmente, solo que no hemos podido sacarlo de ahí.",
+
+  mbUnavailableTitle: "MusicBrainz no responde ahora mismo",
+  mbUnavailableBody: "No hemos podido obtener los datos ({what}). MusicBrainz limita las peticiones y a veces se satura — se soluciona solo. Esta página volverá a intentarlo en 15 segundos.",
+  home: "Inicio",
+
+  dbWarningTitle: "La base de datos local no responde.",
+  dbWarningDetails: "Las valoraciones, los comentarios y los favoritos están temporalmente fuera de servicio — la ficha del disco y la formación siguen leyéndose de MusicBrainz, así que se ven con normalidad.",
+  dbWarningIntro: "Causa habitual: el servidor se cerró a mitad de una escritura, o dos procesos escribían a la vez en la misma base de datos. Solución:",
+  dbWarningThen: "y luego",
+
+  ytHeading: "Vídeos (YouTube)",
+  ytMore: "más resultados en YouTube ↗",
+
+  wikipediaLink: "Wikipedia ({lang}) →",
+};
+
+const de: T = {
+  detailLoading: "Lese Besetzung und Diskografie von MusicBrainz — der erste Besuch dauert einen Moment, die nächsten sind sofort da.",
+  loading: "Lade…",
+  nothingFound: "Nichts gefunden.",
+  showAll: "Alles anzeigen",
+  more: "mehr",
+  all: "Alles",
+  albums: "Alben",
+  bands: "Bands",
+  people: "Personen",
+  album: "Album",
+  band: "Band",
+  musician: "Musiker",
+  year: "Jahr",
+  favorite: "Favorit",
+  addFavorite: "Zu Favoriten",
+  inFavorites: "haben es in den Favoriten",
+  rating: "Bewertung",
+  ratings: "Bewertungen",
+  yourRating: "Deine Bewertung",
+  rate: "Bewerten",
+  comments: "Kommentare",
+  comment: "Kommentar",
+  addComment: "Kommentar schreiben",
+  reply: "Antworten",
+  edit: "Bearbeiten",
+  save: "Speichern",
+  cancel: "Abbrechen",
+  delete: "Löschen",
+  dbDown: "Die Datenbank antwortet gerade nicht — MusicBrainz und Wikipedia laufen weiter, deine Bewertungen und Kommentare sind gleich zurück.",
+  mbDown: "MusicBrainz antwortet gerade nicht. Versuch es gleich noch einmal.",
+  loginToDo: "Melde dich an, um zu bewerten und zu kommentieren.",
+
+  noRatings: "keine Bewertungen",
+  ratingsCount: { one: "{n} Bewertung", many: "{n} Bewertungen" },
+  ratingsPanelTitle: "Bewertungen",
+  yourRatingValue: "Deine Bewertung: {n}/10",
+  loginToRate: "Melde dich an, um zu bewerten.",
+  removeAction: "entfernen",
+
+  replyToggle: "antworten",
+  editToggle: "bearbeiten",
+  replyPlaceholder: "Antwort an {name}…",
+  commentPlaceholder: "Was denkst du?",
+  edited: "(bearbeitet)",
+  commentDeleted: "[Kommentar gelöscht]",
+  logInCta: "Anmelden",
+  loginToCommentSuffix: ", um zu kommentieren.",
+
+  reviewsTitle: "Bewertungen und Rezensionen",
+  reviewsAutoNote: "Bewertungen automatisch übernommen, wo es geklappt hat — steht keine Zahl daneben, hat die Seite meist trotzdem eine, wir konnten sie nur nicht auslesen.",
+
+  mbUnavailableTitle: "MusicBrainz antwortet gerade nicht",
+  mbUnavailableBody: "Die Daten ({what}) ließen sich nicht abrufen. MusicBrainz begrenzt die Anfragen und ist manchmal überlastet — das gibt sich von selbst. Diese Seite versucht es in 15 Sekunden erneut.",
+  home: "Startseite",
+
+  dbWarningTitle: "Die lokale Datenbank antwortet nicht.",
+  dbWarningDetails: "Bewertungen, Kommentare und Favoriten sind kurzzeitig nicht verfügbar — Beschreibung und Besetzung des Albums kommen weiter direkt von MusicBrainz und sind wie gewohnt zu sehen.",
+  dbWarningIntro: "Häufigste Ursache: Der Server wurde mitten im Schreibvorgang beendet, oder zwei Prozesse haben gleichzeitig in dieselbe Datenbank geschrieben. Behebung:",
+  dbWarningThen: "danach",
+
+  ytHeading: "Videos (YouTube)",
+  ytMore: "weitere Ergebnisse auf YouTube ↗",
+
+  wikipediaLink: "Wikipedia ({lang}) →",
+};
+
+export const common: Record<Locale, T> = { pl, en, es, de };

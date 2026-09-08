@@ -1,0 +1,100 @@
+/** Napisy ekranu: search. Polski jest źródłem prawdy — z niego bierzemy typ. */
+import type { Locale } from "@/lib/i18n";
+
+const pl = {
+  inPortal: "W portalu",
+  artistLabel: "Artysta",
+  albumTitleLabel: "Tytuł płyty",
+  narrow: "Zawęź",
+  clear: "wyczyść",
+  missNotice: "Nie udało się automatycznie dopasować tej pozycji w MusicBrainz — wybierz właściwą płytę z wyników.",
+  likeNotice: "Wybierz płytę, którą mam zapamiętać jako lubianą.",
+  searchError: "Błąd wyszukiwania",
+  errorMineFallback: "— poniżej to, co portal ma u siebie.",
+  noAlbumsFor: "Brak płyt dla „{name}”.",
+  artistsAndMusicians: "Artyści i muzycy",
+  noBands: "Brak zespołów.",
+  noPeople: "Brak osób.",
+  noArtists: "Brak artystów.",
+  person: "osoba",
+  akaPrefix: "znany też jako:",
+  likeThisAlbum: "♥ Lubię tę płytę",
+  // Poniższe dwa klucze nie mają własnego ekranu (404 i globalny loading.tsx
+  // to jednoplikowe widoki bez osobnego słownika) — trzymamy je tutaj, bo
+  // najbliżej im tematycznie do wyszukiwania: „nie znaleziono", „czekamy na dane".
+  notFoundBody: "Nie ma takiej strony ani takiego MBID.",
+  loadingData: "Wczytuję dane…",
+  loadingHint: "MusicBrainz i Wikipedia — czasem chwilę to trwa.",
+};
+type T = typeof pl;
+
+const en: T = {
+  inPortal: "On the portal",
+  artistLabel: "Artist",
+  albumTitleLabel: "Album title",
+  narrow: "Narrow down",
+  clear: "clear",
+  missNotice: "We couldn't automatically match this entry in MusicBrainz — pick the right album from the results.",
+  likeNotice: "Pick the album you want us to remember as a favourite.",
+  searchError: "Search error",
+  errorMineFallback: "— below is what the portal has on its own.",
+  noAlbumsFor: "No albums for “{name}”.",
+  artistsAndMusicians: "Artists and musicians",
+  noBands: "No bands found.",
+  noPeople: "No people found.",
+  noArtists: "No artists found.",
+  person: "person",
+  akaPrefix: "also known as:",
+  likeThisAlbum: "♥ I like this album",
+  notFoundBody: "There's no such page, and no such MBID.",
+  loadingData: "Loading data…",
+  loadingHint: "MusicBrainz and Wikipedia — it can take a moment.",
+};
+
+const es: T = {
+  inPortal: "En el portal",
+  artistLabel: "Artista",
+  albumTitleLabel: "Título del disco",
+  narrow: "Acotar",
+  clear: "limpiar",
+  missNotice: "No hemos podido emparejar automáticamente esta entrada en MusicBrainz — elige el disco correcto entre los resultados.",
+  likeNotice: "Elige el disco que quieres que recordemos como favorito.",
+  searchError: "Error de búsqueda",
+  errorMineFallback: "— abajo tienes lo que el portal tiene por su cuenta.",
+  noAlbumsFor: "No hay discos para «{name}».",
+  artistsAndMusicians: "Artistas y músicos",
+  noBands: "No se han encontrado bandas.",
+  noPeople: "No se han encontrado personas.",
+  noArtists: "No se han encontrado artistas.",
+  person: "persona",
+  akaPrefix: "también conocido como:",
+  likeThisAlbum: "♥ Me gusta este disco",
+  notFoundBody: "No existe esa página, ni ese MBID.",
+  loadingData: "Cargando datos…",
+  loadingHint: "MusicBrainz y Wikipedia — a veces tarda un poco.",
+};
+
+const de: T = {
+  inPortal: "Im Portal",
+  artistLabel: "Künstler",
+  albumTitleLabel: "Albumtitel",
+  narrow: "Eingrenzen",
+  clear: "zurücksetzen",
+  missNotice: "Dieser Eintrag ließ sich nicht automatisch in MusicBrainz zuordnen — wähle das richtige Album aus den Ergebnissen.",
+  likeNotice: "Wähle das Album, das wir uns als Favorit merken sollen.",
+  searchError: "Fehler bei der Suche",
+  errorMineFallback: "— unten steht, was das Portal selbst hat.",
+  noAlbumsFor: "Keine Alben für „{name}“.",
+  artistsAndMusicians: "Künstler und Musiker",
+  noBands: "Keine Bands gefunden.",
+  noPeople: "Keine Personen gefunden.",
+  noArtists: "Keine Künstler gefunden.",
+  person: "Person",
+  akaPrefix: "auch bekannt als:",
+  likeThisAlbum: "♥ Gefällt mir",
+  notFoundBody: "Diese Seite gibt es nicht, und diese MBID auch nicht.",
+  loadingData: "Lade Daten…",
+  loadingHint: "MusicBrainz und Wikipedia — das kann einen Moment dauern.",
+};
+
+export const search: Record<Locale, T> = { pl, en, es, de };

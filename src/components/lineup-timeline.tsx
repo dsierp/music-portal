@@ -1,5 +1,7 @@
 import type { AlbumSummary, Membership } from "@/lib/musicbrainz";
 import { mergeSpans, rowRoles, type TimelineRow } from "@/lib/timeline";
+import { fmt, plural, type Locale } from "@/lib/i18n";
+import type { Dict } from "@/lib/dict";
 
 /**
  * Oś czasu — dwa spojrzenia na to samo:
@@ -21,22 +23,30 @@ import { mergeSpans, rowRoles, type TimelineRow } from "@/lib/timeline";
  *
  * Rysujemy inline SVG: skaluje się bez rozmycia, działa bez javascriptu i nie
  * wymaga żadnej biblioteki.
+ *
+ * Napisy (legenda, podpisy, stopka) przychodzą propsami ze strony artysty
+ * (patrz `TimelineLabels` niżej) — komponent sam nie woła i18n(), żeby jego API
+ * pozostało czystą funkcją danych + etykiet, bez ukrytej zależności od żądania.
  */
-const ROLE_COLORS: { match: RegExp; color: string; label: string }[] = [
-  { match: /vocal|voice|śpiew/i, color: "#d6392f", label: "wokal" },
-  { match: /guitar|gitar/i, color: "#5aa84f", label: "gitara" },
-  { match: /bass|bas\b/i, color: "#5b8fd6", label: "bas" },
-  { match: /drum|perkus|percussion/i, color: "#e0913f", label: "perkusja" },
-  { match: /key|piano|organ|synth/i, color: "#a071c9", label: "klawisze" },
-];
-const OTHER = { color: "#7c8296", label: "inne" };
+type TimelineLabels = Dict["artist"]["timeline"];
 
-function roleStyle(roles: string[]) {
+/** Kolejność dopasowania ma znaczenie — pierwsza pasująca rola wygrywa (np. "bas" przed "inne"). */
+function roleColors(t: TimelineLabels): { match: RegExp; color: string; label: string }[] {
+  return [
+    { match: /vocal|voice|śpiew/i, color: "#d6392f", label: t.roleVocal },
+    { match: /guitar|gitar/i, color: "#5aa84f", label: t.roleGuitar },
+    { match: /bass|bas\b/i, color: "#5b8fd6", label: t.roleBass },
+    { match: /drum|perkus|percussion/i, color: "#e0913f", label: t.roleDrums },
+    { match: /key|piano|organ|synth/i, color: "#a071c9", label: t.roleKeys },
+  ];
+}
+
+function roleStyle(roles: string[], t: TimelineLabels) {
   for (const r of roles) {
-    const hit = ROLE_COLORS.find((c) => c.match.test(r));
+    const hit = roleColors(t).find((c) => c.match.test(r));
     if (hit) return hit;
   }
-  return OTHER;
+  return { color: "#7c8296", label: t.roleOther };
 }
 
 /** "1983-04-01" → 1983.25; null → domyślna wartość. */
@@ -67,12 +77,14 @@ function Chart({
   albums,
   labelWidth,
   markLabel,
+  t,
 }: {
   rows: Row[];
   /** znaczniki na całej wysokości wykresu (dyskografia zespołu / płyty solowe) */
   albums: Mark[];
   labelWidth: number;
   markLabel: string;
+  t: TimelineLabels;
 }) {
   const now = new Date().getFullYear() + 1;
 
@@ -111,7 +123,7 @@ function Chart({
 
   const used = new Map<string, string>();
   for (const row of rows) {
-    const s = roleStyle(rowRoles(row));
+    const s = roleStyle(rowRoles(row), t);
     used.set(s.label, s.color);
   }
 
@@ -120,7 +132,7 @@ function Chart({
   return (
     <>
       <div className="mt-3 overflow-x-auto">
-        <svg viewBox={`0 0 ${W} ${H}`} width={W} className="min-w-[680px] max-w-full" role="img" aria-label="Oś czasu">
+        <svg viewBox={`0 0 ${W} ${H}`} width={W} className="min-w-[680px] max-w-full" role="img" aria-label={t.axisAriaLabel}>
           {/* Pionowe kreski = płyty. Kółko na górze jest klikalne i ma podpowiedź
               (SVG <title> = natywny dymek przeglądarki, bez javascriptu). */}
           {globalPoints.map((p, i) => (
@@ -134,7 +146,7 @@ function Chart({
             </a>
           ))}
           {rows.map((row, i) => {
-            const s = roleStyle(rowRoles(row));
+            const s = roleStyle(rowRoles(row), t);
             const y = i * ROW_H + 12;
             return (
               <g key={row.mbid}>
@@ -145,7 +157,7 @@ function Chart({
                   return (
                     <rect key={j} x={x1} y={y + 4} width={Math.max(2, x2 - x1)} height={ROW_H - 8} fill={s.color} rx={2}>
                       <title>
-                        {`${row.name}: ${sp.begin?.slice(0, 4) ?? "?"}–${sp.current ? "dziś" : sp.end?.slice(0, 4) ?? "?"}${sp.roles.length ? ` (${sp.roles.join(", ")})` : ""}`}
+                        {`${row.name}: ${sp.begin?.slice(0, 4) ?? "?"}–${sp.current ? t.today : sp.end?.slice(0, 4) ?? "?"}${sp.roles.length ? ` (${sp.roles.join(", ")})` : ""}`}
                       </title>
                     </rect>
                   );
@@ -160,7 +172,7 @@ function Chart({
                   return (
                     <a key={`rm-${j}`} href={`/album/${p.album.mbid}`} className="album-mark">
                       <title>
-                        {`${p.album.artistText} – ${p.album.title}${p.album.year ? ` (${p.album.year})` : ""}${inSpan ? "" : " — poza jego okresem w składzie"}`}
+                        {`${p.album.artistText} – ${p.album.title}${p.album.year ? ` (${p.album.year})` : ""}${inSpan ? "" : t.outOfSpanSuffix}`}
                       </title>
                       <rect
                         x={x(p.year) - 4}
@@ -188,11 +200,11 @@ function Chart({
           })}
           {/* oś lat */}
           <line x1={LABEL_W} x2={W - 12} y1={baseY} y2={baseY} stroke="var(--rule)" />
-          {ticks.map((t) => (
-            <g key={t}>
-              <line x1={x(t)} x2={x(t)} y1={baseY} y2={baseY + 4} stroke="var(--rule)" />
-              <text x={x(t)} y={baseY + 17} textAnchor="middle" fontSize="11" fill="var(--muted)" fontFamily="var(--font-mono)">
-                {t}
+          {ticks.map((tick) => (
+            <g key={tick}>
+              <line x1={x(tick)} x2={x(tick)} y1={baseY} y2={baseY + 4} stroke="var(--rule)" />
+              <text x={x(tick)} y={baseY + 17} textAnchor="middle" fontSize="11" fill="var(--muted)" fontFamily="var(--font-mono)">
+                {tick}
               </text>
             </g>
           ))}
@@ -214,32 +226,29 @@ function Chart({
             <>
               <span className="flex items-center gap-1.5">
                 <span className="inline-block h-2 w-2 rotate-45 bg-text" />
-                płyta z jego okresu — kliknij po stronę płyty
+                {t.legendInSpan}
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="inline-block h-2 w-2 rotate-45 border border-text opacity-45" />
-                płyta zespołu spoza jego kadencji
+                {t.legendOutSpan}
               </span>
             </>
           )}
         </div>
-        <p className="mt-1 text-[10px] text-faint">
-          Z dat członkostwa w MusicBrainz. Brakujące daty rysujemy do dziś — MB nie zawsze ma komplet.
-          Przerwa w pasku to odejście i powrót.
-        </p>
+        <p className="mt-1 text-[10px] text-faint">{t.footnote}</p>
       </div>
     </>
   );
 }
 
 /** Widok zespołu: po lewej ludzie, pionowe kreski to dyskografia zespołu. */
-export function LineupTimeline({ members, albums }: { members: Membership[]; albums: AlbumSummary[] }) {
+export function LineupTimeline({ members, albums, locale, t }: { members: Membership[]; albums: AlbumSummary[]; locale: Locale; t: TimelineLabels }) {
   const rows = mergeSpans<Membership, Mark>(members.filter((m) => m.begin || m.end));
   if (rows.length < 2) return null; // przy jednym pasku wykres niczego nie pokazuje
   return (
     <details className="mt-6">
-      <summary className="cursor-pointer text-muted hover:text-accent2">Oś czasu składu ({rows.length} osób)</summary>
-      <Chart rows={rows} albums={albums.map(markOf)} labelWidth={150} markLabel="album — najedź po tytuł, kliknij po stronę płyty" />
+      <summary className="cursor-pointer text-muted hover:text-accent2">{plural(locale, rows.length, t.lineupSummary)}</summary>
+      <Chart rows={rows} albums={albums.map(markOf)} labelWidth={150} markLabel={t.markAlbumLabel} t={t} />
     </details>
   );
 }
@@ -256,11 +265,15 @@ export function CareerTimeline({
   bands,
   albumsByBand,
   own,
+  locale,
+  t,
 }: {
   name: string;
   bands: Membership[];
   albumsByBand: Map<string, AlbumSummary[]>;
   own: AlbumSummary[];
+  locale: Locale;
+  t: TimelineLabels;
 }) {
   const rows = mergeSpans<Membership, Mark>(
     bands.filter((b) => b.begin || b.end),
@@ -270,9 +283,9 @@ export function CareerTimeline({
   return (
     <details className="mt-6" open>
       <summary className="cursor-pointer text-muted hover:text-accent2">
-        Oś czasu: gdzie grał(a) {name} ({rows.length} zespołów)
+        {fmt(plural(locale, rows.length, t.careerSummary), { name })}
       </summary>
-      <Chart rows={rows} albums={own.map(markOf)} labelWidth={180} markLabel="płyta pod własnym nazwiskiem" />
+      <Chart rows={rows} albums={own.map(markOf)} labelWidth={180} markLabel={t.markOwnLabel} t={t} />
     </details>
   );
 }

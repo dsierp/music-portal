@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireUser, signIn, signOut } from "@/lib/auth";
+import { cookies } from "next/headers";
+import { currentUser, requireUser, signIn, signOut } from "@/lib/auth";
+import { LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE, normalizeLocale } from "@/lib/i18n";
 import * as ud from "@/lib/user-data";
 
 const target = z.enum(["ALBUM", "ARTIST"]);
@@ -117,7 +119,6 @@ export async function addLikedFromSearch(formData: FormData) {
  * (rok), żeby portal nie wracał z tym pytaniem przy każdym wejściu.
  */
 export async function skipOnboarding() {
-  const { cookies } = await import("next/headers");
   const { SKIP_ONBOARDING } = await import("@/lib/onboarding");
   (await cookies()).set(SKIP_ONBOARDING, "1", { maxAge: 60 * 60 * 24 * 365, httpOnly: true, sameSite: "lax", path: "/" });
   redirect("/");
@@ -139,4 +140,27 @@ export async function removeAreaAction(formData: FormData) {
   await ud.removeArea(u.id, scopeOf(formData.get("scope")), String(formData.get("country") ?? ""), String(formData.get("city") ?? "") || null);
   revalidatePath("/ja");
   revalidatePath("/koncerty");
+}
+
+// ---------- język ----------
+
+/**
+ * Zmiana języka. Ciasteczko działa od razu i także dla niezalogowanych;
+ * zalogowanym zapisujemy wybór jeszcze w profilu, żeby szedł za nimi na inne
+ * urządzenie. Wracamy na tę samą stronę — adresy są wspólne dla wszystkich
+ * języków, więc nie ma dokąd przekierowywać.
+ */
+export async function setLocaleAction(formData: FormData) {
+  const wanted = normalizeLocale(String(formData.get("locale") ?? ""));
+  if (!wanted) return;
+  (await cookies()).set(LOCALE_COOKIE, wanted, {
+    maxAge: LOCALE_COOKIE_MAX_AGE,
+    path: "/",
+    sameSite: "lax",
+  });
+  const user = await currentUser();
+  if (user) await ud.setUserLocale(user.id, wanted).catch(() => {});
+  const back = String(formData.get("back") ?? "/");
+  revalidatePath(back.startsWith("/") ? back : "/", "layout");
+  redirect(back.startsWith("/") ? back : "/");
 }

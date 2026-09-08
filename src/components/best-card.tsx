@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { InferSelectModel } from "drizzle-orm";
 import { schema } from "@/db";
 import { searchLinks } from "./links";
+import type { Dict } from "@/lib/dict";
 
 type Entry = InferSelectModel<typeof schema.bestOfEntries>;
 
@@ -19,7 +20,7 @@ function meta(e: Entry) {
 }
 
 /** Pozycja nr 1 w kategorii — duża okładka, jak płyta tygodnia w premierach. */
-export function BestPick({ e, category }: { e: Entry; category: string }) {
+export function BestPick({ e, category, t }: { e: Entry; category: string; t: Dict }) {
   const links = searchLinks(e.artist, e.album);
   const href = `/go/best/${e.id}`;
   return (
@@ -33,7 +34,7 @@ export function BestPick({ e, category }: { e: Entry; category: string }) {
         )}
       </Link>
       <div>
-        <p className="eyebrow">Numer 1 · {category}</p>
+        <p className="eyebrow">{t.lists.numberOne} · {category}</p>
         <p className="who">{e.artist}</p>
         <h3 className="what">
           <Link href={href} className="hover:text-accent2">{e.album}</Link>
@@ -42,12 +43,12 @@ export function BestPick({ e, category }: { e: Entry; category: string }) {
         {e.why && <p className="desc">{e.why}</p>}
         {e.scores && (
           <p className="rev">
-            <span className="k">Oceny</span>
+            <span className="k">{t.lists.ratingsLabel}</span>
             {e.scores}
           </p>
         )}
         <div className="row">
-          <Actions links={links} href={href} />
+          <Actions links={links} href={href} t={t} />
         </div>
       </div>
     </article>
@@ -55,7 +56,7 @@ export function BestPick({ e, category }: { e: Entry; category: string }) {
 }
 
 /** Pozostałe miejsca — wiersz z numerem zamiast gwiazdki. */
-export function BestRow({ e }: { e: Entry }) {
+export function BestRow({ e, t }: { e: Entry; t: Dict }) {
   const links = searchLinks(e.artist, e.album);
   const href = `/go/best/${e.id}`;
   return (
@@ -71,25 +72,25 @@ export function BestRow({ e }: { e: Entry }) {
         {e.why && <p className="desc">{e.why}</p>}
         {e.scores && (
           <p className="rev">
-            <span className="k">Oceny</span>
+            <span className="k">{t.lists.ratingsLabel}</span>
             {e.scores}
           </p>
         )}
       </div>
       <div className="side">
-        <Actions links={links} href={href} small />
+        <Actions links={links} href={href} t={t} small />
       </div>
     </li>
   );
 }
 
-function Actions({ links, href, small = false }: { links: { spotify: string; tidal: string }; href: string; small?: boolean }) {
+function Actions({ links, href, t, small = false }: { links: { spotify: string; tidal: string }; href: string; t: Dict; small?: boolean }) {
   const pill = "rounded-full border px-3 py-1 font-mono transition-colors";
   return (
     <div className={`flex flex-wrap items-center gap-2 ${small ? "text-[11px]" : "text-xs"}`}>
       <a href={links.spotify} target="_blank" rel="noopener" className={`${pill} border-spotify/40 text-spotify hover:bg-spotify/10`}>▶ Spotify</a>
       <a href={links.tidal} target="_blank" rel="noopener" className={`${pill} border-tidal/40 text-tidal hover:bg-tidal/10`}>▶ Tidal</a>
-      <Link href={href} className={`${pill} border-rule text-muted hover:border-accent2 hover:text-accent2`}>skład i podróż →</Link>
+      <Link href={href} className={`${pill} border-rule text-muted hover:border-accent2 hover:text-accent2`}>{t.releases.travelCta}</Link>
     </div>
   );
 }

@@ -3,12 +3,18 @@ import type { Metadata } from "next";
 import { ReleaseSection } from "@/components/release-list";
 import { Masthead } from "@/components/masthead";
 import { heroArt, leadStyle } from "@/lib/lead-style";
-import { allSections, genreLabel, latestSections, releasesFor, splitDb, styleToCategory } from "@/lib/lists";
+import { allSections, genreLabel as genreLabelFallback, latestSections, releasesFor, splitDb, styleToCategory } from "@/lib/lists";
+import { genreLabel } from "@/lib/dict";
 import { orderByPopularity } from "@/lib/popularity";
 import { currentUser } from "@/lib/auth";
 import { getGenres } from "@/lib/user-data";
+import { i18n } from "@/lib/t";
 
-export const metadata: Metadata = { title: "Premiery" };
+/** Tytuł w zakładce też idzie w języku czytelnika. */
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await i18n();
+  return { title: t.nav.releases };
+}
 export const dynamic = "force-dynamic";
 
 function qs(p: Record<string, string | undefined>) {
@@ -20,6 +26,7 @@ function qs(p: Record<string, string | undefined>) {
 
 export default async function PremieryPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const sp = await searchParams;
+  const { t } = await i18n();
   const user = await currentUser();
   // domyślne filtry z preferencji użytkownika (jeśli nie wybrał ręcznie)
   const genres = sp.g ? sp.g.split(",").filter(Boolean) : [];
@@ -56,19 +63,19 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
     <>
     <Masthead
       art={heroArt(lead)}
-      eyebrow="Premiery płytowe co piątek"
+      eyebrow={t.releases.eyebrow}
       title="Pure New Shit"
       meta={
         <>
-          {sections[0]?.date && <span>Piątek {sections[0].date}</span>}
-          {lead && <span className="ml-4">Twój styl wiodący: <b className="text-accent2">{lead.genre}</b></span>}
-          {!lead && <span className="ml-4"><Link href="/ja#style" className="underline">Ustaw swoje style</Link>, żeby portal dobrał oprawę i filtry pod Ciebie.</span>}
+          {sections[0]?.date && <span>{t.releases.fridayPrefix} {sections[0].date}</span>}
+          {lead && <span className="ml-4">{t.releases.leadGenre} <b className="text-accent2">{lead.genre}</b></span>}
+          {!lead && <span className="ml-4"><Link href="/ja#style" className="underline">{t.releases.setStyles}</Link>{t.releases.setStylesRest}</span>}
         </>
       }
     />
     <div className="mt-8 grid gap-8 md:grid-cols-[220px_1fr]">
       <aside className="md:sticky md:top-20 md:self-start">
-        <div className="label mb-2">Gatunki</div>
+        <div className="label mb-2">{t.releases.genresLabel}</div>
         <div className="flex flex-wrap gap-1.5">
           {available.map((g) => {
             // Puste filtry = wszystko włączone, więc chipy świecą się domyślnie;
@@ -79,25 +86,25 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
               : available.filter((x) => x !== g);
             return (
               <Link key={g} href={qs({ ...base, g: next.join(","), all: next.length ? undefined : "1" })} className={`chip ${on ? "chip-on" : ""}`}>
-                {genreLabel(g)}
+                {genreLabel(g, t, genreLabelFallback(g))}
                 <span className="ml-1.5 font-mono text-[10px] text-faint">{counts.get(g) ?? 0}</span>
               </Link>
             );
           })}
         </div>
-        <div className="label mt-5 mb-2">Widok</div>
+        <div className="label mt-5 mb-2">{t.releases.viewLabel}</div>
         <div className="flex flex-col gap-1.5 text-sm">
-          <Link href={qs({ ...base, g: sp.g, all: sp.all, star: filter.starOnly ? undefined : "1" })} className={`chip ${filter.starOnly ? "chip-on" : ""}`}>Tylko ★</Link>
-          <Link href={qs({ ...base, g: sp.g, all: sp.all, re: filter.showFlagged ? undefined : "1" })} className={`chip ${filter.showFlagged ? "chip-on" : ""}`}>Pokaż reedycje / EP / live</Link>
+          <Link href={qs({ ...base, g: sp.g, all: sp.all, star: filter.starOnly ? undefined : "1" })} className={`chip ${filter.starOnly ? "chip-on" : ""}`}>{t.releases.starOnly}</Link>
+          <Link href={qs({ ...base, g: sp.g, all: sp.all, re: filter.showFlagged ? undefined : "1" })} className={`chip ${filter.showFlagged ? "chip-on" : ""}`}>{t.releases.showFlagged}</Link>
         </div>
-        <p className="mt-5 text-xs text-faint">Lista powstaje co piątek z zestawienia „Pure New Shit”. Kliknięcie w tytuł otwiera stronę płyty ze składem — stamtąd ruszasz w podróż.</p>
+        <p className="mt-5 text-xs text-faint">{t.releases.footnote}</p>
       </aside>
       <div>
 
         {sections.map((s) => (
-          <ReleaseSection key={s.id} section={s} releases={rel.filter((r) => r.sectionId === s.id)} filter={filter} />
+          <ReleaseSection key={s.id} section={s} releases={rel.filter((r) => r.sectionId === s.id)} filter={filter} t={t} />
         ))}
-        {!sections.length && <p className="text-muted">Brak zaimportowanych premier. Uruchom <code>npm run import:pns</code>.</p>}
+        {!sections.length && <p className="text-muted">{t.releases.noSectionsBefore}<code>npm run import:pns</code>{t.releases.noSectionsAfter}</p>}
       </div>
     </div>
     </>

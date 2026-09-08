@@ -1,15 +1,20 @@
+import { i18n } from "@/lib/t";
+
 /**
  * Pasek pokazywany, gdy lokalna baza nie odpowiada. Reszta strony (dane
  * z MusicBrainz/Wikipedii) działa normalnie — nie ma powodu jej ukrywać.
+ *
+ * Tylko na stronach artysty i płyty — woła i18n() sam, bez propsów.
  */
-export function DbWarning() {
+export async function DbWarning() {
+  const { t } = await i18n();
   return (
     <div className="mb-4 rounded border border-red-500/40 bg-red-500/10 p-3 text-sm">
-      <strong className="block">Lokalna baza nie odpowiada.</strong>
+      <strong className="block">{t.common.dbWarningTitle}</strong>
       <span className="text-text2">
-        Oceny, komentarze i ulubione są chwilowo niedostępne — opis płyty i skład czytamy z MusicBrainz, więc widać je normalnie.
-        Najczęstsza przyczyna: serwer był ubity w trakcie zapisu albo dwa procesy pisały do jednej bazy. Naprawa:{" "}
-        <code className="font-mono text-accent2">npm run db:reset</code>, potem <code className="font-mono text-accent2">npm run dev</code>.
+        {t.common.dbWarningDetails} {t.common.dbWarningIntro}{" "}
+        <code className="font-mono text-accent2">npm run db:reset</code>, {t.common.dbWarningThen}{" "}
+        <code className="font-mono text-accent2">npm run dev</code>.
       </span>
     </div>
   );

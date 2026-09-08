@@ -6,12 +6,21 @@ import { ratingAverages } from "@/lib/user-data";
 import { currentUser } from "@/lib/auth";
 import { addLikedFromSearch } from "@/app/actions";
 import { localAlbums, localAlbumsBy } from "@/lib/local-search";
+import { i18n } from "@/lib/t";
+import { fmt } from "@/lib/i18n";
 import Link from "next/link";
 
-export const metadata: Metadata = { title: "Szukaj" };
+// Tytuł karty przeglądarki zostaje po polsku jak na sąsiednich ekranach
+// (/premiery, /koncerty…) — te strony tłumaczy inny agent razem z <head>.
+/** Tytuł w zakładce też idzie w języku czytelnika. */
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await i18n();
+  return { title: t.nav.search };
+}
 export const dynamic = "force-dynamic";
 
 export default async function SearchPage({ searchParams }: { searchParams: Promise<{ q?: string; a?: string; t?: string; f?: string; miss?: string; lubie?: string }> }) {
+  const { t } = await i18n();
   const { q = "", a: artistQ = "", t: titleQ = "", f = "", miss, lubie } = await searchParams;
   // Zawężanie ma pierwszeństwo: jak ktoś wypełnił „artysta" albo „tytuł",
   // pytamy MusicBrainz dokładnie o to pole, zamiast szukać słowa wszędzie.
@@ -55,7 +64,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
           : searchArtists(artistTerm, kind ? 25 : 10, kind),
       ]);
     } catch (e) {
-      error = e instanceof Error ? e.message : "Błąd wyszukiwania";
+      error = e instanceof Error ? e.message : t.search.searchError;
     }
   }
   const ratings = await ratingAverages("ALBUM", albums.map((a) => a.mbid));
@@ -71,16 +80,16 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
     return `/szukaj?${sp.toString()}`;
   };
   const FILTERS: { id: string; label: string; count: number }[] = [
-    { id: "", label: "Wszystko", count: albums.length + artists.length + mine.length },
-    { id: "plyty", label: "Płyty", count: albums.length },
-    { id: "zespoly", label: "Zespoły", count: artists.filter((a) => !a.isPerson).length },
-    { id: "ludzie", label: "Ludzie", count: artists.filter((a) => a.isPerson).length },
-    { id: "portal", label: "W portalu", count: mine.length },
+    { id: "", label: t.common.all, count: albums.length + artists.length + mine.length },
+    { id: "plyty", label: t.common.albums, count: albums.length },
+    { id: "zespoly", label: t.common.bands, count: artists.filter((a) => !a.isPerson).length },
+    { id: "ludzie", label: t.common.people, count: artists.filter((a) => a.isPerson).length },
+    { id: "portal", label: t.search.inPortal, count: mine.length },
   ];
   return (
     <div>
-      <h1 className="mb-4 text-4xl">Szukaj</h1>
-      <SearchBox defaultValue={q} big />
+      <h1 className="mb-4 text-4xl">{t.nav.search}</h1>
+      <SearchBox defaultValue={q} big placeholder={t.nav.searchPlaceholder} label={t.nav.search} />
       {(q || narrowed) && (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {FILTERS.map((x) => (
@@ -93,27 +102,28 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       )}
       <form action="/szukaj" className="mt-3 flex flex-wrap items-end gap-2">
         <label className="text-xs text-muted">
-          <span className="label block">Artysta</span>
+          {/* "Sigh" i "Goh-Ka" to przykładowe nazwa zespołu i tytuł płyty — nazwy własne, nie tłumaczymy. */}
+          <span className="label block">{t.search.artistLabel}</span>
           <input name="a" defaultValue={artistQ} placeholder="np. Sigh" className="input w-56 py-1 text-sm" autoComplete="off" />
         </label>
         <label className="text-xs text-muted">
-          <span className="label block">Tytuł płyty</span>
+          <span className="label block">{t.search.albumTitleLabel}</span>
           <input name="t" defaultValue={titleQ} placeholder="np. Goh-Ka" className="input w-56 py-1 text-sm" autoComplete="off" />
         </label>
-        <button className="btn">Zawęź</button>
-        {narrowed && <Link href="/szukaj" className="text-xs text-muted hover:text-accent2">wyczyść</Link>}
+        <button className="btn">{t.search.narrow}</button>
+        {narrowed && <Link href="/szukaj" className="text-xs text-muted hover:text-accent2">{t.search.clear}</Link>}
       </form>
-      {miss && <p className="mt-3 text-sm text-warn">Nie udało się automatycznie dopasować tej pozycji w MusicBrainz — wybierz właściwą płytę z wyników.</p>}
-      {lubie && <p className="mt-3 text-sm text-muted">Wybierz płytę, którą mam zapamiętać jako lubianą.</p>}
+      {miss && <p className="mt-3 text-sm text-warn">{t.search.missNotice}</p>}
+      {lubie && <p className="mt-3 text-sm text-muted">{t.search.likeNotice}</p>}
       {error && (
         <p className="mt-3 text-sm text-warn">
           {error}
-          {mine.length > 0 && " — poniżej to, co portal ma u siebie."}
+          {mine.length > 0 && ` ${t.search.errorMineFallback}`}
         </p>
       )}
       {showMine && mine.length > 0 && (
         <section className="mt-6">
-          <h2 className="label mb-3">W portalu</h2>
+          <h2 className="label mb-3">{t.search.inPortal}</h2>
           <div className="grid gap-2">
             {mine.map((h) => (
               <Link key={h.href} href={h.href} className="block rounded-lg border border-rule bg-surface2 px-3 py-2 hover:border-accent">
@@ -128,7 +138,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
         <div className={`mt-8 grid gap-8 ${showAlbums && showArtists ? "md:grid-cols-[1fr_320px]" : ""}`}>
           {showAlbums && (
           <section>
-            <h2 className="label mb-3">Płyty</h2>
+            <h2 className="label mb-3">{t.common.albums}</h2>
             {albums.length ? (
               <div className="grid gap-3">
                 {albums.map((a) => (
@@ -143,7 +153,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
                           <input type="hidden" name="title" value={a.title} />
                           <input type="hidden" name="artistName" value={a.artistText} />
                           <input type="hidden" name="artistMbid" value={a.credit[0]?.mbid ?? ""} />
-                          <button className="btn text-xs">♥ Lubię tę płytę</button>
+                          <button className="btn text-xs">{t.search.likeThisAlbum}</button>
                         </form>
                       ) : null
                     }
@@ -151,13 +161,13 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
                 ))}
               </div>
             ) : (
-              <Empty>Brak płyt dla „{shown}”.</Empty>
+              <Empty>{fmt(t.search.noAlbumsFor, { name: shown })}</Empty>
             )}
           </section>
           )}
           {showArtists && (
           <section>
-            <h2 className="label mb-3">{f === "zespoly" ? "Zespoły" : f === "ludzie" ? "Ludzie" : "Artyści i muzycy"}</h2>
+            <h2 className="label mb-3">{f === "zespoly" ? t.common.bands : f === "ludzie" ? t.common.people : t.search.artistsAndMusicians}</h2>
             {artists.length ? (
               <div className="grid gap-2">
                 {artists.map((a) => {
@@ -171,7 +181,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
                       key={a.mbid}
                       mbid={a.mbid}
                       name={a.name}
-                      sub={[a.isPerson ? "osoba" : a.type?.toLowerCase(), skad || null, lata].filter(Boolean).join(" · ")}
+                      sub={[a.isPerson ? t.search.person : a.type?.toLowerCase(), skad || null, lata].filter(Boolean).join(" · ")}
                       extra={
                         <>
                           {a.disambiguation && <div className="mt-0.5 text-xs text-text2">{a.disambiguation}</div>}
@@ -183,7 +193,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
                             </div>
                           )}
                           {a.aliases.length > 0 && (
-                            <div className="mt-1 text-[10px] text-faint">znany też jako: {a.aliases.join(", ")}</div>
+                            <div className="mt-1 text-[10px] text-faint">{t.search.akaPrefix} {a.aliases.join(", ")}</div>
                           )}
                         </>
                       }
@@ -192,7 +202,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
                 })}
               </div>
             ) : (
-              <Empty>{f === "zespoly" ? "Brak zespołów." : f === "ludzie" ? "Brak osób." : "Brak artystów."}</Empty>
+              <Empty>{f === "zespoly" ? t.search.noBands : f === "ludzie" ? t.search.noPeople : t.search.noArtists}</Empty>
             )}
           </section>
           )}

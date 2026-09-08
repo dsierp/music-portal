@@ -17,6 +17,9 @@ import { relatedBands } from "@/lib/related";
 import { CareerTimeline, LineupTimeline } from "@/components/lineup-timeline";
 import { dbSafe } from "@/lib/db-safe";
 import { DbWarning } from "@/components/db-warning";
+import { i18n } from "@/lib/t";
+import { fmt, wikiLangs, type Locale } from "@/lib/i18n";
+import type { Dict } from "@/lib/dict";
 import type { Artist, Membership, PlayedOn } from "@/lib/musicbrainz";
 
 /** Grupuje "Grał(a) na płytach" wg zespołu (do rozwijania przy pozycji w Zespoły). */
@@ -49,11 +52,13 @@ function MemberList({
   items,
   playedByBand,
   ratings,
+  t,
 }: {
   title: string;
   items: Membership[];
   playedByBand?: Map<string, PlayedOn[]>;
   ratings?: Map<string, { avg: number; count: number }>;
+  t: Dict;
 }) {
   if (!items.length) return null;
   return (
@@ -72,7 +77,7 @@ function MemberList({
               {albums && albums.length > 0 && (
                 <details className="mt-0.5">
                   <summary className="cursor-pointer text-xs text-muted hover:text-accent2">
-                    płyty z {m.name} ({albums.length})
+                    {fmt(t.artist.albumsWithMember, { name: m.name, n: albums.length })}
                   </summary>
                   <ul className="mt-1 space-y-0.5 border-l border-rule/60 pl-3">
                     {albums.map((p) => (
@@ -106,15 +111,13 @@ function MemberList({
  * Powiązane zespoły — w osobnym strumieniu, bo to kilkanaście zapytań do
  * MusicBrainz (limit 1/s). Reszta strony nie ma na nie czekać.
  */
-async function RelatedSection({ artist }: { artist: Artist }) {
+async function RelatedSection({ artist, t }: { artist: Artist; t: Dict }) {
   const related = await relatedBands(artist).catch(() => []);
   if (!related.length) return null;
   return (
     <section className="mt-10">
-      <h2 className="mb-1 text-2xl">Powiązane zespoły</h2>
-      <p className="mb-3 text-xs text-muted">
-        Liczone z MusicBrainz: przede wszystkim wspólni muzycy, pomocniczo wspólne gatunki. Bez zgadywania — przy każdym zespole widać, co go łączy.
-      </p>
+      <h2 className="mb-1 text-2xl">{t.artist.relatedHeading}</h2>
+      <p className="mb-3 text-xs text-muted">{t.artist.relatedNote}</p>
       <ul className="grid gap-2 sm:grid-cols-2">
         {related.map((b) => (
           <li key={b.mbid} className="rounded-lg border border-rule bg-surface p-3">
@@ -123,7 +126,7 @@ async function RelatedSection({ artist }: { artist: Artist }) {
               {b.people.map((p) => `${p.name}${p.roles.length ? ` (${p.roles.join(", ")})` : ""}`).join(" · ")}
             </p>
             {b.genres.length > 0 && (
-              <p className="font-mono text-[10px] text-faint">wspólne: {b.genres.join(", ")}</p>
+              <p className="font-mono text-[10px] text-faint">{fmt(t.artist.relatedShared, { genres: b.genres.join(", ") })}</p>
             )}
           </li>
         ))}
@@ -132,7 +135,7 @@ async function RelatedSection({ artist }: { artist: Artist }) {
   );
 }
 
-async function ArtistDeepContent({ artist, mbid }: { artist: Artist; mbid: string }) {
+async function ArtistDeepContent({ artist, mbid, locale, t }: { artist: Artist; mbid: string; locale: Locale; t: Dict }) {
   const [disco, played] = await Promise.all([
     getDiscography(mbid).catch(() => []),
     artist.isPerson ? getPlayedOn(mbid, artist.memberOf).catch(() => []) : Promise.resolve([]),
@@ -163,22 +166,24 @@ async function ArtistDeepContent({ artist, mbid }: { artist: Artist; mbid: strin
     <>
       {(artist.members.length > 0 || artist.memberOf.length > 0) && (
         <section className="mt-8 space-y-4">
-          <h2 className="text-2xl">{artist.isPerson ? "Zespoły" : "Skład"}</h2>
+          <h2 className="text-2xl">{artist.isPerson ? t.artist.bandsHeading : t.artist.lineupHeading}</h2>
           {artist.isPerson && deceased ? (
-            <MemberList title="Grał w zespołach" items={artist.memberOf.filter((m) => !m.supporting)} playedByBand={playedByBand} ratings={ratings} />
+            <MemberList title={t.artist.playedInBands} items={artist.memberOf.filter((m) => !m.supporting)} playedByBand={playedByBand} ratings={ratings} t={t} />
           ) : (
             <>
               <MemberList
-                title="Obecnie"
+                title={t.artist.currently}
                 items={(artist.isPerson ? artist.memberOf.filter((m) => m.current) : current).filter((m) => !m.supporting)}
                 playedByBand={playedByBand}
                 ratings={ratings}
+                t={t}
               />
               <MemberList
-                title="Dawniej"
+                title={t.artist.formerly}
                 items={(artist.isPerson ? artist.memberOf.filter((m) => !m.current) : former).filter((m) => !m.supporting)}
                 playedByBand={playedByBand}
                 ratings={ratings}
+                t={t}
               />
             </>
           )}
@@ -186,18 +191,19 @@ async function ArtistDeepContent({ artist, mbid }: { artist: Artist; mbid: strin
               w życiorysie (Bordin u Ozzy'ego 1996–2010). MusicBrainz opisuje to
               osobną relacją, więc i my dajemy osobną listę zamiast mieszać. */}
           <MemberList
-            title={artist.isPerson ? "Grał u (koncertowo / sesyjnie)" : "Muzycy towarzyszący"}
+            title={artist.isPerson ? t.artist.guestOf : t.artist.supportMusicians}
             items={(artist.isPerson ? artist.memberOf : artist.members).filter((m) => m.supporting)}
             playedByBand={playedByBand}
             ratings={ratings}
+            t={t}
           />
         </section>
       )}
 
       {played.length > 0 && (
         <section className="mt-8">
-          <h2 className="mb-2 text-2xl">Grał(a) na płytach</h2>
-          <p className="mb-3 text-xs text-muted">Wg składów w MusicBrainz — najpierw gościnnie i sesyjnie, potem z własnymi zespołami.</p>
+          <h2 className="mb-2 text-2xl">{t.artist.playedOnHeading}</h2>
+          <p className="mb-3 text-xs text-muted">{t.artist.playedOnNote}</p>
           <div className="grid gap-2 sm:grid-cols-2">
             {played.slice(0, 40).map((p) => (
               <AlbumCard
@@ -207,7 +213,7 @@ async function ArtistDeepContent({ artist, mbid }: { artist: Artist; mbid: strin
                 extra={
                   <div className="text-xs">
                     {p.roles.length > 0 && <span className="text-accent2">{p.roles.join(", ")}</span>}
-                    {p.withBand ? <span className="ml-2 text-muted">z {p.withBand}</span> : <span className="ml-2 rounded bg-surface2 px-1 font-mono text-[10px] uppercase text-muted">gościnnie</span>}
+                    {p.withBand ? <span className="ml-2 text-muted">{fmt(t.artist.withBand, { name: p.withBand })}</span> : <span className="ml-2 rounded bg-surface2 px-1 font-mono text-[10px] uppercase text-muted">{t.artist.guestBadge}</span>}
                   </div>
                 }
               />
@@ -218,7 +224,7 @@ async function ArtistDeepContent({ artist, mbid }: { artist: Artist; mbid: strin
 
       {albums.length > 0 && (
         <section className="mt-8">
-          <h2 className="mb-2 text-2xl">Albumy</h2>
+          <h2 className="mb-2 text-2xl">{t.artist.albumsHeading}</h2>
           <div className="grid gap-2 sm:grid-cols-2">
             {albums.map((a) => <AlbumCard key={a.mbid} album={a} rating={ratings.get(a.mbid)} />)}
           </div>
@@ -226,7 +232,7 @@ async function ArtistDeepContent({ artist, mbid }: { artist: Artist; mbid: strin
       )}
       {eps.length > 0 && (
         <section className="mt-8">
-          <h2 className="mb-2 text-2xl">EP</h2>
+          <h2 className="mb-2 text-2xl">{t.artist.epHeading}</h2>
           <div className="grid gap-2 sm:grid-cols-2">
             {eps.map((a) => <AlbumCard key={a.mbid} album={a} rating={ratings.get(a.mbid)} />)}
           </div>
@@ -234,20 +240,18 @@ async function ArtistDeepContent({ artist, mbid }: { artist: Artist; mbid: strin
       )}
       {rest.length > 0 && (
         <details className="mt-8">
-          <summary className="cursor-pointer text-lg text-muted hover:text-accent2">Pozostałe wydawnictwa — single, live, kompilacje, dema ({rest.length})</summary>
+          <summary className="cursor-pointer text-lg text-muted hover:text-accent2">{fmt(t.artist.otherReleases, { n: rest.length })}</summary>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {rest.map((a) => <AlbumCard key={a.mbid} album={a} rating={ratings.get(a.mbid)} />)}
           </div>
         </details>
       )}
-      {!disco.length && !played.length && <p className="mt-8 text-sm text-muted">MusicBrainz nie ma wydawnictw dla tego artysty.</p>}
+      {!disco.length && !played.length && <p className="mt-8 text-sm text-muted">{t.artist.noReleases}</p>}
 
       {artist.workedOn.length > 0 && (
         <section className="mt-8">
-          <h2 className="mb-1 text-2xl">Produkcja, realizacja, okładki <span className="font-mono text-sm text-muted">{artist.workedOn.length}</span></h2>
-          <p className="mb-3 text-xs text-muted">
-            Praca przy płytach, która nie jest graniem — w MusicBrainz wisi przy wydaniu, nie przy utworze. Stąd też da się ruszyć w podróż.
-          </p>
+          <h2 className="mb-1 text-2xl">{t.artist.creditsHeading} <span className="font-mono text-sm text-muted">{artist.workedOn.length}</span></h2>
+          <p className="mb-3 text-xs text-muted">{t.artist.creditsNote}</p>
           <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
             {artist.workedOn.slice(0, 60).map((w) => (
               <li key={w.releaseMbid} className="flex flex-wrap items-baseline gap-x-2 text-sm">
@@ -260,7 +264,7 @@ async function ArtistDeepContent({ artist, mbid }: { artist: Artist; mbid: strin
             ))}
           </ul>
           {artist.workedOn.length > 60 && (
-            <p className="mt-2 text-xs text-faint">Pokazujemy 60 najnowszych z {artist.workedOn.length}.</p>
+            <p className="mt-2 text-xs text-faint">{fmt(t.artist.creditsMoreNote, { n: artist.workedOn.length })}</p>
           )}
         </section>
       )}
@@ -268,13 +272,13 @@ async function ArtistDeepContent({ artist, mbid }: { artist: Artist; mbid: strin
       {artist.isPerson ? (
         // Odwrotność osi zespołu: po lewej zespoły, na paskach płyty nagrane
         // w danym okresie. Sidemani też — u nich to często najważniejsze granie.
-        <CareerTimeline name={artist.name} bands={artist.memberOf} albumsByBand={bandAlbums} own={albums} />
+        <CareerTimeline name={artist.name} bands={artist.memberOf} albumsByBand={bandAlbums} own={albums} locale={locale} t={t.artist.timeline} />
       ) : (
-        <LineupTimeline members={artist.members.filter((m) => !m.supporting)} albums={albums} />
+        <LineupTimeline members={artist.members.filter((m) => !m.supporting)} albums={albums} locale={locale} t={t.artist.timeline} />
       )}
 
-      <Suspense fallback={<p className="mt-10 font-mono text-xs text-muted">Szukam powiązanych zespołów…</p>}>
-        <RelatedSection artist={artist} />
+      <Suspense fallback={<p className="mt-10 font-mono text-xs text-muted">{t.artist.relatedLoading}</p>}>
+        <RelatedSection artist={artist} t={t} />
       </Suspense>
 
       <YoutubeVideos query={artist.isPerson ? artist.name : `${artist.name} band`} />
@@ -282,11 +286,11 @@ async function ArtistDeepContent({ artist, mbid }: { artist: Artist; mbid: strin
   );
 }
 
-function DeepContentLoading() {
+function DeepContentLoading({ t }: { t: Dict }) {
   return (
     <div className="mt-8 flex items-center gap-3 text-sm text-muted">
       <div className="h-4 w-4 animate-spin rounded-full border-2 border-rule border-t-accent" />
-      Wczytuję dyskografię i skład — przy artystach z długim dorobkiem chwilę to trwa…
+      {t.artist.deepLoading}
     </div>
   );
 }
@@ -294,13 +298,14 @@ function DeepContentLoading() {
 export default async function ArtistPage({ params }: { params: Promise<{ mbid: string }> }) {
   const { mbid } = await params;
   if (!UUID.test(mbid)) notFound();
+  const { locale, t } = await i18n();
   let artist;
   try {
     artist = await getArtist(mbid);
   } catch (e) {
     if (e instanceof MbError && e.status === 404) notFound();
     // 503/limit zapytań: spokojny komunikat zamiast czerwonego ekranu.
-    if (e instanceof MbError) return <MbUnavailable what="artysty" />;
+    if (e instanceof MbError) return <MbUnavailable what={t.artist.mbUnavailableWhat} />;
     throw e;
   }
   const user = await currentUser();
@@ -310,14 +315,14 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
     dbSafe(commentTree("ARTIST", mbid), []),
     dbSafe(user ? isFavorite(user.id, mbid) : Promise.resolve(false), false),
     dbSafe(favoriteCount(mbid), 0),
-    wikiFromLinks(artist.links).catch(() => null),
+    wikiFromLinks(artist.links, wikiLangs(locale)).catch(() => null),
     wikiLogo(artist.links).catch(() => null),
   ]);
   const [summary, tree, fav, favs] = [summaryS.value, treeS.value, favS.value, favsS.value];
   const dbDown = summaryS.failed || treeS.failed || favS.failed || favsS.failed;
 
   const meta = [
-    artist.isPerson ? "muzyk" : artist.type?.toLowerCase(),
+    artist.isPerson ? t.artist.personType : artist.type?.toLowerCase(),
     [artist.country, artist.area].filter(Boolean).join(" · "),
     artist.begin ? `${artist.begin.slice(0, 4)}${artist.ended ? `–${artist.end?.slice(0, 4) ?? ""}` : "–"}` : null,
   ].filter(Boolean).join(" · ");
@@ -340,7 +345,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
               <h1 className="text-4xl leading-tight">{artist.name}</h1>
             )}
             {artist.disambiguation && <div className="text-sm text-muted">{artist.disambiguation}</div>}
-            {artist.aliases.length > 0 && <div className="text-xs text-faint">aka {artist.aliases.join(", ")}</div>}
+            {artist.aliases.length > 0 && <div className="text-xs text-faint">{t.artist.aka} {artist.aliases.join(", ")}</div>}
             {artist.genres.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1">
                 {artist.genres.map((g) => <Link key={g} href={`/szukaj?q=${encodeURIComponent(g)}`} className="chip">{g}</Link>)}
@@ -353,12 +358,12 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
                   <input type="hidden" name="mbid" value={mbid} />
                   <input type="hidden" name="favorite" value={fav ? "1" : "0"} />
                   <input type="hidden" name="name" value={artist.name} />
-                  <button className={`btn ${fav ? "btn-accent" : ""}`}>{fav ? "★ Ulubiony" : "☆ Do ulubionych"}</button>
+                  <button className={`btn ${fav ? "btn-accent" : ""}`}>{fav ? t.artist.favoriteActive : t.artist.favoriteAdd}</button>
                 </form>
               ) : (
-                <Link href={`/login?callbackUrl=/artist/${mbid}`} className="btn">☆ Do ulubionych</Link>
+                <Link href={`/login?callbackUrl=/artist/${mbid}`} className="btn">{t.artist.favoriteAdd}</Link>
               )}
-              {favs > 0 && <span className="font-mono text-xs text-muted">{favs} w ulubionych</span>}
+              {favs > 0 && <span className="font-mono text-xs text-muted">{fmt(t.artist.favoritesCount, { n: favs })}</span>}
             </div>
           </div>
         </header>
@@ -366,12 +371,12 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
         {wiki && (
           <section className="mt-6 text-sm text-text2">
             <p>{wiki.extract}</p>
-            <a href={wiki.url} target="_blank" rel="noopener" className="text-xs text-muted hover:text-accent2">Wikipedia ({wiki.lang}) →</a>
+            <a href={wiki.url} target="_blank" rel="noopener" className="text-xs text-muted hover:text-accent2">{fmt(t.common.wikipediaLink, { lang: wiki.lang })}</a>
           </section>
         )}
 
-        <Suspense fallback={<DeepContentLoading />}>
-          <ArtistDeepContent artist={artist} mbid={mbid} />
+        <Suspense fallback={<DeepContentLoading t={t} />}>
+          <ArtistDeepContent artist={artist} mbid={mbid} locale={locale} t={t} />
         </Suspense>
       </div>
 

@@ -265,3 +265,15 @@ export async function removeArea(userId: string, scope: AreaScope, country: stri
       ),
     );
 }
+
+// ---------- język interfejsu ----------
+
+/** Język zapisany w profilu; null = użytkownik nic nie wybierał. */
+export async function getUserLocale(userId: string): Promise<string | null> {
+  const row = await db.query.users.findFirst({ where: eq(schema.users.id, userId), columns: { locale: true } });
+  return row?.locale ?? null;
+}
+
+export async function setUserLocale(userId: string, locale: string) {
+  await db.update(schema.users).set({ locale }).where(eq(schema.users.id, userId));
+}

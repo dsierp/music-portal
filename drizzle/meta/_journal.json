@@ -15,6 +15,13 @@
       "when": 1788874715516,
       "tag": "0001_careless_jane_foster",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788896472189,
+      "tag": "0002_brainy_vertigo",
+      "breakpoints": true
     }
   ]
 }

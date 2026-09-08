@@ -18,6 +18,8 @@ import { Comments } from "@/components/comments";
 import { AlbumCard, CreditLinks, typeLabel } from "@/components/cards";
 import { Cover } from "@/components/cover";
 import { YoutubeVideos } from "@/components/youtube";
+import { i18n } from "@/lib/t";
+import { fmt, formatDate, formatNumber, plural, wikiLangs } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 const UUID = /^[0-9a-f-]{36}$/;
@@ -37,13 +39,14 @@ export async function generateMetadata({ params }: { params: Promise<{ mbid: str
 export default async function AlbumPage({ params }: { params: Promise<{ mbid: string }> }) {
   const { mbid } = await params;
   if (!UUID.test(mbid)) notFound();
+  const { locale, t } = await i18n();
   let album;
   try {
     album = await getAlbum(mbid);
   } catch (e) {
     if (e instanceof MbError && e.status === 404) notFound();
     // 503/limit zapytań: spokojny komunikat zamiast czerwonego ekranu.
-    if (e instanceof MbError) return <MbUnavailable what="płyty" />;
+    if (e instanceof MbError) return <MbUnavailable what={t.album.mbUnavailableWhat} />;
     throw e;
   }
   const user = await currentUser();
@@ -55,10 +58,10 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
     dbSafe(commentTree("ALBUM", mbid), []),
     dbSafe(user ? isLiked(user.id, mbid) : Promise.resolve(false), false),
     dbSafe(likeCount(mbid), 0),
-    wikiFromLinks(album.links).catch(() => null),
+    wikiFromLinks(album.links, wikiLangs(locale)).catch(() => null),
     mainArtist ? getDiscography(mainArtist.mbid).catch(() => []) : Promise.resolve([]),
     getExternalRatings(album.links).catch(() => []),
-    wikiAlbumRatings(album.links).catch(() => []),
+    wikiAlbumRatings(album.links, wikiLangs(locale)).catch(() => []),
     // skład zespołu = źródło MBID-ów dla nazwisk z Wikipedii (żeby dało się w nie kliknąć)
     mainArtist ? getArtist(mainArtist.mbid).catch(() => null) : Promise.resolve(null),
   ]);
@@ -77,7 +80,7 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
   // — z jego strony widać wszystkie płyty, które oprawił.
   const COVER_ROLES = /design|illustration|art direction|graphic|photograph|artwork/i;
   const coverArtists = staff.filter((c) => c.roles.some((r) => COVER_ROLES.test(r)));
-  const discs = [...new Set(album.tracks.map((t) => t.disc))];
+  const discs = [...new Set(album.tracks.map((tr) => tr.disc))];
   // MusicBrainz nierzadko nie ma jeszcze składu na poziomie nagrań — wtedy bierzemy
   // listę z sekcji "Skład"/"Personnel" na Wikipedii.
   const wikiCredits = !musicians.length && wiki ? await wikiPersonnel(wiki.lang, wiki.title).catch(() => null) : null;
@@ -116,7 +119,7 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
       <div>
         <header className="flex flex-col gap-4 sm:flex-row">
           <div className="shrink-0">
-            <Cover mbid={mbid} size={176} className="shadow-lg" />
+            <Cover mbid={mbid} size={176} className="shadow-lg" noCoverLabel={t.album.noCoverLabel} />
             {/* Cover Art Archive trzyma też oryginał — bywa wielki i wart obejrzenia. */}
             <a
               href={`https://coverartarchive.org/release-group/${mbid}/front`}
@@ -124,7 +127,7 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
               rel="noopener"
               className="mt-1 block text-center font-mono text-[10px] text-faint hover:text-accent2"
             >
-              okładka w pełnym rozmiarze ↗
+              {t.album.fullSizeCover}
             </a>
           </div>
           <div className="min-w-0">
@@ -133,7 +136,7 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
             <div className="mt-1 text-xl text-text2"><CreditLinks credit={album.credit} /></div>
             {album.disambiguation && <div className="text-sm text-muted">{album.disambiguation}</div>}
             <div className="mt-2 flex flex-wrap gap-x-3 font-mono text-xs text-muted">
-              {album.releaseDate && <span>wydano {album.releaseDate}</span>}
+              {album.releaseDate && <span>{fmt(t.album.releasedOn, { date: formatDate(album.releaseDate, locale) })}</span>}
               {album.labels.length > 0 && <span>{album.labels.join(", ")}</span>}
             </div>
             {album.genres.length > 0 && (
@@ -143,7 +146,7 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
             )}
             {coverArtists.length > 0 && (
               <p className="mt-2 text-sm">
-                <span className="label mr-1">Okładka</span>
+                <span className="label mr-1">{t.album.coverLabel}</span>
                 {coverArtists.map((c, i) => (
                   <span key={c.mbid}>
                     {i > 0 && ", "}
@@ -162,12 +165,12 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
                   <input type="hidden" name="title" value={album.title} />
                   <input type="hidden" name="artistName" value={album.artistText} />
                   <input type="hidden" name="artistMbid" value={mainArtist?.mbid ?? ""} />
-                  <button className={`btn ${liked ? "btn-accent" : ""}`}>{liked ? "♥ Lubisz" : "♡ Lubię tę płytę"}</button>
+                  <button className={`btn ${liked ? "btn-accent" : ""}`}>{liked ? t.album.likeActive : t.album.likeAdd}</button>
                 </form>
               ) : (
-                <Link href={`/login?callbackUrl=/album/${mbid}`} className="btn">♡ Lubię tę płytę</Link>
+                <Link href={`/login?callbackUrl=/album/${mbid}`} className="btn">{t.album.likeAdd}</Link>
               )}
-              {likes > 0 && <span className="font-mono text-xs text-muted">{likes} {likes === 1 ? "osoba lubi" : "osób lubi"}</span>}
+              {likes > 0 && <span className="font-mono text-xs text-muted">{plural(locale, likes, t.album.likesCount)}</span>}
             </div>
           </div>
         </header>
@@ -177,19 +180,19 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
         {wiki && (
           <section className="mt-6 text-sm text-text2">
             <p>{wiki.extract}</p>
-            <a href={wiki.url} target="_blank" rel="noopener" className="text-xs text-muted hover:text-accent2">Wikipedia ({wiki.lang}) →</a>
+            <a href={wiki.url} target="_blank" rel="noopener" className="text-xs text-muted hover:text-accent2">{fmt(t.common.wikipediaLink, { lang: wiki.lang })}</a>
           </section>
         )}
 
         <section className="mt-8">
-          <h2 className="mb-2 text-2xl">Skład</h2>
+          <h2 className="mb-2 text-2xl">{t.album.lineupHeading}</h2>
           {musicians.length ? (
             <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
               {musicians.map((c) => (
                 <li key={c.mbid} className="flex items-baseline gap-2 text-sm">
                   <Link href={`/artist/${c.mbid}`} className="font-medium hover:text-accent2 hover:underline">{c.name}</Link>
                   <span className="text-muted">{c.roles.filter(isMusicianRole).join(", ")}</span>
-                  {!c.onAllTracks && c.trackCount > 0 && <span className="font-mono text-[10px] text-faint">{c.trackCount}/{album.tracks.length} utw.</span>}
+                  {!c.onAllTracks && c.trackCount > 0 && <span className="font-mono text-[10px] text-faint">{c.trackCount}/{album.tracks.length} {t.album.trackCountSuffix}</span>}
                 </li>
               ))}
             </ul>
@@ -205,7 +208,7 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
                       ) : (
                         // Nie znamy MBID — ale nazwisko i tak ma prowadzić dalej,
                         // więc kierujemy do wyszukiwarki portalu.
-                        <Link href={`/szukaj?q=${encodeURIComponent(line.name)}`} className="font-medium text-text2 decoration-dotted hover:text-accent2 hover:underline" title="Szukaj w portalu">{line.name}</Link>
+                        <Link href={`/szukaj?q=${encodeURIComponent(line.name)}`} className="font-medium text-text2 decoration-dotted hover:text-accent2 hover:underline" title={t.album.searchInPortalTitle}>{line.name}</Link>
                       )}
                       {line.roles && <span className="text-muted">{line.roles}</span>}
                     </li>
@@ -213,18 +216,18 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
                 })}
               </ul>
               <p className="mt-2 text-xs text-faint">
-                Źródło: <a href={wiki?.url} target="_blank" rel="noopener" className="underline hover:text-accent2">Wikipedia</a> — MusicBrainz nie ma jeszcze tego składu na poziomie nagrań. Nazwiska rozpoznane w MusicBrainz prowadzą do profilu; pozostałe (kropkowane) do wyszukiwarki portalu.
+                {t.album.wikiCreditsPrefix} <a href={wiki?.url} target="_blank" rel="noopener" className="underline hover:text-accent2">Wikipedia</a>{t.album.wikiCreditsSuffix}
               </p>
             </div>
           ) : (
             <p className="text-sm text-muted">
-              MusicBrainz nie ma jeszcze składu tej płyty. Zajrzyj do zespołu {mainArtist && <Link href={`/artist/${mainArtist.mbid}`} className="underline">{mainArtist.name}</Link>} (członkowie) albo {album.links.metalArchives && <a href={album.links.metalArchives} className="underline" target="_blank" rel="noopener">Metal-Archives</a>}{album.links.allmusic && <a href={album.links.allmusic} className="underline" target="_blank" rel="noopener">AllMusic</a>}.
+              {t.album.noLineupPrefix} {mainArtist && <Link href={`/artist/${mainArtist.mbid}`} className="underline">{mainArtist.name}</Link>} {t.album.noLineupMembers} {album.links.metalArchives && <a href={album.links.metalArchives} className="underline" target="_blank" rel="noopener">Metal-Archives</a>}{album.links.allmusic && <a href={album.links.allmusic} className="underline" target="_blank" rel="noopener">AllMusic</a>}.
             </p>
           )}
 
           {lineupThen.length > 0 && (
             <div className="mt-4">
-              <h3 className="label mb-1">Zespół w tym czasie</h3>
+              <h3 className="label mb-1">{t.album.currentLineupHeading}</h3>
               <ul className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
                 {lineupThen.map((m) => (
                   <li key={m.mbid} className="flex items-baseline gap-2">
@@ -236,14 +239,12 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
                   </li>
                 ))}
               </ul>
-              <p className="mt-1 text-xs text-faint">
-                Z dat członkostwa w MusicBrainz — kto był w składzie, gdy płyta wychodziła. To nie są credits z okładki: MusicBrainz opisuje nagrania wybiórczo, więc lista wyżej bywa krótsza niż rzeczywisty skład.
-              </p>
+              <p className="mt-1 text-xs text-faint">{t.album.currentLineupNote}</p>
             </div>
           )}
           {staff.length > 0 && (
             <details className="mt-3 text-sm">
-              <summary className="cursor-pointer text-muted hover:text-accent2">Produkcja, realizacja, grafika ({staff.length})</summary>
+              <summary className="cursor-pointer text-muted hover:text-accent2">{fmt(t.album.staffSummary, { n: formatNumber(staff.length, locale) })}</summary>
               <ul className="mt-2 grid gap-x-6 gap-y-1 sm:grid-cols-2">
                 {staff.map((c) => (
                   <li key={c.mbid} className="flex items-baseline gap-2">
@@ -258,15 +259,15 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
 
         {album.tracks.length > 0 && (
           <section className="mt-8">
-            <h2 className="mb-2 text-2xl">Utwory</h2>
+            <h2 className="mb-2 text-2xl">{t.album.tracksHeading}</h2>
             {discs.map((d) => (
               <ol key={d} className="mb-3 text-sm">
-                {discs.length > 1 && <div className="label my-1">Dysk {d}</div>}
-                {album.tracks.filter((t) => t.disc === d).map((t) => (
-                  <li key={t.recordingMbid + t.position} className="flex gap-3 border-b border-rule/60 py-1">
-                    <span className="w-6 text-right font-mono text-xs text-faint">{t.number}</span>
-                    <span className="flex-1">{t.title}</span>
-                    <span className="font-mono text-xs text-muted">{fmtLength(t.lengthMs)}</span>
+                {discs.length > 1 && <div className="label my-1">{fmt(t.album.discLabel, { n: d })}</div>}
+                {album.tracks.filter((tr) => tr.disc === d).map((tr) => (
+                  <li key={tr.recordingMbid + tr.position} className="flex gap-3 border-b border-rule/60 py-1">
+                    <span className="w-6 text-right font-mono text-xs text-faint">{tr.number}</span>
+                    <span className="flex-1">{tr.title}</span>
+                    <span className="font-mono text-xs text-muted">{fmtLength(tr.lengthMs)}</span>
                   </li>
                 ))}
               </ol>
@@ -278,7 +279,7 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
 
         {others.length > 0 && mainArtist && (
           <section className="mt-8">
-            <h2 className="mb-2 text-2xl">Więcej: <Link href={`/artist/${mainArtist.mbid}`} className="hover:text-accent2">{mainArtist.name}</Link></h2>
+            <h2 className="mb-2 text-2xl">{t.album.morePrefix} <Link href={`/artist/${mainArtist.mbid}`} className="hover:text-accent2">{mainArtist.name}</Link></h2>
             <div className="grid gap-2 sm:grid-cols-2">
               {others.map((a) => <AlbumCard key={a.mbid} album={a} rating={otherRatings.get(a.mbid)} />)}
             </div>
@@ -293,7 +294,7 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
         </div>
         <Comments type="ALBUM" mbid={mbid} tree={tree} userId={user?.id ?? null} />
         <p className="text-xs text-faint">
-          <a href={`https://musicbrainz.org/release-group/${mbid}`} target="_blank" rel="noopener" className="hover:text-accent2">MusicBrainz</a> · brakuje składu? Uzupełnij go tam — portal zaciągnie zmiany w ciągu tygodnia.
+          <a href={`https://musicbrainz.org/release-group/${mbid}`} target="_blank" rel="noopener" className="hover:text-accent2">MusicBrainz</a> · {t.album.mbLinkFooterSuffix}
         </p>
       </aside>
     </div>

@@ -15,6 +15,12 @@ export const users = pgTable("user", {
   email: text("email").unique().notNull(),
   emailVerified: timestamp("emailVerified", { mode: "date" }),
   image: text("image"),
+  /**
+   * Język interfejsu („pl" | „en" | „es" | „de"). NULL = jeszcze nie wybrał,
+   * wtedy decyduje ciasteczko albo przeglądarka. Trzymamy to przy użytkowniku,
+   * żeby wybór szedł za nim na telefon i drugi komputer.
+   */
+  locale: text("locale"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 

@@ -1,4 +1,7 @@
 import { DetailSkeleton } from "@/components/skeleton";
-export default function Loading() {
-  return <DetailSkeleton note="Czytam skład i dyskografię z MusicBrainz — pierwsze wejście trwa chwilę, kolejne są natychmiastowe." />;
+import { i18n } from "@/lib/t";
+
+export default async function Loading() {
+  const { t } = await i18n();
+  return <DetailSkeleton note={t.common.detailLoading} />;
 }

@@ -1,5 +1,6 @@
 import type { Links } from "@/lib/musicbrainz";
 import type { ExternalRating } from "@/lib/externalRatings";
+import { i18n } from "@/lib/t";
 
 /**
  * Pasek linków zewnętrznych — Spotify i Tidal zawsze, reszta gdy jest.
@@ -33,7 +34,8 @@ export function LinksRow({ links, compact = false, wikiUrl }: { links: Links; co
  * serwisach, dla których udało się ją wyciągnąć — best-effort, więc część linków
  * i tak zostanie samym linkiem.
  */
-export function ReviewLinks({ links, ratings }: { links: Links; ratings?: ExternalRating[] }) {
+export async function ReviewLinks({ links, ratings }: { links: Links; ratings?: ExternalRating[] }) {
+  const { t } = await i18n();
   const byLabel = new Map((ratings ?? []).map((r) => [r.source, r]));
   const items: { href?: string; label: string }[] = [
     { href: links.rateYourMusic, label: "RateYourMusic" },
@@ -47,7 +49,7 @@ export function ReviewLinks({ links, ratings }: { links: Links; ratings?: Extern
   if (!items.length) return null;
   return (
     <div>
-      <h3 className="label mb-1">Oceny i recenzje</h3>
+      <h3 className="label mb-1">{t.common.reviewsTitle}</h3>
       <div className="flex flex-col gap-1 font-mono text-sm">
         {items.map((i) => {
           const r = byLabel.get(i.label);
@@ -67,9 +69,7 @@ export function ReviewLinks({ links, ratings }: { links: Links; ratings?: Extern
         })}
       </div>
       {ratings && items.some((i) => !byLabel.get(i.label)) && (
-        <p className="mt-1 text-[10px] text-faint">
-          Oceny wyciągnięte automatycznie, gdy się udało — bez liczby obok, serwis zwykle i tak ją ma, tylko nie dało się jej stąd pobrać.
-        </p>
+        <p className="mt-1 text-[10px] text-faint">{t.common.reviewsAutoNote}</p>
       )}
     </div>
   );

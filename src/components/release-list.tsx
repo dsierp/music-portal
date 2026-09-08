@@ -1,6 +1,8 @@
 import type { InferSelectModel } from "drizzle-orm";
 import { schema } from "@/db";
-import { genreLabel, sectionImage, splitDb } from "@/lib/lists";
+import { genreLabel as genreLabelFallback, sectionImage, splitDb } from "@/lib/lists";
+import { genreLabel } from "@/lib/dict";
+import type { Dict } from "@/lib/dict";
 import { sortByPopularity, categoryVotes } from "@/lib/popularity";
 import { PickCard, ReleaseCard } from "./release-card";
 import { SectionHead } from "./masthead";
@@ -13,7 +15,7 @@ export interface ReleaseFilter { genres: string[]; starOnly: boolean; showFlagge
 
 export { ReleaseCard as ReleaseRow } from "./release-card";
 
-export async function ReleaseSection({ section, releases, filter }: { section: Section; releases: Release[]; filter: ReleaseFilter }) {
+export async function ReleaseSection({ section, releases, filter, t }: { section: Section; releases: Release[]; filter: ReleaseFilter; t: Dict }) {
   const visible = releases.filter((r) => {
     if (filter.genres.length && !filter.genres.includes(splitDb(r.genre, r.description))) return false;
     if (filter.starOnly && r.star !== 1) return false;
@@ -45,7 +47,7 @@ export async function ReleaseSection({ section, releases, filter }: { section: S
         variant={lead === "db" ? "red" : lead === "other" ? "morgue" : "other"}
       />
       {/* pick pokazujemy też przy aktywnych filtrach — o ile do nich pasuje */}
-      {pick && visible.some((r) => r.id === pick.id) && <PickCard r={pick} />}
+      {pick && visible.some((r) => r.id === pick.id) && <PickCard r={pick} t={t} />}
       {groups.map(({ g, items }) => (
         <div key={g} className="mt-6">
           <h3 className="label relative mb-3 overflow-hidden rounded border border-rule px-3 py-2 text-xs">
@@ -54,12 +56,12 @@ export async function ReleaseSection({ section, releases, filter }: { section: S
               <img src={sectionImage(g)!} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover opacity-25" />
             )}
             <span className="absolute inset-0 bg-gradient-to-r from-bg via-bg/80 to-transparent" />
-            <span className="relative">{genreLabel(g)}</span>
+            <span className="relative">{genreLabel(g, t, genreLabelFallback(g))}</span>
           </h3>
-          <ul className="space-y-3">{items.map((r) => <ReleaseCard key={r.id} r={r} />)}</ul>
+          <ul className="space-y-3">{items.map((r) => <ReleaseCard key={r.id} r={r} t={t} />)}</ul>
         </div>
       ))}
-      {!groups.length && !pick && <p className="mt-3 text-sm text-muted">Nic nie pasuje do filtrów.</p>}
+      {!groups.length && !pick && <p className="mt-3 text-sm text-muted">{t.releases.noMatch}</p>}
     </section>
   );
 }

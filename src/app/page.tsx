@@ -11,6 +11,10 @@ import { lineupNews } from "@/lib/lineup-news";
 import { getFavoriteArtists, getGenres, getLikedAlbums, recentComments } from "@/lib/user-data";
 import { genreToSection } from "@/lib/genres";
 import { SKIP_ONBOARDING } from "@/lib/onboarding";
+import { i18n } from "@/lib/t";
+import { fmt } from "@/lib/i18n";
+import { genreLabel } from "@/lib/dict";
+import type { Dict } from "@/lib/dict";
 
 export const dynamic = "force-dynamic";
 
@@ -18,22 +22,20 @@ export const dynamic = "force-dynamic";
  * „Kto zmienił zespół" — osobny strumień, bo to jedno zapytanie do MusicBrainz
  * na zespół (limit 1/s). Strona główna nie ma na to czekać.
  */
-async function LineupNews({ bands, favorites }: { bands: { mbid: string; name: string }[]; favorites: Set<string> }) {
+async function LineupNews({ bands, favorites, t }: { bands: { mbid: string; name: string }[]; favorites: Set<string>; t: Dict["home"] }) {
   if (!bands.length) return null;
   const news = await lineupNews(bands, favorites).catch(() => []);
   if (!news.length) return null;
   return (
     <section>
-      <h2 className="text-3xl">Zmiany w składach</h2>
-      <p className="mb-3 text-sm text-muted">
-        Z dat członkostwa w MusicBrainz — ostatnie półtora roku. ★ to Twoje ulubione zespoły.
-      </p>
+      <h2 className="text-3xl">{t.lineupTitle}</h2>
+      <p className="mb-3 text-sm text-muted">{t.lineupNote}</p>
       <ul className="space-y-1.5">
         {news.map((n, i) => (
           <li key={`${n.artistMbid}-${n.personMbid}-${n.kind}-${i}`} className="flex flex-wrap items-baseline gap-x-2 text-sm">
             <span className={n.kind === "joined" ? "text-ok" : "text-warn"}>{n.kind === "joined" ? "+" : "−"}</span>
             <Link href={`/artist/${n.personMbid}`} className="font-medium hover:text-accent2 hover:underline">{n.personName}</Link>
-            <span className="text-muted">{n.kind === "joined" ? "dołączył(a) do" : "odszedł(-ła) z"}</span>
+            <span className="text-muted">{n.kind === "joined" ? t.joined : t.left}</span>
             <Link href={`/artist/${n.artistMbid}`} className="font-medium hover:text-accent2 hover:underline">
               {n.favorite && <span className="text-accent2">★ </span>}{n.artistName}
             </Link>
@@ -47,6 +49,7 @@ async function LineupNews({ bands, favorites }: { bands: { mbid: string; name: s
 }
 
 export default async function Home() {
+  const { t } = await i18n();
   const user = await currentUser();
   // Pierwsze wejście po zalogowaniu: nikt nie ma jeszcze stylów, a bez nich
   // portal nie wie, co komu pokazywać — więc zamiast wpuszczać na stronę
@@ -82,24 +85,24 @@ export default async function Home() {
 
   return (
     <div className="space-y-10">
-      <Banner image="/img/studio.jpg" title="Podróż po muzyce" position="center 40%">
+      <Banner image="/img/studio.jpg" title={t.home.heroTitle} position="center 40%">
         <p className="mt-3 max-w-2xl text-text2">
-          Twoja podróż z muzyką zaczyna się tutaj. Zanurz się w tym wspaniałym świecie, podróżuj
-          <b className="text-text"> odwiedzając artystów i ich kolejne przystanie</b>. Zapraszamy.
+          {t.home.heroTextBefore}
+          <b className="text-text">{t.home.heroTextBold}</b>{t.home.heroTextAfter}
         </p>
-        <div className="mt-5 max-w-xl"><SearchBox big /></div>
-        {!user && <p className="mt-3 text-sm text-muted"><Link href="/login" className="underline">Zaloguj się</Link>, żeby ustawić preferencje, oceniać i komentować.</p>}
+        <div className="mt-5 max-w-xl"><SearchBox big placeholder={t.nav.searchPlaceholder} label={t.nav.search} /></div>
+        {!user && <p className="mt-3 text-sm text-muted"><Link href="/login" className="underline">{t.home.loginCta}</Link>{t.home.loginPromptRest}</p>}
       </Banner>
 
       <div className="grid gap-10 lg:grid-cols-[1fr_320px]">
-        <Suspense fallback={<p className="font-mono text-xs text-muted">Sprawdzam zmiany w składach…</p>}>
-          <LineupNews bands={newsBands} favorites={favMbids} />
+        <Suspense fallback={<p className="font-mono text-xs text-muted">{t.home.lineupLoading}</p>}>
+          <LineupNews bands={newsBands} favorites={favMbids} t={t.home} />
         </Suspense>
 
         <section>
           <div className="flex items-baseline justify-between">
-            <h2 className="text-3xl">Premiery {prefSections ? "dla Ciebie" : "tygodnia"}</h2>
-            <Link href="/premiery" className="text-sm text-muted hover:text-accent2">wszystkie →</Link>
+            <h2 className="text-3xl">{prefSections ? t.home.releasesForYou : t.home.releasesThisWeek}</h2>
+            <Link href="/premiery" className="text-sm text-muted hover:text-accent2">{t.home.allReleases}</Link>
           </div>
           {sections.map((s) => {
             const items = stars.filter((r) => r.sectionId === s.id);
@@ -107,19 +110,19 @@ export default async function Home() {
             return (
               <div key={s.id} className="mt-4">
                 <h3 className="label mb-2">{s.title} {s.date}</h3>
-                <ul className="space-y-3">{items.map((r) => <ReleaseRow key={r.id} r={r} />)}</ul>
+                <ul className="space-y-3">{items.map((r) => <ReleaseRow key={r.id} r={r} t={t} />)}</ul>
               </div>
             );
           })}
-          {!stars.length && <p className="mt-3 text-sm text-muted">Brak premier — zaimportuj listę (<code>npm run import:pns</code>).</p>}
+          {!stars.length && <p className="mt-3 text-sm text-muted">{t.home.noReleasesBefore}<code>npm run import:pns</code>{t.home.noReleasesAfter}</p>}
         </section>
 
         <aside className="space-y-6">
           {best && (
             <section className="card">
               <div className="flex items-baseline justify-between">
-                <h2 className="text-xl">Best of {best.year?.label}</h2>
-                <Link href="/best-of" className="text-xs text-muted hover:text-accent2">całość →</Link>
+                <h2 className="text-xl">{fmt(t.home.bestOfTitle, { year: best.year?.label ?? "" })}</h2>
+                <Link href="/best-of" className="text-xs text-muted hover:text-accent2">{t.home.bestOfAll}</Link>
               </div>
               <ul className="mt-2 space-y-1 text-sm">
                 {Object.keys(BEST_CATS).map((c) => {
@@ -127,7 +130,7 @@ export default async function Home() {
                   if (!top) return null;
                   return (
                     <li key={c}>
-                      <span className="label mr-1">{c}</span>
+                      <span className="label mr-1">{genreLabel(c, t, BEST_CATS[c])}</span>
                       <Link href={`/go/best/${top.id}`} className="hover:text-accent2">{top.artist} – <i>{top.album}</i></Link>
                     </li>
                   );
@@ -137,7 +140,7 @@ export default async function Home() {
           )}
           {user && (favs.length > 0 || liked.length > 0) && (
             <section className="card">
-              <h2 className="text-xl">Twoje</h2>
+              <h2 className="text-xl">{t.home.yours}</h2>
               {favs.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {favs.slice(0, 12).map((f) => <Link key={f.mbid} href={`/artist/${f.mbid}`} className="chip">{f.name}</Link>)}
@@ -150,12 +153,12 @@ export default async function Home() {
                   ))}
                 </ul>
               )}
-              <Link href="/ja" className="mt-2 block text-xs text-muted hover:text-accent2">profil i preferencje →</Link>
+              <Link href="/ja" className="mt-2 block text-xs text-muted hover:text-accent2">{t.home.manageProfile}</Link>
             </section>
           )}
           {recent.length > 0 && (
             <section className="card">
-              <h2 className="text-xl">Ostatnie komentarze</h2>
+              <h2 className="text-xl">{t.home.recentComments}</h2>
               <ul className="mt-2 space-y-2 text-sm">
                 {recent.map((c) => (
                   <li key={c.id}>
