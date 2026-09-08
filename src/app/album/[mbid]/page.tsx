@@ -81,6 +81,25 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
   // MusicBrainz nierzadko nie ma jeszcze składu na poziomie nagrań — wtedy bierzemy
   // listę z sekcji "Skład"/"Personnel" na Wikipedii.
   const wikiCredits = !musicians.length && wiki ? await wikiPersonnel(wiki.lang, wiki.title).catch(() => null) : null;
+  // Skład zespołu Z CZASU tej płyty — z dat członkostwa, czyli z tego samego
+  // źródła, z którego rysuje się oś czasu na stronie zespołu.
+  //
+  // Po co, skoro wyżej są credits: MusicBrainz opisuje nagrania wybiórczo i przy
+  // wielu płytach zna jedno nazwisko (tu: wokalistę), podczas gdy Metal-Archives
+  // pokazuje pełną piątkę. Daty członkostwa MB ma komplet, więc dokładamy je jako
+  // osobną, wyraźnie podpisaną listę — to nie są credits z okładki i nie udajemy,
+  // że są.
+  const albumDate = album.firstReleaseDate ?? null;
+  const lineupThen = (() => {
+    if (!band?.members?.length || !albumDate) return [];
+    const inRange = band.members.filter((m) => {
+      if (m.begin && m.begin > albumDate) return false;
+      if (m.end && m.end < albumDate) return false;
+      return Boolean(m.begin || m.end || m.current);
+    });
+    const already = new Set(musicians.map((c) => c.mbid));
+    return inRange.filter((m) => !already.has(m.mbid));
+  })();
   // …i dopasowujemy nazwiska do MBID-ów (członkowie zespołu + credits z MB), żeby
   // dało się w nie kliknąć — bez tego "podróż" po składach urywa się na tej stronie.
   const knownPeople = new Map<string, string>();
@@ -134,7 +153,7 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
                 ))}
               </p>
             )}
-            <div className="mt-3"><LinksRow links={album.links} /></div>
+            <div className="mt-3"><LinksRow links={album.links} wikiUrl={wiki?.url} /></div>
             <div className="mt-3 flex items-center gap-3">
               {user ? (
                 <form action={toggleLike}>
@@ -201,6 +220,26 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
             <p className="text-sm text-muted">
               MusicBrainz nie ma jeszcze składu tej płyty. Zajrzyj do zespołu {mainArtist && <Link href={`/artist/${mainArtist.mbid}`} className="underline">{mainArtist.name}</Link>} (członkowie) albo {album.links.metalArchives && <a href={album.links.metalArchives} className="underline" target="_blank" rel="noopener">Metal-Archives</a>}{album.links.allmusic && <a href={album.links.allmusic} className="underline" target="_blank" rel="noopener">AllMusic</a>}.
             </p>
+          )}
+
+          {lineupThen.length > 0 && (
+            <div className="mt-4">
+              <h3 className="label mb-1">Zespół w tym czasie</h3>
+              <ul className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+                {lineupThen.map((m) => (
+                  <li key={m.mbid} className="flex items-baseline gap-2">
+                    <Link href={`/artist/${m.mbid}`} className="font-medium hover:text-accent2 hover:underline">{m.name}</Link>
+                    {m.roles.length > 0 && <span className="text-muted">{m.roles.join(", ")}</span>}
+                    <span className="font-mono text-[10px] text-faint">
+                      {m.begin?.slice(0, 4) ?? "?"}–{m.current ? "" : (m.end?.slice(0, 4) ?? "?")}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1 text-xs text-faint">
+                Z dat członkostwa w MusicBrainz — kto był w składzie, gdy płyta wychodziła. To nie są credits z okładki: MusicBrainz opisuje nagrania wybiórczo, więc lista wyżej bywa krótsza niż rzeczywisty skład.
+              </p>
+            </div>
           )}
           {staff.length > 0 && (
             <details className="mt-3 text-sm">

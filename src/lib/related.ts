@@ -31,6 +31,9 @@ export interface RelatedBand {
 
 const MAX_PEOPLE = 8;
 const MAX_RESULTS = 12;
+/** Dla osoby: ile jej zespołów przeglądamy i ilu kolegów z nich bierzemy. */
+const MAX_OWN_BANDS = 4;
+const MAX_COLLEAGUES = 6;
 
 /**
  * Zespoły powiązane z `artist`:
@@ -39,28 +42,47 @@ const MAX_RESULTS = 12;
  * Zwraca pustą listę, gdy MusicBrainz nie ma składu — nie zgadujemy.
  */
 export async function relatedBands(artist: Artist): Promise<RelatedBand[]> {
-  return cached(`related:v1:${artist.mbid}`, TTL.wiki, async () => {
-    // Kogo pytamy: skład zespołu albo — dla osoby — jej własne zespoły.
-    const seeds = artist.isPerson ? artist.memberOf : artist.members;
-    if (!seeds.length) return [];
-
+  return cached(`related:v2:${artist.mbid}`, TTL.wiki, async () => {
     const mine = new Set(artist.genres.map((g) => g.toLowerCase()));
     const acc = new Map<string, RelatedBand>();
+    /** Zawsze zbieramy ZESPOŁY. Osoba jako „powiązany zespół" to była pomyłka. */
+    const addBand = (mbid: string, name: string, via: { name: string; roles: string[] }) => {
+      if (mbid === artist.mbid || name === artist.name) return;
+      const prev = acc.get(mbid);
+      if (prev) {
+        if (!prev.people.some((p) => p.name === via.name)) prev.people.push(via);
+      } else {
+        acc.set(mbid, { mbid, name, people: [via], genres: [], score: 0 });
+      }
+    };
 
-    for (const seed of seeds.slice(0, MAX_PEOPLE)) {
-      const person = await getArtist(seed.mbid).catch(() => null);
-      if (!person) continue;
-      // Dla zespołu: gdzie jeszcze grał ten muzyk. Dla osoby: kto grał w jej zespole
-      // (a więc z kim się zetknęła) — w obu razach interesują nas cudze kapele.
-      const links = artist.isPerson ? person.members : person.memberOf;
-      for (const band of links) {
-        if (band.mbid === artist.mbid) continue;
-        const prev = acc.get(band.mbid);
-        const person_ = { name: artist.isPerson ? band.name : person.name, roles: band.roles.length ? band.roles : seed.roles };
-        if (prev) {
-          if (!prev.people.some((p) => p.name === person_.name)) prev.people.push(person_);
-        } else {
-          acc.set(band.mbid, { mbid: band.mbid, name: band.name, people: [person_], genres: [], score: 0 });
+    if (artist.isPerson) {
+      // Dla człowieka droga jest o krok dłuższa: jego zespoły → koledzy z tych
+      // zespołów → INNE kapele tych kolegów. Wcześniej zatrzymywaliśmy się na
+      // kolegach i portal wypisywał ludzi pod nagłówkiem „Powiązane zespoły".
+      const ownBands = new Set(artist.memberOf.map((b) => b.mbid));
+      const colleagues = new Map<string, { name: string; roles: string[] }>();
+      for (const band of artist.memberOf.slice(0, MAX_OWN_BANDS)) {
+        const info = await getArtist(band.mbid).catch(() => null);
+        for (const m of info?.members ?? []) {
+          if (m.mbid === artist.mbid || colleagues.has(m.mbid)) continue;
+          colleagues.set(m.mbid, { name: m.name, roles: m.roles });
+        }
+      }
+      for (const [mbid, who] of [...colleagues].slice(0, MAX_COLLEAGUES)) {
+        const person = await getArtist(mbid).catch(() => null);
+        for (const b of person?.memberOf ?? []) {
+          if (ownBands.has(b.mbid)) continue;
+          addBand(b.mbid, b.name, who);
+        }
+      }
+    } else {
+      // Dla zespołu wystarczy jeden krok: gdzie jeszcze grali jego muzycy.
+      for (const seed of artist.members.slice(0, MAX_PEOPLE)) {
+        const person = await getArtist(seed.mbid).catch(() => null);
+        if (!person) continue;
+        for (const b of person.memberOf) {
+          addBand(b.mbid, b.name, { name: person.name, roles: b.roles.length ? b.roles : seed.roles });
         }
       }
     }
@@ -69,11 +91,15 @@ export async function relatedBands(artist: Artist): Promise<RelatedBand[]> {
     // Wspólne gatunki dobieramy tylko dla najlepszych kandydatów — każdy kosztuje
     // osobne zapytanie, a przy dziesiątkach zespołów czekanie byłoby absurdalne.
     const ranked = [...acc.values()].sort((a, b) => b.people.length - a.people.length).slice(0, MAX_RESULTS);
+    const out: RelatedBand[] = [];
     for (const cand of ranked) {
       const info = await getArtist(cand.mbid).catch(() => null);
+      // Ostatnie sito: gdyby po drodze wpadł człowiek, tutaj wypada.
+      if (info?.isPerson) continue;
       cand.genres = (info?.genres ?? []).filter((g) => mine.has(g.toLowerCase())).slice(0, 4);
       cand.score = cand.people.length * 10 + cand.genres.length;
+      out.push(cand);
     }
-    return ranked.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name, "pl"));
+    return out.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name, "pl"));
   });
 }

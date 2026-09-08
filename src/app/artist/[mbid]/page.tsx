@@ -319,7 +319,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
                 {artist.genres.map((g) => <Link key={g} href={`/szukaj?q=${encodeURIComponent(g)}`} className="chip">{g}</Link>)}
               </div>
             )}
-            <div className="mt-3"><LinksRow links={artist.links} /></div>
+            <div className="mt-3"><LinksRow links={artist.links} wikiUrl={wiki?.url} /></div>
             <div className="mt-3 flex items-center gap-3">
               {user ? (
                 <form action={toggleFavorite}>
