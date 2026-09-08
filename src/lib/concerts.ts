@@ -290,6 +290,20 @@ function mbToConcert(e: MbEvent, artist?: { mbid: string; name: string }): Conce
   };
 }
 
+/**
+ * Wszystkie zapowiedzi jednego zespołu: MusicBrainz + Ticketmaster.
+ *
+ * Sama MusicBrainz to za mało — Napalm Death gra 20 listopada w Krakowie i TM
+ * o tym wie, a MB nie. Odwrotnie też się zdarza (małe kluby), więc oba źródła.
+ */
+export async function concertsForArtist(artist: { mbid: string; name: string }, country?: string): Promise<Concert[]> {
+  const [mb, tm] = await Promise.all([
+    concertsByArtist(artist).catch(() => []),
+    tmByArtist(artist.name, country).catch(() => []),
+  ]);
+  return dedupe([...mb, ...tm]).sort((a, b) => a.date.localeCompare(b.date));
+}
+
 export async function concertsByArtist(artist: { mbid: string; name: string }): Promise<Concert[]> {
   const { from, to } = concertWindow();
   const url = new URL(`${MB_BASE}/event`);
@@ -325,7 +339,7 @@ export async function concertsByArtist(artist: { mbid: string; name: string }): 
  * Keyword w TM jest luźny („Napalm" wraca z festiwalami, na których gra ktoś
  * inny), więc odsiewamy po nazwie: musi wystąpić w tytule wydarzenia.
  */
-async function tmByArtist(name: string, country?: string, size = 20): Promise<Concert[]> {
+export async function tmByArtist(name: string, country?: string, size = 20): Promise<Concert[]> {
   const key = (process.env.TICKETMASTER_API_KEY ?? "").trim();
   if (!key || !name.trim()) return [];
   const { from, to } = concertWindow();

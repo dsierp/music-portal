@@ -15,7 +15,7 @@ import { Comments } from "@/components/comments";
 import { AlbumCard } from "@/components/cards";
 import { YoutubeVideos } from "@/components/youtube";
 import { relatedBands } from "@/lib/related";
-import { concertsByArtist } from "@/lib/concerts";
+import { concertsForArtist } from "@/lib/concerts";
 import { mergeDates, wdGenres, wdMembers, wdMemberships } from "@/lib/wikidata";
 import { CareerTimeline, LineupTimeline } from "@/components/lineup-timeline";
 import { dbSafe } from "@/lib/db-safe";
@@ -249,7 +249,7 @@ async function CrewSectionWewn({ albums, t }: { albums: AlbumSummary[]; t: Dict 
  * udawać, że zespół nie koncertuje.
  */
 async function ConcertsSectionWewn({ mbid, name, locale, t }: { mbid: string; name: string; locale: Locale; t: Dict }) {
-  const items = await concertsByArtist({ mbid, name }).catch(() => []);
+  const items = await concertsForArtist({ mbid, name }).catch(() => []);
   return (
     <details className="mt-10">
       <summary className="cursor-pointer text-2xl text-muted hover:text-accent2">
