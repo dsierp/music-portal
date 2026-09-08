@@ -6,8 +6,8 @@ import { wikiAlbumRatings, wikiFromLinks, wikiPersonnel } from "@/lib/wikipedia"
 import { nameKeys } from "@/lib/names";
 import { MbUnavailable } from "@/components/mb-unavailable";
 import { currentUser } from "@/lib/auth";
-import { commentTree, isLiked, likeCount, ratingAverages, ratingSummary } from "@/lib/user-data";
-import { toggleLike } from "@/app/actions";
+import { albumSentiment, commentTree, likeCount, ratingAverages, ratingSummary } from "@/lib/user-data";
+import { toggleFavorite, toggleLike } from "@/app/actions";
 import { LinksRow, ReviewLinks } from "@/components/links";
 import { getExternalRatings } from "@/lib/externalRatings";
 import { dbSafe } from "@/lib/db-safe";
@@ -36,8 +36,17 @@ export async function generateMetadata({ params }: { params: Promise<{ mbid: str
   }
 }
 
-export default async function AlbumPage({ params }: { params: Promise<{ mbid: string }> }) {
+export default async function AlbumPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ mbid: string }>;
+  searchParams: Promise<{ nielubie?: string }>;
+}) {
   const { mbid } = await params;
+  // ?nielubie=<mbid artysty> — pytanie zadane po odrzuceniu płyty. Trzymamy je
+  // w adresie, bo dzięki temu przeżywa przeładowanie i nie wymaga javascriptu.
+  const pytanieOArtyste = (await searchParams).nielubie ?? "";
   if (!UUID.test(mbid)) notFound();
   const { locale, t } = await i18n();
   let album;
@@ -56,7 +65,7 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
   const [summaryS, treeS, likedS, likesS, wiki, more, externalRatings, pressRatings, band] = await Promise.all([
     dbSafe(ratingSummary("ALBUM", mbid, user?.id), EMPTY_SUMMARY),
     dbSafe(commentTree("ALBUM", mbid), []),
-    dbSafe(user ? isLiked(user.id, mbid) : Promise.resolve(false), false),
+    dbSafe(user ? albumSentiment(user.id, mbid) : Promise.resolve(null), null as "like" | "dislike" | null),
     dbSafe(likeCount(mbid), 0),
     wikiFromLinks(album.links, wikiLangs(locale)).catch(() => null),
     mainArtist ? getDiscography(mainArtist.mbid).catch(() => []) : Promise.resolve([]),
@@ -159,19 +168,55 @@ export default async function AlbumPage({ params }: { params: Promise<{ mbid: st
             <div className="mt-3"><LinksRow links={album.links} wikiUrl={wiki?.url} /></div>
             <div className="mt-3 flex items-center gap-3">
               {user ? (
-                <form action={toggleLike}>
-                  <input type="hidden" name="mbid" value={mbid} />
-                  <input type="hidden" name="liked" value={liked ? "1" : "0"} />
-                  <input type="hidden" name="title" value={album.title} />
-                  <input type="hidden" name="artistName" value={album.artistText} />
-                  <input type="hidden" name="artistMbid" value={mainArtist?.mbid ?? ""} />
-                  <button className={`btn ${liked ? "btn-accent" : ""}`}>{liked ? t.album.likeActive : t.album.likeAdd}</button>
-                </form>
+                // Dwa przyciski, nie jeden przełącznik: „lubię" i „nie moja bajka"
+                // to nie są dwa końce jednej skali — większość płyt zostaje bez
+                // znaku i tak ma być.
+                <>
+                  <form action={toggleLike}>
+                    <input type="hidden" name="mbid" value={mbid} />
+                    <input type="hidden" name="current" value={liked ?? ""} />
+                    <input type="hidden" name="kind" value="like" />
+                    <input type="hidden" name="title" value={album.title} />
+                    <input type="hidden" name="artistName" value={album.artistText} />
+                    <input type="hidden" name="artistMbid" value={mainArtist?.mbid ?? ""} />
+                    <button className={`btn ${liked === "like" ? "btn-accent" : ""}`}>
+                      {liked === "like" ? t.album.likeActive : t.album.likeAdd}
+                    </button>
+                  </form>
+                  <form action={toggleLike}>
+                    <input type="hidden" name="mbid" value={mbid} />
+                    <input type="hidden" name="current" value={liked ?? ""} />
+                    <input type="hidden" name="kind" value="dislike" />
+                    <input type="hidden" name="title" value={album.title} />
+                    <input type="hidden" name="artistName" value={album.artistText} />
+                    <input type="hidden" name="artistMbid" value={mainArtist?.mbid ?? ""} />
+                    <button className={`btn ${liked === "dislike" ? "btn-warn" : ""}`}>
+                      {liked === "dislike" ? t.album.dislikeActive : t.album.dislikeAdd}
+                    </button>
+                  </form>
+                </>
               ) : (
                 <Link href={`/login?callbackUrl=/album/${mbid}`} className="btn">{t.album.likeAdd}</Link>
               )}
               {likes > 0 && <span className="font-mono text-xs text-muted">{plural(locale, likes, t.album.likesCount)}</span>}
             </div>
+            {/* Odrzuciłeś płytę — pytamy o artystę, bo to zwykle „nie mój
+                klimat", a nie „ta jedna płyta wyszła słabo". Pytanie znika samo
+                po odpowiedzi albo po przejściu dalej. */}
+            {user && pytanieOArtyste && pytanieOArtyste === (mainArtist?.mbid ?? "") && (
+              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-rule bg-surface2 px-3 py-2 text-sm">
+                <span>{fmt(t.album.dislikeArtistAsk, { name: mainArtist?.name ?? album.artistText })}</span>
+                <form action={toggleFavorite}>
+                  <input type="hidden" name="mbid" value={mainArtist?.mbid ?? ""} />
+                  <input type="hidden" name="kind" value="dislike" />
+                  <input type="hidden" name="current" value="" />
+                  <input type="hidden" name="name" value={mainArtist?.name ?? album.artistText} />
+                  <input type="hidden" name="back" value={`/album/${mbid}`} />
+                  <button className="btn btn-warn">{t.album.dislikeArtistYes}</button>
+                </form>
+                <Link href={`/album/${mbid}`} className="text-xs text-muted underline">{t.album.dislikeArtistNo}</Link>
+              </div>
+            )}
           </div>
         </header>
 

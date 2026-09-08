@@ -8,6 +8,11 @@
 import type { Locale } from "@/lib/i18n";
 
 const pl = {
+  sortNewest: "od najnowszych",
+  sortOldest: "chronologicznie",
+  dislikeAdd: "Nie moja bajka",
+  dislikeActive: "Nie moja bajka ✓",
+  genresFromTags: "z tagów MusicBrainz — nikt nie zatwierdził ich jeszcze jako gatunków",
   crewHeading: "Kto to nagrywał",
   crewNote: "Producenci, realizatorzy, mastering i autorzy okładek — z wydań w MusicBrainz. Każde nazwisko to kolejny przystanek: z jego strony widać wszystko, przy czym pracował.",
   crewLoading: "Sprawdzam, kto produkował i kto malował…",
@@ -85,6 +90,11 @@ const pl = {
 type T = typeof pl;
 
 const en: T = {
+  sortNewest: "newest first",
+  sortOldest: "in order",
+  dislikeAdd: "Not my thing",
+  dislikeActive: "Not my thing ✓",
+  genresFromTags: "from MusicBrainz tags — nobody has promoted them to genres yet",
   crewHeading: "Who recorded it",
   crewNote: "Producers, engineers, mastering and cover artists — from the releases on MusicBrainz. Every name is another stop: their page shows everything they worked on.",
   crewLoading: "Checking who produced and who painted…",
@@ -161,6 +171,11 @@ const en: T = {
 };
 
 const es: T = {
+  sortNewest: "más nuevos primero",
+  sortOldest: "en orden",
+  dislikeAdd: "No es lo mío",
+  dislikeActive: "No es lo mío ✓",
+  genresFromTags: "de las etiquetas de MusicBrainz — todavía nadie las ha aprobado como géneros",
   crewHeading: "Quién lo grabó",
   crewNote: "Productores, técnicos, masterización y autores de portada — de las ediciones en MusicBrainz. Cada nombre es otra parada: en su página está todo en lo que trabajó.",
   crewLoading: "Mirando quién produjo y quién pintó…",
@@ -237,6 +252,11 @@ const es: T = {
 };
 
 const de: T = {
+  sortNewest: "neueste zuerst",
+  sortOldest: "chronologisch",
+  dislikeAdd: "Nicht mein Ding",
+  dislikeActive: "Nicht mein Ding ✓",
+  genresFromTags: "aus MusicBrainz-Tags — noch niemand hat sie als Genres bestätigt",
   crewHeading: "Wer es aufgenommen hat",
   crewNote: "Produzenten, Toningenieure, Mastering und Cover-Künstler — aus den Veröffentlichungen bei MusicBrainz. Jeder Name ist die nächste Station: auf seiner Seite steht alles, woran er gearbeitet hat.",
   crewLoading: "Schaue nach, wer produziert und wer gemalt hat…",

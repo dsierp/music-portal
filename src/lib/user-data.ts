@@ -191,28 +191,64 @@ export async function setGenre(userId: string, genre: string, weight: number | n
     .onConflictDoUpdate({ target: [schema.userGenres.userId, schema.userGenres.genre], set: { weight: w } });
 }
 
-export async function getLikedAlbums(userId: string) {
-  return db.select().from(schema.likedAlbums).where(eq(schema.likedAlbums.userId, userId)).orderBy(desc(schema.likedAlbums.createdAt));
+export type Sentiment = "like" | "dislike";
+
+export async function getLikedAlbums(userId: string, kind: Sentiment = "like") {
+  return db
+    .select()
+    .from(schema.likedAlbums)
+    .where(and(eq(schema.likedAlbums.userId, userId), eq(schema.likedAlbums.kind, kind)))
+    .orderBy(desc(schema.likedAlbums.createdAt));
+}
+/** null = obojętny; inaczej „lubię" albo „nie moja bajka". */
+export async function albumSentiment(userId: string, mbid: string): Promise<Sentiment | null> {
+  const row = await db.query.likedAlbums.findFirst({
+    where: and(eq(schema.likedAlbums.userId, userId), eq(schema.likedAlbums.mbid, mbid)),
+    columns: { kind: true },
+  });
+  return row?.kind ?? null;
 }
 export async function isLiked(userId: string, mbid: string) {
-  return !!(await db.query.likedAlbums.findFirst({ where: and(eq(schema.likedAlbums.userId, userId), eq(schema.likedAlbums.mbid, mbid)) }));
+  return (await albumSentiment(userId, mbid)) === "like";
 }
-export async function likeAlbum(userId: string, a: { mbid: string; title: string; artistName: string; artistMbid?: string | null; note?: string | null }) {
-  await db.insert(schema.likedAlbums).values({ userId, mbid: a.mbid, title: a.title, artistName: a.artistName, artistMbid: a.artistMbid ?? null, note: a.note ?? null })
-    .onConflictDoUpdate({ target: [schema.likedAlbums.userId, schema.likedAlbums.mbid], set: { note: a.note ?? null } });
+export async function likeAlbum(
+  userId: string,
+  a: { mbid: string; title: string; artistName: string; artistMbid?: string | null; note?: string | null },
+  kind: Sentiment = "like",
+) {
+  await db
+    .insert(schema.likedAlbums)
+    .values({ userId, mbid: a.mbid, title: a.title, artistName: a.artistName, artistMbid: a.artistMbid ?? null, note: a.note ?? null, kind })
+    // Zmiana zdania ma nadpisywać, nie odbijać się o klucz główny: z „lubię"
+    // na „nie moja bajka" i odwrotnie to jeden ruch.
+    .onConflictDoUpdate({ target: [schema.likedAlbums.userId, schema.likedAlbums.mbid], set: { note: a.note ?? null, kind } });
 }
 export async function unlikeAlbum(userId: string, mbid: string) {
   await db.delete(schema.likedAlbums).where(and(eq(schema.likedAlbums.userId, userId), eq(schema.likedAlbums.mbid, mbid)));
 }
 
-export async function getFavoriteArtists(userId: string) {
-  return db.select().from(schema.favoriteArtists).where(eq(schema.favoriteArtists.userId, userId)).orderBy(asc(schema.favoriteArtists.name));
+export async function getFavoriteArtists(userId: string, kind: Sentiment = "like") {
+  return db
+    .select()
+    .from(schema.favoriteArtists)
+    .where(and(eq(schema.favoriteArtists.userId, userId), eq(schema.favoriteArtists.kind, kind)))
+    .orderBy(asc(schema.favoriteArtists.name));
+}
+export async function artistSentiment(userId: string, mbid: string): Promise<Sentiment | null> {
+  const row = await db.query.favoriteArtists.findFirst({
+    where: and(eq(schema.favoriteArtists.userId, userId), eq(schema.favoriteArtists.mbid, mbid)),
+    columns: { kind: true },
+  });
+  return row?.kind ?? null;
 }
 export async function isFavorite(userId: string, mbid: string) {
-  return !!(await db.query.favoriteArtists.findFirst({ where: and(eq(schema.favoriteArtists.userId, userId), eq(schema.favoriteArtists.mbid, mbid)) }));
+  return (await artistSentiment(userId, mbid)) === "like";
 }
-export async function favoriteArtist(userId: string, mbid: string, name: string) {
-  await db.insert(schema.favoriteArtists).values({ userId, mbid, name }).onConflictDoNothing();
+export async function favoriteArtist(userId: string, mbid: string, name: string, kind: Sentiment = "like") {
+  await db
+    .insert(schema.favoriteArtists)
+    .values({ userId, mbid, name, kind })
+    .onConflictDoUpdate({ target: [schema.favoriteArtists.userId, schema.favoriteArtists.mbid], set: { kind, name } });
 }
 export async function unfavoriteArtist(userId: string, mbid: string) {
   await db.delete(schema.favoriteArtists).where(and(eq(schema.favoriteArtists.userId, userId), eq(schema.favoriteArtists.mbid, mbid)));
@@ -220,11 +256,17 @@ export async function unfavoriteArtist(userId: string, mbid: string) {
 
 /** Ile osób lubi płytę / ma artystę w ulubionych. */
 export async function likeCount(mbid: string) {
-  const [r] = await db.select({ n: count() }).from(schema.likedAlbums).where(eq(schema.likedAlbums.mbid, mbid));
+  const [r] = await db
+    .select({ n: count() })
+    .from(schema.likedAlbums)
+    .where(and(eq(schema.likedAlbums.mbid, mbid), eq(schema.likedAlbums.kind, "like")));
   return Number(r?.n ?? 0);
 }
 export async function favoriteCount(mbid: string) {
-  const [r] = await db.select({ n: count() }).from(schema.favoriteArtists).where(eq(schema.favoriteArtists.mbid, mbid));
+  const [r] = await db
+    .select({ n: count() })
+    .from(schema.favoriteArtists)
+    .where(and(eq(schema.favoriteArtists.mbid, mbid), eq(schema.favoriteArtists.kind, "like")));
   return Number(r?.n ?? 0);
 }
 

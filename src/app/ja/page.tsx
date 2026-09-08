@@ -36,8 +36,10 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
     4: t.profile.weight4,
     5: t.profile.weight5,
   };
-  const [genres, liked, favs, albumRatings, artistRatings, areas] = await Promise.all([
+  const [genres, liked, favs, albumRatings, artistRatings, areas, odrzuconePlyty, odrzuceniArtysci] = await Promise.all([
     getGenres(user.id), getLikedAlbums(user.id), getFavoriteArtists(user.id), myRatings(user.id, "ALBUM"), myRatings(user.id, "ARTIST"), getAreas(user.id),
+    // „Nie moja bajka" — osobne listy, bo to nie to samo co niska ocena.
+    getLikedAlbums(user.id, "dislike"), getFavoriteArtists(user.id, "dislike"),
   ]);
   const weightOf = new Map(genres.map((g) => [g.genre, g.weight]));
   // Statystyki tylko dla administratora — jedna liczba, więc pytamy o nią
@@ -220,7 +222,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
                 </div>
                 <form action={toggleLike}>
                   <input type="hidden" name="mbid" value={a.mbid} />
-                  <input type="hidden" name="liked" value="1" />
+                  <input type="hidden" name="current" value="like" />
+                  <input type="hidden" name="kind" value="like" />
                   <button className="text-xs text-muted hover:text-accent2">{t.profile.removeAlbum}</button>
                 </form>
               </li>
@@ -240,7 +243,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
                 <Link href={`/artist/${f.mbid}`} className="hover:text-accent2">{f.name}</Link>
                 <form action={toggleFavorite}>
                   <input type="hidden" name="mbid" value={f.mbid} />
-                  <input type="hidden" name="favorite" value="1" />
+                  <input type="hidden" name="current" value="like" />
+                  <input type="hidden" name="kind" value="like" />
                   <input type="hidden" name="name" value={f.name} />
                   <button className="text-xs text-muted hover:text-accent2">×</button>
                 </form>
@@ -251,6 +255,48 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           <p className="mt-2 text-sm text-muted">{t.profile.noFavoriteArtists}</p>
         )}
       </section>
+
+      {(odrzuconePlyty.length > 0 || odrzuceniArtysci.length > 0) && (
+        <section id="nie-moja-bajka">
+          <h2 className="text-2xl">{t.profile.dislikedTitle}</h2>
+          <p className="mb-3 text-sm text-muted">{t.profile.dislikedExplain}</p>
+          {odrzuconePlyty.length > 0 && (
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {odrzuconePlyty.map((a) => (
+                <li key={a.mbid} className="flex items-center gap-3 rounded border border-rule bg-surface p-2 text-sm opacity-70">
+                  <Cover mbid={a.mbid} size={40} />
+                  <div className="min-w-0 flex-1">
+                    <Link href={`/album/${a.mbid}`} className="block truncate font-medium hover:text-accent2">{a.title}</Link>
+                    <div className="truncate text-xs text-muted">{a.artistName}</div>
+                  </div>
+                  <form action={toggleLike}>
+                    <input type="hidden" name="mbid" value={a.mbid} />
+                    <input type="hidden" name="current" value="dislike" />
+                    <input type="hidden" name="kind" value="dislike" />
+                    <button className="text-xs text-muted hover:text-accent2">{t.profile.undislike}</button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          )}
+          {odrzuceniArtysci.length > 0 && (
+            <ul className="mt-3 flex flex-wrap gap-2">
+              {odrzuceniArtysci.map((f) => (
+                <li key={f.mbid} className="flex items-center gap-2 rounded border border-rule bg-surface px-3 py-1 text-sm opacity-70">
+                  <Link href={`/artist/${f.mbid}`} className="hover:text-accent2">{f.name}</Link>
+                  <form action={toggleFavorite}>
+                    <input type="hidden" name="mbid" value={f.mbid} />
+                    <input type="hidden" name="current" value="dislike" />
+                    <input type="hidden" name="kind" value="dislike" />
+                    <input type="hidden" name="name" value={f.name} />
+                    <button className="text-xs text-muted hover:text-accent2">×</button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       <section id="oceny" className="grid gap-6 sm:grid-cols-2">
         <div>

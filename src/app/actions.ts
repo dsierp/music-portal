@@ -66,28 +66,52 @@ export async function deleteCommentAction(formData: FormData) {
 
 // ---------- ulubione / lubię ----------
 
+/**
+ * „Lubię" i „nie moja bajka" na jednym przycisku każdy.
+ *
+ * `kind` mówi, o który chodzi; kliknięcie w już zaznaczony zdejmuje znak,
+ * a kliknięcie w drugi po prostu zmienia zdanie. „Nie lubię" to świadomie NIE
+ * ocena 1/10: ocena mówi „to jest słabe", a to mówi „nie mój klimat".
+ */
 export async function toggleLike(formData: FormData) {
   const u = await requireUser();
   const id = mbid.parse(formData.get("mbid"));
-  if (formData.get("liked") === "1") await ud.unlikeAlbum(u.id, id);
+  const kind = formData.get("kind") === "dislike" ? "dislike" : "like";
+  const teraz = String(formData.get("current") ?? "");
+  if (teraz === kind) await ud.unlikeAlbum(u.id, id);
   else
-    await ud.likeAlbum(u.id, {
-      mbid: id,
-      title: String(formData.get("title") ?? ""),
-      artistName: String(formData.get("artistName") ?? ""),
-      artistMbid: String(formData.get("artistMbid") || "") || null,
-    });
+    await ud.likeAlbum(
+      u.id,
+      {
+        mbid: id,
+        title: String(formData.get("title") ?? ""),
+        artistName: String(formData.get("artistName") ?? ""),
+        artistMbid: String(formData.get("artistMbid") || "") || null,
+      },
+      kind,
+    );
   revalidatePath(`/album/${id}`);
   revalidatePath("/ja");
+  // Po odrzuceniu płyty pytamy o artystę — jednym parametrem w adresie, bez
+  // okienka. Pytamy tylko wtedy, gdy jest o kogo i gdy sam nie jest jeszcze
+  // oznaczony; stronę i tak przeładowujemy.
+  const artistMbid = String(formData.get("artistMbid") || "");
+  if (kind === "dislike" && teraz !== kind && artistMbid && !(await ud.artistSentiment(u.id, artistMbid))) {
+    redirect(`/album/${id}?nielubie=${encodeURIComponent(artistMbid)}`);
+  }
 }
 
 export async function toggleFavorite(formData: FormData) {
   const u = await requireUser();
   const id = mbid.parse(formData.get("mbid"));
-  if (formData.get("favorite") === "1") await ud.unfavoriteArtist(u.id, id);
-  else await ud.favoriteArtist(u.id, id, String(formData.get("name") ?? ""));
+  const kind = formData.get("kind") === "dislike" ? "dislike" : "like";
+  const teraz = String(formData.get("current") ?? "");
+  if (teraz === kind) await ud.unfavoriteArtist(u.id, id);
+  else await ud.favoriteArtist(u.id, id, String(formData.get("name") ?? ""), kind);
   revalidatePath(`/artist/${id}`);
   revalidatePath("/ja");
+  const back = String(formData.get("back") ?? "");
+  if (back.startsWith("/")) redirect(back);
 }
 
 // ---------- preferencje ----------

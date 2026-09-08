@@ -72,6 +72,14 @@ export const userGenres = pgTable(
 );
 
 /** Płyta, którą użytkownik kazał zapamiętać ("lubię"). mbid = release-group. */
+/**
+ * Stosunek do płyty/artysty. „Nie lubię" to nie ocena 1/10 — ocena mówi, że coś
+ * jest słabe, a to mówi „nie mój klimat, nie podsuwaj mi tego". Trzymamy to
+ * w tych samych tabelach co polubienia (stąd ich historyczne nazwy), bo to ta
+ * sama relacja człowiek↔płyta, tylko ze znakiem.
+ */
+export const sentiment = pgEnum("sentiment", ["like", "dislike"]);
+
 export const likedAlbums = pgTable(
   "liked_album",
   {
@@ -81,6 +89,7 @@ export const likedAlbums = pgTable(
     artistName: text("artist_name").notNull(),
     artistMbid: text("artist_mbid"),
     note: text("note"),
+    kind: sentiment("kind").notNull().default("like"),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.mbid] }), index("liked_album_mbid").on(t.mbid)],
@@ -92,6 +101,7 @@ export const favoriteArtists = pgTable(
     userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     mbid: text("mbid").notNull(),
     name: text("name").notNull(),
+    kind: sentiment("kind").notNull().default("like"),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.mbid] }), index("favorite_artist_mbid").on(t.mbid)],

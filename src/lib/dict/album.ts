@@ -2,6 +2,11 @@
 import type { Locale } from "@/lib/i18n";
 
 const pl = {
+  dislikeAdd: "Nie moja bajka",
+  dislikeActive: "Nie moja bajka ✓",
+  dislikeArtistAsk: "Zapisane. A {name} w ogóle — też nie Twój klimat?",
+  dislikeArtistYes: "Też nie",
+  dislikeArtistNo: "nie, tylko ta płyta",
   mbUnavailableWhat: "płyty",
   noCoverLabel: "brak okładki",
   fullSizeCover: "okładka w pełnym rozmiarze ↗",
@@ -42,6 +47,11 @@ const pl = {
 type T = typeof pl;
 
 const en: T = {
+  dislikeAdd: "Not my thing",
+  dislikeActive: "Not my thing ✓",
+  dislikeArtistAsk: "Noted. And {name} in general — also not your thing?",
+  dislikeArtistYes: "Them too",
+  dislikeArtistNo: "no, just this album",
   mbUnavailableWhat: "an album",
   noCoverLabel: "no cover art",
   fullSizeCover: "full-size cover ↗",
@@ -80,6 +90,11 @@ const en: T = {
 };
 
 const es: T = {
+  dislikeAdd: "No es lo mío",
+  dislikeActive: "No es lo mío ✓",
+  dislikeArtistAsk: "Anotado. ¿Y {name} en general — tampoco es lo tuyo?",
+  dislikeArtistYes: "Tampoco",
+  dislikeArtistNo: "no, solo este disco",
   mbUnavailableWhat: "un disco",
   noCoverLabel: "sin portada",
   fullSizeCover: "portada a tamaño completo ↗",
@@ -118,6 +133,11 @@ const es: T = {
 };
 
 const de: T = {
+  dislikeAdd: "Nicht mein Ding",
+  dislikeActive: "Nicht mein Ding ✓",
+  dislikeArtistAsk: "Notiert. Und {name} überhaupt — auch nicht dein Ding?",
+  dislikeArtistYes: "Auch nicht",
+  dislikeArtistNo: "nein, nur dieses Album",
   mbUnavailableWhat: "eines Albums",
   noCoverLabel: "kein Cover",
   fullSizeCover: "Cover in voller Größe ↗",

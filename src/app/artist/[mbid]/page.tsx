@@ -6,7 +6,7 @@ import { ARTWORK_ROLES, albumCrew, getArtist, getDiscography, getPlayedOn, MbErr
 import { wikiFromLinks, wikiLogo } from "@/lib/wikipedia";
 import { MbUnavailable } from "@/components/mb-unavailable";
 import { currentUser } from "@/lib/auth";
-import { commentTree, favoriteCount, isFavorite, ratingAverages, ratingSummary } from "@/lib/user-data";
+import { artistSentiment, commentTree, favoriteCount, ratingAverages, ratingSummary } from "@/lib/user-data";
 import { toggleFavorite } from "@/app/actions";
 import { LinksRow } from "@/components/links";
 import { RatingBadge, RatingPanel } from "@/components/rating";
@@ -203,7 +203,7 @@ async function CrewSection({ albums, t }: { albums: AlbumSummary[]; t: Dict }) {
   );
 }
 
-async function ArtistDeepContent({ artist: raw, mbid, locale, t }: { artist: Artist; mbid: string; locale: Locale; t: Dict }) {
+async function ArtistDeepContent({ artist: raw, mbid, locale, t, chrono }: { artist: Artist; mbid: string; locale: Locale; t: Dict; chrono: boolean }) {
   // MusicBrainz nagminnie gubi daty przy członkostwie (Inferno w Behemocie od
   // 1997 — relacja jest, dat nie ma). Wikidane trzymają to samo strukturalnie,
   // więc zanim cokolwiek narysujemy, łatamy dziury stamtąd. Pytamy tylko wtedy,
@@ -327,9 +327,19 @@ async function ArtistDeepContent({ artist: raw, mbid, locale, t }: { artist: Art
 
       {albums.length > 0 && (
         <section className="mt-8">
-          <h2 className="mb-2 text-2xl">{t.artist.albumsHeading}</h2>
+          <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-2xl">{t.artist.albumsHeading}</h2>
+            {/* Domyślnie od najnowszych — tak się zwykle sprawdza, co nowego.
+                Ale dorobek czyta się od początku, więc jedno kliknięcie odwraca. */}
+            <div className="flex gap-1">
+              <Link href={`/artist/${mbid}`} className={`chip text-[11px] ${chrono ? "" : "chip-on"}`}>{t.artist.sortNewest}</Link>
+              <Link href={`/artist/${mbid}?plyty=chrono`} className={`chip text-[11px] ${chrono ? "chip-on" : ""}`}>{t.artist.sortOldest}</Link>
+            </div>
+          </div>
           <div className="grid gap-2 sm:grid-cols-2">
-            {albums.map((a) => <AlbumCard key={a.mbid} album={a} rating={ratings.get(a.mbid)} />)}
+            {(chrono ? [...albums].reverse() : albums).map((a) => (
+              <AlbumCard key={a.mbid} album={a} rating={ratings.get(a.mbid)} />
+            ))}
           </div>
         </section>
       )}
@@ -411,8 +421,15 @@ function DeepContentLoading({ t }: { t: Dict }) {
   );
 }
 
-export default async function ArtistPage({ params }: { params: Promise<{ mbid: string }> }) {
+export default async function ArtistPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ mbid: string }>;
+  searchParams: Promise<{ plyty?: string }>;
+}) {
   const { mbid } = await params;
+  const chrono = (await searchParams).plyty === "chrono";
   if (!UUID.test(mbid)) notFound();
   const { locale, t } = await i18n();
   let artist;
@@ -432,14 +449,25 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
   const [summaryS, treeS, favS, favsS, wiki, logo, wdStyles] = await Promise.all([
     dbSafe(ratingSummary("ARTIST", mbid, user?.id), EMPTY_SUMMARY),
     dbSafe(commentTree("ARTIST", mbid), []),
-    dbSafe(user ? isFavorite(user.id, mbid) : Promise.resolve(false), false),
+    dbSafe(user ? artistSentiment(user.id, mbid) : Promise.resolve(null), null as "like" | "dislike" | null),
     dbSafe(favoriteCount(mbid), 0),
     wikiFromLinks(artist.links, wikiLangs(locale)).catch(() => null),
     wikiLogo(artist.links).catch(() => null),
-    artist.genres.length ? Promise.resolve([] as string[]) : wdGenres(artist.links, locale).catch(() => []),
+    // Kolejność szukania stylu: gatunki z MusicBrainz → jego tagi (mniej
+    // wypieszczone, ale przy mniejszych zespołach to jedyne, co jest) → dopiero
+    // Wikidane. Venomous Concept miał pusty nagłówek, choć „hardcore punk" wisi
+    // i w tagach MB, i w pierwszym zdaniu Wikipedii.
+    artist.genres.length || artist.tags.length ? Promise.resolve([] as string[]) : wdGenres(artist.links, locale).catch(() => []),
   ]);
   const [summary, tree, fav, favs] = [summaryS.value, treeS.value, favS.value, favsS.value];
   const dbDown = summaryS.failed || treeS.failed || favS.failed || favsS.failed;
+
+  // Styl zespołu z pierwszego źródła, które cokolwiek wie.
+  const style = artist.genres.length
+    ? { items: artist.genres, source: "genres" as const }
+    : artist.tags.length
+      ? { items: artist.tags.slice(0, 6), source: "tags" as const }
+      : { items: wdStyles, source: "wikidata" as const };
 
   const meta = [
     artist.isPerson ? t.artist.personType : artist.type?.toLowerCase(),
@@ -466,30 +494,45 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
             )}
             {artist.disambiguation && <div className="text-sm text-muted">{artist.disambiguation}</div>}
             {artist.aliases.length > 0 && <div className="text-xs text-faint">{t.artist.aka} {artist.aliases.join(", ")}</div>}
-            {(artist.genres.length > 0 || wdStyles.length > 0) && (
+            {style.items.length > 0 && (
               <>
                 <div className="mt-2 flex flex-wrap gap-1">
-                  {(artist.genres.length ? artist.genres : wdStyles).map((g) => (
+                  {style.items.map((g) => (
                     <Link key={g} href={`/szukaj?q=${encodeURIComponent(g)}`} className="chip">{g}</Link>
                   ))}
                 </div>
-                {/* Uczciwie mówimy, skąd to jest — Wikidane bywają jedynym miejscem,
-                    które w ogóle wie, co ten zespół gra. */}
-                {!artist.genres.length && <p className="mt-1 font-mono text-[10px] text-faint">{t.artist.genresFromWikidata}</p>}
+                {/* Uczciwie mówimy, skąd to jest, gdy nie z gatunków MusicBrainz. */}
+                {style.source !== "genres" && (
+                  <p className="mt-1 font-mono text-[10px] text-faint">
+                    {style.source === "tags" ? t.artist.genresFromTags : t.artist.genresFromWikidata}
+                  </p>
+                )}
               </>
             )}
-            {!artist.genres.length && !wdStyles.length && artist.tags.length === 0 && (
-              <p className="mt-2 text-xs text-faint">{t.artist.noGenres}</p>
-            )}
+            {!style.items.length && <p className="mt-2 text-xs text-faint">{t.artist.noGenres}</p>}
             <div className="mt-3"><LinksRow links={artist.links} wikiUrl={wiki?.url} /></div>
             <div className="mt-3 flex items-center gap-3">
               {user ? (
-                <form action={toggleFavorite}>
-                  <input type="hidden" name="mbid" value={mbid} />
-                  <input type="hidden" name="favorite" value={fav ? "1" : "0"} />
-                  <input type="hidden" name="name" value={artist.name} />
-                  <button className={`btn ${fav ? "btn-accent" : ""}`}>{fav ? t.artist.favoriteActive : t.artist.favoriteAdd}</button>
-                </form>
+                <>
+                  <form action={toggleFavorite}>
+                    <input type="hidden" name="mbid" value={mbid} />
+                    <input type="hidden" name="current" value={fav ?? ""} />
+                    <input type="hidden" name="kind" value="like" />
+                    <input type="hidden" name="name" value={artist.name} />
+                    <button className={`btn ${fav === "like" ? "btn-accent" : ""}`}>
+                      {fav === "like" ? t.artist.favoriteActive : t.artist.favoriteAdd}
+                    </button>
+                  </form>
+                  <form action={toggleFavorite}>
+                    <input type="hidden" name="mbid" value={mbid} />
+                    <input type="hidden" name="current" value={fav ?? ""} />
+                    <input type="hidden" name="kind" value="dislike" />
+                    <input type="hidden" name="name" value={artist.name} />
+                    <button className={`btn ${fav === "dislike" ? "btn-warn" : ""}`}>
+                      {fav === "dislike" ? t.artist.dislikeActive : t.artist.dislikeAdd}
+                    </button>
+                  </form>
+                </>
               ) : (
                 <Link href={`/login?callbackUrl=/artist/${mbid}`} className="btn">{t.artist.favoriteAdd}</Link>
               )}
@@ -506,7 +549,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
         )}
 
         <Suspense fallback={<DeepContentLoading t={t} />}>
-          <ArtistDeepContent artist={artist} mbid={mbid} locale={locale} t={t} />
+          <ArtistDeepContent artist={artist} mbid={mbid} locale={locale} t={t} chrono={chrono} />
         </Suspense>
       </div>
 

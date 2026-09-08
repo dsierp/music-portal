@@ -2,6 +2,9 @@
 import type { Locale } from "@/lib/i18n";
 
 const pl = {
+  dislikedTitle: "Nie moja bajka",
+  dislikedExplain: "Nie chodzi o to, że to złe — po prostu nie Twój klimat. Portal nie będzie Ci tego podsuwał.",
+  undislike: "cofnij",
   statsTitle: "Statystyki portalu",
   statsExplain: "Widzisz to, bo Twoje konto jest na liście administratorów portalu.",
   statsUsers: { one: "{n} zarejestrowana osoba", few: "{n} zarejestrowane osoby", many: "{n} zarejestrowanych osób" } as { one: string; few?: string; many: string },
@@ -60,6 +63,9 @@ const pl = {
 type T = typeof pl;
 
 const en: T = {
+  dislikedTitle: "Not my thing",
+  dislikedExplain: "Not a verdict that it\u2019s bad — simply not your kind of thing. The portal will stop pushing it your way.",
+  undislike: "undo",
   statsTitle: "Portal statistics",
   statsExplain: "You see this because your account is on the portal's admin list.",
   statsUsers: { one: "{n} registered person", many: "{n} registered people" },
@@ -117,6 +123,9 @@ const en: T = {
 };
 
 const es: T = {
+  dislikedTitle: "No es lo mío",
+  dislikedExplain: "No es que sea malo — sencillamente no es lo tuyo. El portal dejará de proponértelo.",
+  undislike: "deshacer",
   statsTitle: "Estadísticas del portal",
   statsExplain: "Ves esto porque tu cuenta está en la lista de administradores del portal.",
   statsUsers: { one: "{n} persona registrada", many: "{n} personas registradas" },
@@ -174,6 +183,9 @@ const es: T = {
 };
 
 const de: T = {
+  dislikedTitle: "Nicht mein Ding",
+  dislikedExplain: "Kein Urteil über die Qualität — es ist einfach nicht deins. Das Portal schlägt es dir nicht mehr vor.",
+  undislike: "rückgängig",
   statsTitle: "Portal-Statistik",
   statsExplain: "Du siehst das, weil dein Konto auf der Admin-Liste des Portals steht.",
   statsUsers: { one: "{n} registrierte Person", many: "{n} registrierte Personen" },
