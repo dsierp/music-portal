@@ -65,6 +65,24 @@ export const authConfig: NextAuthConfig = {
     },
   },
   trustHost: true,
+  /**
+   * Auth.js pokazuje użytkownikowi tylko „problem with the server
+   * configuration" i chowa prawdziwy powód — a każdy strzał w ciemno na
+   * produkcji kosztuje wdrożenie. Ten logger wypisuje w logach serwera nazwę
+   * błędu (MissingSecret, OperationProcessingError, InvalidCheck…) razem
+   * z przyczyną, którą Auth.js pakuje w `cause.err`.
+   */
+  logger: {
+    error(error) {
+      const e = error as Error & { cause?: { err?: Error; provider?: string } };
+      const inner = e?.cause?.err;
+      console.error(
+        `[auth] ${e?.name ?? "Error"}: ${e?.message ?? String(error)}` +
+          (e?.cause?.provider ? ` (dostawca: ${e.cause.provider})` : "") +
+          (inner ? `\n[auth] przyczyna: ${inner.name}: ${inner.message}` : ""),
+      );
+    },
+  },
 };
 
 export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);
