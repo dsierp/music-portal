@@ -122,3 +122,19 @@ export async function skipOnboarding() {
   (await cookies()).set(SKIP_ONBOARDING, "1", { maxAge: 60 * 60 * 24 * 365, httpOnly: true, sameSite: "lax", path: "/" });
   redirect("/");
 }
+
+// ---------- Obszary koncertowe ----------
+
+export async function addAreaAction(formData: FormData) {
+  const u = await requireUser();
+  await ud.addArea(u.id, String(formData.get("country") ?? ""), String(formData.get("city") ?? "") || null);
+  revalidatePath("/ja");
+  revalidatePath("/koncerty");
+}
+
+export async function removeAreaAction(formData: FormData) {
+  const u = await requireUser();
+  await ud.removeArea(u.id, String(formData.get("country") ?? ""), String(formData.get("city") ?? "") || null);
+  revalidatePath("/ja");
+  revalidatePath("/koncerty");
+}

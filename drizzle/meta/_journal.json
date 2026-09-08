@@ -8,6 +8,13 @@
       "when": 1788786999212,
       "tag": "0000_perpetual_karma",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788872451844,
+      "tag": "0001_calm_hedge_knight",
+      "breakpoints": true
     }
   ]
 }

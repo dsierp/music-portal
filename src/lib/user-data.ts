@@ -231,3 +231,33 @@ export async function favoriteCount(mbid: string) {
 export async function myRatings(userId: string, type: Target) {
   return db.select().from(schema.ratings).where(and(eq(schema.ratings.userId, userId), eq(schema.ratings.targetType, type))).orderBy(desc(schema.ratings.updatedAt));
 }
+
+// ---------- Obszary koncertowe ----------
+
+/** Obszary, z których użytkownik chce widzieć koncerty (miasto albo cały kraj). */
+export async function getAreas(userId: string) {
+  return db
+    .select()
+    .from(schema.userAreas)
+    .where(eq(schema.userAreas.userId, userId))
+    .orderBy(asc(schema.userAreas.country), asc(schema.userAreas.city));
+}
+
+export async function addArea(userId: string, country: string, city: string | null) {
+  const c = country.trim().toUpperCase().slice(0, 2);
+  if (!/^[A-Z]{2}$/.test(c)) return;
+  const town = city?.trim().slice(0, 80) || null;
+  await db.insert(schema.userAreas).values({ userId, country: c, city: town }).onConflictDoNothing();
+}
+
+export async function removeArea(userId: string, country: string, city: string | null) {
+  await db
+    .delete(schema.userAreas)
+    .where(
+      and(
+        eq(schema.userAreas.userId, userId),
+        eq(schema.userAreas.country, country),
+        city === null ? isNull(schema.userAreas.city) : eq(schema.userAreas.city, city),
+      ),
+    );
+}

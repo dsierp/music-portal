@@ -91,6 +91,24 @@ export const favoriteArtists = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.mbid] }), index("favorite_artist_mbid").on(t.mbid)],
 );
 
+/**
+ * Obszary, z których użytkownik chce widzieć koncerty.
+ *
+ * Miasto ALBO cały kraj — dlatego `city` bywa puste. Kod kraju trzymamy zawsze,
+ * bo to on identyfikuje rynek w Ticketmasterze („PL", „DE"), a nazwy miast
+ * bywają w kilku wariantach (Warszawa/Warsaw) i same w sobie są niejednoznaczne.
+ */
+export const userAreas = pgTable(
+  "user_area",
+  {
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    country: text("country").notNull(), // ISO-3166-1 alpha-2, np. "PL"
+    city: text("city"), // null = cały kraj
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.country, t.city] })],
+);
+
 // ---------- Oceny i komentarze ----------
 
 export const targetType = pgEnum("target_type", ["ALBUM", "ARTIST"]);
