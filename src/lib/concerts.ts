@@ -75,6 +75,37 @@ export const TM_GENRE: Record<string, string | null> = {
   folk: "Folk",
 };
 
+/**
+ * Etykiety, które UZNAJEMY za „moje" przy sprawdzaniu wyników.
+ *
+ * Do zapytania idzie szeroki gatunek („Metal", „Rock"), bo takiego słownika
+ * używa wyszukiwarka TM. Ale do filtrowania odpowiedzi szeroki „Rock" jest
+ * bezużyteczny: prog rock i As December Falls to dla TM ten sam „Rock". Dlatego
+ * przy każdej kategorii trzymamy listę etykiet z podgatunków — dopasowanie jest
+ * po nich, a nie po korzeniu drzewa.
+ */
+export const TM_ACCEPT: Record<string, string[]> = {
+  death: ["Metal", "Death Metal/Black Metal", "Heavy Metal", "Thrash & Speed", "Hardcore"],
+  black: ["Metal", "Death Metal/Black Metal", "Heavy Metal", "Thrash & Speed"],
+  other: ["Metal", "Heavy Metal", "Death Metal/Black Metal", "Thrash & Speed", "Hard Rock", "Power Metal", "Doom"],
+  prog: ["Progressive Rock", "Progressive Metal", "Art Rock", "Psychedelic"],
+  jazz: ["Jazz", "Jazz Blues", "Bebop", "Fusion", "Big Band", "Free Jazz", "Avant Garde"],
+  punk: ["Punk", "Hardcore", "Post Punk", "Ska Punk"],
+  country: ["Country", "Americana", "Bluegrass", "Alt Country"],
+  classical: ["Classical", "Chamber Music", "Orchestral", "Opera"],
+  electronic: ["Dance/Electronic", "Ambient Electronica", "Techno", "House", "Drum & Bass"],
+  hiphop: ["Hip-Hop/Rap", "Rap"],
+  pop: ["Pop", "Pop Rock", "Indie Pop"],
+  folk: ["Folk", "Singer/Songwriter", "World"],
+};
+
+/** Etykiety uznawane za „moje" dla kategorii z profilu. */
+export function acceptedLabels(categories: string[]): string[] {
+  const out = new Set<string>();
+  for (const c of categories) for (const g of TM_ACCEPT[c] ?? []) out.add(g);
+  return [...out];
+}
+
 /** Nazwy gatunków TM dla listy kategorii użytkownika (bez powtórek). */
 export function tmGenres(categories: string[]): string[] {
   const out = new Set<string>();
@@ -103,7 +134,10 @@ export function matchesGenres(c: Concert, wanted: string[]): boolean {
   const chce = wanted.map((g) => g.toLowerCase());
   return c.genres.some((g) => {
     const label = g.toLowerCase();
-    return chce.some((w) => label.includes(w) || w.includes(label));
+    // Tylko w jedną stronę: etykieta TM może być WĘŻSZA od tego, co uznajemy
+    // („Death Metal/Black Metal" ⊂ „Metal"), ale nie odwrotnie — inaczej „Rock"
+    // z listy przepuszczałby cały pop-rock, którego nikt nie chciał.
+    return chce.some((w) => label === w || label.includes(w));
   });
 }
 

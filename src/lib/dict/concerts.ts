@@ -2,6 +2,8 @@
 import type { Locale } from "@/lib/i18n";
 
 const pl = {
+  myGenresChip: "Moje gatunki",
+  otherGenresLabel: "poza moimi",
   hiddenOffGenre: "Schowałam {n} koncertów spoza Twoich gatunków — Ticketmaster traktuje gatunek jak podpowiedź, nie filtr.",
   showOffGenre: "pokaż wszystko",
   hideOffGenre: "pokaż tylko moje gatunki",
@@ -34,6 +36,8 @@ const pl = {
 type T = typeof pl;
 
 const en: T = {
+  myGenresChip: "My genres",
+  otherGenresLabel: "outside mine",
   hiddenOffGenre: "Hidden {n} concerts outside your genres — Ticketmaster treats genre as a hint, not a filter.",
   showOffGenre: "show everything",
   hideOffGenre: "show only my genres",
@@ -65,6 +69,8 @@ const en: T = {
 };
 
 const es: T = {
+  myGenresChip: "Mis géneros",
+  otherGenresLabel: "fuera de los míos",
   hiddenOffGenre: "He ocultado {n} conciertos fuera de tus géneros — Ticketmaster trata el género como una pista, no como un filtro.",
   showOffGenre: "mostrar todo",
   hideOffGenre: "mostrar solo mis géneros",
@@ -96,6 +102,8 @@ const es: T = {
 };
 
 const de: T = {
+  myGenresChip: "Meine Genres",
+  otherGenresLabel: "außerhalb meiner",
   hiddenOffGenre: "{n} Konzerte außerhalb deiner Genres ausgeblendet — Ticketmaster versteht das Genre als Hinweis, nicht als Filter.",
   showOffGenre: "alles anzeigen",
   hideOffGenre: "nur meine Genres",

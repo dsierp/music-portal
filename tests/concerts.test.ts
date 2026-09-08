@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { concertWindow, tmGenres, dedupe, inAnyArea, type Concert } from "../src/lib/concerts";
+import { acceptedLabels, concertWindow, dedupe, inAnyArea, matchesGenres, offGenre, tmGenres, type Concert } from "../src/lib/concerts";
 
 test("okno koncertów to dokładnie trzy miesiące od dziś", () => {
   const w = concertWindow(new Date("2026-09-08T22:00:00Z"));
@@ -48,4 +48,29 @@ test("puste obszary nie zawężają niczego", () => {
   const anywhere = c({ city: "Tokio", country: "JP" });
   assert.equal(inAnyArea(anywhere, []), false, "pusta lista nie pasuje…");
   // …a wywołujący traktuje pustą listę jako „bez filtra" (patrz concertsForFavorites).
+});
+
+// --- „to nie są moje gatunki" -------------------------------------------------
+
+test("szeroki Rock z listy nie przepuszcza pop-rocka", () => {
+  // Prog rock i As December Falls to dla Ticketmastera ten sam „Rock" — dlatego
+  // dopasowujemy po podgatunkach, nie po korzeniu drzewa.
+  const moje = acceptedLabels(["prog", "death"]);
+  const popRock = { id: "1", name: "As December Falls", date: "2026-09-17", time: null, city: "Krakow", country: "PL", venue: null, url: null, source: "ticketmaster" as const, genres: ["Rock", "Pop"] };
+  const prog = { ...popRock, id: "2", genres: ["Progressive Rock"] };
+  const death = { ...popRock, id: "3", genres: ["Metal", "Death Metal/Black Metal"] };
+  assert.equal(matchesGenres(popRock, moje), false);
+  assert.equal(matchesGenres(prog, moje), true);
+  assert.equal(matchesGenres(death, moje), true, "podgatunek węższy niż „Metal” ma się łapać");
+});
+
+test("koncert bez etykiet zostaje — o nim nic nie wiadomo", () => {
+  const mb = { id: "mb:1", name: "DeViLs", date: "2026-09-13", time: null, city: null, country: "PL", venue: "Kwadrat", url: null, source: "musicbrainz" as const, genres: [] };
+  assert.equal(matchesGenres(mb, acceptedLabels(["death"])), true);
+  assert.equal(offGenre(mb, acceptedLabels(["death"])), false);
+});
+
+test("bez wybranych kategorii nie filtrujemy niczego", () => {
+  const c = { id: "1", name: "X", date: "2026-09-17", time: null, city: null, country: "PL", venue: null, url: null, source: "ticketmaster" as const, genres: ["Pop"] };
+  assert.equal(matchesGenres(c, acceptedLabels([])), true);
 });

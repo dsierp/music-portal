@@ -6,7 +6,7 @@ import { AddToList } from "@/components/add-to-list";
 import { heroArt, leadStyle } from "@/lib/lead-style";
 import { currentUser } from "@/lib/auth";
 import { getAreas, getFavoriteArtists, getGenres, getUserLocale, getMyLists } from "@/lib/user-data";
-import { concertWindow, concertsByArea, concertsByAreaMb, concertsForFavorites, dedupe, hasTicketmasterKey, offGenre, tmGenres, type Concert } from "@/lib/concerts";
+import { acceptedLabels, concertWindow, concertsByArea, concertsByAreaMb, concertsForFavorites, dedupe, hasTicketmasterKey, matchesGenres, offGenre, type Concert } from "@/lib/concerts";
 import { dbSafe } from "@/lib/db-safe";
 import { i18n } from "@/lib/t";
 import { fmt, formatDate, type Locale } from "@/lib/i18n";
@@ -94,19 +94,63 @@ function ConcertList({
  * etykiety, które faktycznie są w wynikach, razem z liczbą koncertów. Wybór
  * siedzi w adresie (?g=), więc zawężoną listę da się wysłać linkiem.
  */
-function GenreChips({ items, wybrany, locale, t }: { items: Concert[]; wybrany: string; locale: Locale; t: Dict }) {
+function GenreChips({
+  items,
+  wybrany,
+  moje,
+  wszystko,
+  locale,
+  t,
+}: {
+  /** wszystko, co przyszło — chipsy mają pokazywać pełny obraz, nie tylko wynik filtra */
+  items: Concert[];
+  wybrany: string;
+  /** etykiety uznane za „moje gatunki" — te chipsy są zaznaczone domyślnie */
+  moje: string[];
+  wszystko: boolean;
+  locale: Locale;
+  t: Dict;
+}) {
   const licznik = new Map<string, number>();
   for (const c of items) for (const g of c.genres) licznik.set(g, (licznik.get(g) ?? 0) + 1);
   if (licznik.size < 2) return null;
-  const lista = [...licznik.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], locale));
+  const chce = moje.map((g) => g.toLowerCase());
+  const mojeEtykiety = new Set(
+    [...licznik.keys()].filter((g) => chce.some((w) => g.toLowerCase() === w || g.toLowerCase().includes(w))),
+  );
+  const sortuj = (a: [string, number], b: [string, number]) => b[1] - a[1] || a[0].localeCompare(b[0], locale);
+  const lista = [...licznik.entries()].sort(sortuj);
+  const mojeChipsy = lista.filter(([g]) => mojeEtykiety.has(g));
+  const resztaChipsy = lista.filter(([g]) => !mojeEtykiety.has(g));
+  const link = (g: string) => `/koncerty?g=${encodeURIComponent(g)}${wszystko ? "&w=1" : ""}`;
+
   return (
-    <div className="mb-3 flex flex-wrap gap-1.5">
-      <Link href="/koncerty" className={`chip ${wybrany ? "" : "chip-on"}`}>{t.common.all} <span className="ml-1 font-mono text-[10px] text-muted">{items.length}</span></Link>
-      {lista.map(([g, n]) => (
-        <Link key={g} href={`/koncerty?g=${encodeURIComponent(g)}`} className={`chip ${wybrany === g ? "chip-on" : ""}`}>
-          {g} <span className="ml-1 font-mono text-[10px] text-muted">{n}</span>
+    <div className="mb-3 space-y-1.5">
+      {/* Moje gatunki: zaznaczone z góry, bez klikania. Reszta jest obok —
+          „niech sobie będą", ale nie udają, że to moja muzyka. */}
+      <div className="flex flex-wrap gap-1.5">
+        <Link href={wszystko ? "/koncerty?w=1" : "/koncerty"} className={`chip ${wybrany ? "" : "chip-on"}`}>
+          {t.concerts.myGenresChip}{" "}
+          <span className="ml-1 font-mono text-[10px] text-muted">
+            {items.filter((c) => !c.genres.length || c.genres.some((g) => mojeEtykiety.has(g))).length}
+          </span>
         </Link>
-      ))}
+        {mojeChipsy.map(([g, n]) => (
+          <Link key={g} href={link(g)} className={`chip ${wybrany === g ? "chip-on" : ""}`}>
+            {g} <span className="ml-1 font-mono text-[10px] text-muted">{n}</span>
+          </Link>
+        ))}
+      </div>
+      {resztaChipsy.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="font-mono text-[10px] uppercase tracking-widest text-faint">{t.concerts.otherGenresLabel}</span>
+          {resztaChipsy.map(([g, n]) => (
+            <Link key={g} href={link(g)} className={`chip text-faint ${wybrany === g ? "chip-on" : ""}`}>
+              {g} <span className="ml-1 font-mono text-[10px]">{n}</span>
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -140,10 +184,18 @@ async function ByArea({
   // Ticketmaster traktuje gatunek jak podpowiedź, nie filtr — stąd Melanie
   // Martinez w wynikach zapytania o metal. Odsiewamy to, co ma etykiety i żadna
   // nie pasuje; koncerty bez etykiet zostają, bo o nich po prostu nic nie wiemy.
-  const moje = tmGenres(categories);
+  // Do zapytania szedł szeroki gatunek („Metal", „Rock"), ale do filtrowania
+  // bierzemy podgatunki: dla TM prog rock i pop-rockowy support to ten sam
+  // „Rock", a to nie jest ta sama muzyka.
+  const moje = acceptedLabels(categories);
   const obce = zebrane.filter((c) => offGenre(c, moje));
-  const wszystkie = wszystko ? zebrane : zebrane.filter((c) => !offGenre(c, moje));
-  const items = wybrany ? wszystkie.filter((c) => c.genres.includes(wybrany)) : wszystkie;
+  // Domyślnie widać MOJE gatunki. Konkretny chips zawęża do jednej etykiety —
+  // także spoza moich, bo skoro ktoś w nią kliknął, to chce właśnie tego.
+  const items = wybrany
+    ? zebrane.filter((c) => c.genres.includes(wybrany))
+    : wszystko
+      ? zebrane
+      : zebrane.filter((c) => matchesGenres(c, moje));
   if (!zebrane.length) {
     return (
       <p className="text-sm text-muted">
@@ -154,7 +206,7 @@ async function ByArea({
   }
   return (
     <>
-      <GenreChips items={wszystkie} wybrany={wybrany} locale={locale} t={t} />
+      <GenreChips items={zebrane} wybrany={wybrany} moje={moje} wszystko={wszystko} locale={locale} t={t} />
       {items.length ? (
         <ConcertList items={items} locale={locale} t={t} lists={lists} />
       ) : (
