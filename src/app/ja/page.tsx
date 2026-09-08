@@ -2,8 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { currentUser } from "@/lib/auth";
-import { getFavoriteArtists, getGenres, getLikedAlbums, myRatings } from "@/lib/user-data";
-import { setGenreAction, skipOnboarding, toggleFavorite, toggleLike } from "@/app/actions";
+import { getAreas, getFavoriteArtists, getGenres, getLikedAlbums, myRatings } from "@/lib/user-data";
+import { addAreaAction, removeAreaAction, setGenreAction, skipOnboarding, toggleFavorite, toggleLike } from "@/app/actions";
 import { MAIN_CATEGORIES, WEIGHT_LABELS } from "@/lib/genres";
 import { orderByPopularity } from "@/lib/popularity";
 import { genreImage } from "@/lib/genre-art";
@@ -16,8 +16,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const witaj = (await searchParams).witaj === "1";
   const user = await currentUser();
   if (!user) redirect("/login?callbackUrl=/ja");
-  const [genres, liked, favs, albumRatings, artistRatings] = await Promise.all([
-    getGenres(user.id), getLikedAlbums(user.id), getFavoriteArtists(user.id), myRatings(user.id, "ALBUM"), myRatings(user.id, "ARTIST"),
+  const [genres, liked, favs, albumRatings, artistRatings, areas] = await Promise.all([
+    getGenres(user.id), getLikedAlbums(user.id), getFavoriteArtists(user.id), myRatings(user.id, "ALBUM"), myRatings(user.id, "ARTIST"), getAreas(user.id),
   ]);
   const weightOf = new Map(genres.map((g) => [g.genre, g.weight]));
   // Kafelki: najpierw to, co już masz (od największej wagi), potem reszta
@@ -49,6 +49,61 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         <h1 className="text-4xl">{user.name || user.email}</h1>
         <p className="text-sm text-muted">{user.email}</p>
       </header>
+
+      <section id="obszary">
+        <h2 className="text-2xl">Koncerty — moje obszary</h2>
+        <p className="mb-4 text-sm text-muted">
+          Dwie osobne listy, bo to dwa różne apetyty: po ulubiony zespół jedzie się przez pół kraju, a &bdquo;coś w moich
+          gatunkach&rdquo; ogląda się u siebie. Zostaw miasto puste, żeby śledzić cały kraj. Na tej podstawie buduję{" "}
+          <Link href="/koncerty" className="underline">listę koncertów</Link> na najbliższe trzy miesiące.
+        </p>
+        <div className="grid gap-6 sm:grid-cols-2">
+          {([
+            { scope: "genres" as const, title: "Dla moich gatunków", hint: "np. Kraków, Warszawa" },
+            { scope: "favorites" as const, title: "Dla ulubionych zespołów", hint: "np. cała Polska" },
+          ]).map(({ scope, title, hint }) => {
+            const list = areas.filter((a) => a.scope === scope);
+            return (
+              <div key={scope} className="card">
+                <div className="label mb-2">{title}</div>
+                {list.length > 0 ? (
+                  <ul className="mb-3 flex flex-wrap gap-2">
+                    {list.map((a) => (
+                      <li key={`${a.country}-${a.city ?? ""}`}>
+                        <form action={removeAreaAction} className="flex items-center gap-1">
+                          <input type="hidden" name="scope" value={scope} />
+                          <input type="hidden" name="country" value={a.country} />
+                          <input type="hidden" name="city" value={a.city ?? ""} />
+                          <span className="chip chip-on">{a.city ? `${a.city} · ${a.country}` : `cały kraj: ${a.country}`}</span>
+                          <button className="text-xs text-muted hover:text-accent2" title="Usuń obszar">×</button>
+                        </form>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mb-3 text-xs text-muted">Nic jeszcze nie wybrałeś ({hint}).</p>
+                )}
+                <form action={addAreaAction} className="flex flex-wrap items-end gap-2">
+                  <input type="hidden" name="scope" value={scope} />
+                  <label className="text-xs text-muted">
+                    <span className="label block">Miasto</span>
+                    <input name="city" placeholder="puste = cały kraj" className="input w-44 py-1 text-sm" autoComplete="off" />
+                  </label>
+                  <label className="text-xs text-muted">
+                    <span className="label block">Kraj</span>
+                    <input name="country" maxLength={2} defaultValue="PL" className="input w-16 py-1 text-sm uppercase" autoComplete="off" />
+                  </label>
+                  <button className="btn">Dodaj</button>
+                </form>
+              </div>
+            );
+          })}
+        </div>
+        <p className="mt-2 text-xs text-faint">
+          Kraj podaje się dwuliterowym kodem: PL, DE, CZ, GB. Miasto wpisz tak, jak nazywa się lokalnie
+          (Warszawa, Kraków, Berlin).
+        </p>
+      </section>
 
       <section id="style">
         <h2 className="text-2xl">Style muzyczne</h2>

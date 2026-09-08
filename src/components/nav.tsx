@@ -15,6 +15,7 @@ export async function Nav() {
           <Link href="/premiery">Premiery</Link>
           <Link href="/best-of">Best of</Link>
           <Link href="/listy">Listy</Link>
+          <Link href="/koncerty">Koncerty</Link>
         </nav>
         <div className="ml-auto flex items-center gap-3">
           <SearchBox />

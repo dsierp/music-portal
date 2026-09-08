@@ -239,6 +239,29 @@ export interface Album extends AlbumSummary {
   /** Ocena społeczności MusicBrainz (0–5) — jedyne źródło ocen, które zawsze mamy bez scrapowania. */
   mbRating: { value: number; votes: number } | null;
 }
+/**
+ * Wynik wyszukiwania artysty — świadomie bogatszy niż sama nazwa.
+ *
+ * „Cynic" w MusicBrainz to co najmniej trzy zespoły; sam napis „group · US"
+ * nie mówi, który jest który. Wszystkie te pola przychodzą JEDNYM zapytaniem
+ * (odpowiedź wyszukiwarki MB i tak je zawiera), więc nic nas nie kosztują.
+ */
+export interface ArtistHit {
+  mbid: string;
+  name: string;
+  type: string | null;
+  isPerson: boolean;
+  country: string | null;
+  disambiguation: string | null;
+  begin: string | null;
+  end: string | null;
+  ended: boolean;
+  area: string | null;
+  city: string | null;
+  tags: string[];
+  aliases: string[];
+}
+
 export interface Membership {
   mbid: string;
   name: string;
@@ -453,10 +476,11 @@ export async function searchArtists(
   query: string,
   limit = 20,
   kind?: "group" | "person",
-): Promise<Pick<Artist, "mbid" | "name" | "type" | "country" | "disambiguation" | "isPerson">[]> {
+): Promise<ArtistHit[]> {
   const full = artistQuery(query, kind);
   if (!full) return [];
-  const data = await cached(`mb:artist-search:${full}:${limit}`, TTL.search, () =>
+  // v2: doszły lata działalności, gatunki i miasto — patrz ArtistHit.
+  const data = await cached(`mb:artist-search:v2:${full}:${limit}`, TTL.search, () =>
     mbFetch<{ artists: MbArtist[] }>("/artist/", { query: full, limit }),
   );
   return data.artists.map((a) => ({
@@ -466,6 +490,14 @@ export async function searchArtists(
     isPerson: a.type === "Person",
     country: a.country ?? null,
     disambiguation: a.disambiguation || null,
+    begin: a["life-span"]?.begin ?? null,
+    end: a["life-span"]?.end ?? null,
+    ended: Boolean(a["life-span"]?.ended),
+    area: a.area?.name ?? null,
+    city: a["begin-area"]?.name ?? null,
+    // Tagi bywają śmieciowe, więc bierzemy tylko te, które ktoś realnie poparł.
+    tags: (a.tags ?? []).filter((t) => t.count > 0).sort((x, y) => y.count - x.count).map((t) => t.name).slice(0, 3),
+    aliases: (a.aliases ?? []).map((x) => x.name).slice(0, 3),
   }));
 }
 

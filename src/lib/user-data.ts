@@ -231,3 +231,37 @@ export async function favoriteCount(mbid: string) {
 export async function myRatings(userId: string, type: Target) {
   return db.select().from(schema.ratings).where(and(eq(schema.ratings.userId, userId), eq(schema.ratings.targetType, type))).orderBy(desc(schema.ratings.updatedAt));
 }
+
+// ---------- Obszary koncertowe ----------
+
+export type AreaScope = "genres" | "favorites";
+
+/** Obszary użytkownika dla jednej z dwóch list (gatunki / ulubieni). */
+export async function getAreas(userId: string, scope?: AreaScope) {
+  const where = scope
+    ? and(eq(schema.userAreas.userId, userId), eq(schema.userAreas.scope, scope))
+    : eq(schema.userAreas.userId, userId);
+  const rows = await db.select().from(schema.userAreas).where(where).orderBy(asc(schema.userAreas.country), asc(schema.userAreas.city));
+  // W bazie "" znaczy „cały kraj"; na zewnątrz wygodniejszy jest null.
+  return rows.map((r) => ({ ...r, city: r.city || null }));
+}
+
+export async function addArea(userId: string, scope: AreaScope, country: string, city: string | null) {
+  const c = country.trim().toUpperCase().slice(0, 2);
+  if (!/^[A-Z]{2}$/.test(c)) return;
+  const town = city?.trim().slice(0, 80) || "";
+  await db.insert(schema.userAreas).values({ userId, scope, country: c, city: town }).onConflictDoNothing();
+}
+
+export async function removeArea(userId: string, scope: AreaScope, country: string, city: string | null) {
+  await db
+    .delete(schema.userAreas)
+    .where(
+      and(
+        eq(schema.userAreas.userId, userId),
+        eq(schema.userAreas.scope, scope),
+        eq(schema.userAreas.country, country),
+        eq(schema.userAreas.city, city ?? ""),
+      ),
+    );
+}
