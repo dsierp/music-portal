@@ -4,12 +4,14 @@
  */
 import { cached, TTL } from "./cache";
 import type { Links } from "./musicbrainz";
+import { normalizeUserAgent } from "./musicbrainz";
 import { PERSONNEL_HEADING, cleanWikitext, splitPersonnelLine, parseRatingsTemplate } from "./wikitext";
 export { parseRatingsTemplate } from "./wikitext";
 import type { PersonnelLine, WikiReview } from "./wikitext";
 export type { PersonnelLine, WikiReview } from "./wikitext";
 
-const UA = process.env.MUSICBRAINZ_USER_AGENT ?? "MusicPortal/0.1 (dev)";
+// Ten sam nagłówek co dla MusicBrainz — i tak samo odporny na pustą zmienną.
+const UA = normalizeUserAgent(process.env.MUSICBRAINZ_USER_AGENT);
 
 export interface WikiSummary {
   lang: string;

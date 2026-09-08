@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 process.env.MB_FIXTURES = "tests/fixtures/mb";
 process.env.DATABASE_URL ??= "postgresql://invalid";
-import { getAlbum, getArtist, getDiscography, getPlayedOn, findAlbumMbid, searchAlbums, buildLinks } from "../src/lib/musicbrainz";
+import { getAlbum, getArtist, getDiscography, getPlayedOn, findAlbumMbid, searchAlbums, buildLinks, normalizeUserAgent } from "../src/lib/musicbrainz";
 import { ID } from "./make-fixtures";
 
 test("album: skład z relacji nagrań, najwcześniejsze wydanie, linki", async () => {
@@ -79,4 +79,19 @@ test("buildLinks: wyszukiwanie gdy brak relacji; AllMusic dla jazzu", () => {
   assert.match(l.spotify, /open\.spotify\.com\/search\/John%20Coltrane/);
   assert.ok(l.allmusic);
   assert.equal(l.metalArchives, undefined);
+});
+
+test("User-Agent: pusta zmienna nie kończy się pustym nagłówkiem", () => {
+  // Dokładnie ten przypadek wyłączył portal na produkcji: zmienna istniała,
+  // ale była pusta, a `??` łapie tylko brak zmiennej.
+  for (const empty of [undefined, "", "   ", '""', "''"]) {
+    const ua = normalizeUserAgent(empty as string | undefined);
+    assert.ok(ua.length > 10, `pusto dla ${JSON.stringify(empty)}`);
+    assert.match(ua, /PureNewShit/);
+  }
+});
+
+test("User-Agent: własna wartość przechodzi, cudzysłowy z importu .env obcięte", () => {
+  assert.equal(normalizeUserAgent('"MusicPortal/0.1 (a@b.pl)"'), "MusicPortal/0.1 (a@b.pl)");
+  assert.equal(normalizeUserAgent("  MusicPortal/0.2 (a@b.pl)  "), "MusicPortal/0.2 (a@b.pl)");
 });

@@ -13,7 +13,23 @@ import { cached, TTL } from "./cache";
 import { createThrottle } from "./throttle";
 
 const MB_BASE = "https://musicbrainz.org/ws/2";
-const UA = process.env.MUSICBRAINZ_USER_AGENT ?? "MusicPortal/0.1 (dev)";
+
+/**
+ * MusicBrainz wymaga, żeby aplikacja się przedstawiła — bez tego odpowiada 403
+ * („the application you are using has not identified itself").
+ *
+ * Wcześniej stało tu `process.env.X ?? domyślne`, a `??` łapie tylko brak
+ * zmiennej, NIE pusty tekst. Na Vercelu zmienna istniała, ale była pusta, więc
+ * nagłówek szedł pusty i MB odcinał portal — przy działającym lokalnie macu,
+ * gdzie zmienna miała wartość. Dlatego teraz: przycinamy, zdejmujemy cudzysłowy
+ * (tak potrafi przyjechać wartość z importu pliku .env) i pilnujemy, żeby nigdy
+ * nie zostało pusto.
+ */
+export function normalizeUserAgent(raw: string | undefined): string {
+  const v = (raw ?? "").trim().replace(/^["']|["']$/g, "").trim();
+  return v || "PureNewShit/0.1 ( https://music-travel.app )";
+}
+const UA = normalizeUserAgent(process.env.MUSICBRAINZ_USER_AGENT);
 
 // ---------- rate limiter ----------
 // Odstęp między wysłaniami zapytań (MusicBrainz: 1/s; 1,1 s daje zapas na
