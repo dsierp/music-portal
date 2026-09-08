@@ -152,8 +152,17 @@ function Chart({
               <g key={row.mbid}>
                 <rect x={LABEL_W} y={y + 4} width={plotW} height={ROW_H - 8} fill="var(--surface2)" />
                 {row.spans.map((sp, j) => {
-                  const x1 = x(toYear(sp.begin, from));
-                  const x2 = x(sp.current ? now : toYear(sp.end, now));
+                  // Nieznany okres rozciągamy na całą oś — ale pustym prostokątem
+                  // w przerywanej ramce, żeby nikt nie wziął go za fakt.
+                  const x1 = sp.unknown ? x(from) : x(toYear(sp.begin, from));
+                  const x2 = sp.unknown ? x(to) : x(sp.current ? now : toYear(sp.end, now));
+                  const zrodlo = sp.unknown
+                    ? ` — ${t.unknownNote}`
+                    : sp.inferred
+                      ? ` — ${t.inferredNote}`
+                      : sp.fromWikidata
+                        ? ` — ${t.wikidataNote}`
+                        : "";
                   return (
                     <rect
                       key={j}
@@ -161,12 +170,15 @@ function Chart({
                       y={y + 4}
                       width={Math.max(2, x2 - x1)}
                       height={ROW_H - 8}
-                      fill={s.color}
+                      fill={sp.unknown ? "transparent" : s.color}
+                      stroke={sp.unknown ? s.color : undefined}
+                      strokeWidth={sp.unknown ? 1.2 : undefined}
+                      strokeDasharray={sp.unknown ? "4 3" : undefined}
                       rx={2}
-                      opacity={sp.inferred ? 0.45 : 1}
+                      opacity={sp.unknown ? 0.7 : sp.inferred ? 0.45 : 1}
                     >
                       <title>
-                        {`${row.name}: ${sp.begin?.slice(0, 4) ?? "?"}–${sp.current ? t.today : sp.end?.slice(0, 4) ?? "?"}${sp.roles.length ? ` (${sp.roles.join(", ")})` : ""}${sp.inferred ? ` — ${t.inferredNote}` : ""}`}
+                        {`${row.name}: ${sp.unknown ? "?–?" : `${sp.begin?.slice(0, 4) ?? "?"}–${sp.current ? t.today : sp.end?.slice(0, 4) ?? "?"}`}${sp.roles.length ? ` (${sp.roles.join(", ")})` : ""}${zrodlo}`}
                       </title>
                     </rect>
                   );
@@ -201,7 +213,8 @@ function Chart({
                 <a href={`/artist/${row.mbid}`}>
                   <title>{row.name}</title>
                   <text x={LABEL_W - 8} y={y + ROW_H / 2 + 4} textAnchor="end" fontSize="12" fill="var(--text2)" fontFamily="var(--font-sans)">
-                    {row.name.length > maxName ? row.name.slice(0, maxName - 1) + "…" : row.name}
+                    {(row.name.length > maxName ? row.name.slice(0, maxName - 1) + "…" : row.name) +
+                      (row.spans.every((sp) => sp.unknown) ? " ?" : "")}
                   </text>
                 </a>
               </g>
@@ -244,6 +257,18 @@ function Chart({
             </>
           )}
         </div>
+        {rows.some((r) => r.spans.some((sp) => sp.unknown)) && (
+          <div className="mt-1 flex items-center gap-1.5 font-mono text-[10px] text-muted">
+            <span className="inline-block h-2.5 w-4 rounded-sm border border-dashed border-muted" />
+            {t.legendUnknown}
+          </div>
+        )}
+        {rows.some((r) => r.spans.some((sp) => sp.fromWikidata)) && (
+          <div className="mt-1 flex items-center gap-1.5 font-mono text-[10px] text-muted">
+            <span className="inline-block h-2.5 w-4 rounded-sm bg-muted" />
+            {t.legendWikidata}
+          </div>
+        )}
         {rows.some((r) => r.spans.some((sp) => sp.inferred)) && (
           <div className="mt-1 flex items-center gap-1.5 font-mono text-[10px] text-muted">
             <span className="inline-block h-2.5 w-4 rounded-sm bg-muted opacity-45" />
@@ -258,7 +283,8 @@ function Chart({
 
 /** Widok zespołu: po lewej ludzie, pionowe kreski to dyskografia zespołu. */
 export function LineupTimeline({ members, albums, locale, t }: { members: Membership[]; albums: AlbumSummary[]; locale: Locale; t: TimelineLabels }) {
-  const rows = mergeSpans<Membership, Mark>(members.filter((m) => m.begin || m.end));
+  // Bez odsiewania po datach: człowiek bez dat członkostwa to nadal część składu.
+  const rows = fillMissingSpans(mergeSpans<Membership, Mark>(members));
   if (!rows.length) return null;
   return (
     <details className="mt-6">

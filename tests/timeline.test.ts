@@ -64,9 +64,13 @@ test("zespół bez dat członkostwa dostaje okres z własnych płyt", () => {
   assert.equal(row.spans[0].inferred, true, "trzeba oznaczyć, że to daty z płyt, nie z członkostwa");
 });
 
-test("bez dat i bez płyt nie ma czego rysować", () => {
-  const rows = mergeSpans([m("x", "Zespół widmo", null, null)]);
-  assert.deepEqual(fillMissingSpans(rows), []);
+test("bez dat i bez płyt wiersz zostaje, tyle że z „?\u2013?\"", () => {
+  // Świadoma zmiana zdania: kiedyś takie wiersze wypadały. Ale „grał w tym
+  // zespole" to prawdziwa informacja, a serwisy bywają dziurawe — lepiej
+  // pokazać ją ze znakiem zapytania niż schować.
+  const [row] = fillMissingSpans(mergeSpans([m("x", "Zespół widmo", null, null)]));
+  assert.ok(row);
+  assert.equal(row.spans[0].unknown, true);
 });
 
 test("prawdziwe daty członkostwa mają pierwszeństwo przed płytami", () => {
@@ -77,4 +81,18 @@ test("prawdziwe daty członkostwa mają pierwszeństwo przed płytami", () => {
   const [row] = fillMissingSpans(rows);
   assert.equal(row.spans[0].begin, "1990-01");
   assert.ok(!row.spans[0].inferred);
+});
+
+test("bez dat i bez płyt wiersz zostaje — z okresem oznaczonym jako nieznany", () => {
+  const rows = fillMissingSpans(mergeSpans([m("x", "Behemoth", null, null)]));
+  assert.equal(rows.length, 1, "informacja „grał tam\" jest prawdziwa i ma zostać");
+  assert.equal(rows[0].spans[0].unknown, true);
+  assert.equal(rows[0].spans[0].begin, null);
+});
+
+test("wiersze bez dat lądują pod tymi, które da się umiejscowić", () => {
+  const rows = fillMissingSpans(
+    mergeSpans([m("nieznany", "Aaa", null, null), m("znany", "Zzz", "1999-01", null)]),
+  );
+  assert.deepEqual(rows.map((r) => r.mbid), ["znany", "nieznany"]);
 });

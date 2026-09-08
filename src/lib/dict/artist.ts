@@ -49,6 +49,10 @@ const pl = {
 
   timeline: {
     roleVocal: "wokal",
+    unknownNote: "dat nie zna ani MusicBrainz, ani Wikidane",
+    legendUnknown: "okres nieznany — wiemy, że grał, nie wiemy kiedy",
+    wikidataNote: "daty z Wikidanych",
+    legendWikidata: "daty dobrane z Wikidanych, bo MusicBrainz ich nie ma",
     inferredNote: "daty z płyt — MusicBrainz nie ma dat członkostwa",
     legendInferred: "okres odczytany z płyt, nie z dat członkostwa",
     roleGuitar: "gitara",
@@ -112,6 +116,10 @@ const en: T = {
 
   timeline: {
     roleVocal: "vocals",
+    unknownNote: "neither MusicBrainz nor Wikidata knows the dates",
+    legendUnknown: "period unknown — we know they played, not when",
+    wikidataNote: "dates from Wikidata",
+    legendWikidata: "dates taken from Wikidata, because MusicBrainz has none",
     inferredNote: "dates taken from the albums — MusicBrainz has no membership dates",
     legendInferred: "period read from the albums, not from membership dates",
     roleGuitar: "guitar",
@@ -174,6 +182,10 @@ const es: T = {
 
   timeline: {
     roleVocal: "voz",
+    unknownNote: "ni MusicBrainz ni Wikidata conocen las fechas",
+    legendUnknown: "periodo desconocido — sabemos que tocó, no cuándo",
+    wikidataNote: "fechas de Wikidata",
+    legendWikidata: "fechas tomadas de Wikidata, porque MusicBrainz no las tiene",
     inferredNote: "fechas tomadas de los discos — MusicBrainz no tiene fechas de pertenencia",
     legendInferred: "periodo deducido de los discos, no de las fechas de pertenencia",
     roleGuitar: "guitarra",
@@ -236,6 +248,10 @@ const de: T = {
 
   timeline: {
     roleVocal: "Gesang",
+    unknownNote: "weder MusicBrainz noch Wikidata kennt die Daten",
+    legendUnknown: "Zeitraum unbekannt — wir wissen, dass er spielte, nicht wann",
+    wikidataNote: "Daten aus Wikidata",
+    legendWikidata: "Daten aus Wikidata, weil MusicBrainz keine hat",
     inferredNote: "Daten aus den Alben — MusicBrainz hat keine Mitgliedsdaten",
     legendInferred: "Zeitraum aus den Alben abgelesen, nicht aus Mitgliedsdaten",
     roleGuitar: "Gitarre",

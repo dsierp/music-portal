@@ -277,6 +277,12 @@ export interface Membership {
    * „zespołu Ozzy'ego" nie był. Bez tego pola takie granie w ogóle nam znikało.
    */
   supporting?: boolean;
+  /**
+   * Skąd są daty, gdy nie z MusicBrainz. MB nagminnie ma gołą relację bez dat
+   * (Inferno w Behemocie od 1997) — wtedy dobieramy je z Wikidanych i mówimy
+   * o tym wprost na osi, zamiast udawać, że to ten sam materiał.
+   */
+  datesFrom?: "wikidata";
 }
 export interface Artist {
   mbid: string;

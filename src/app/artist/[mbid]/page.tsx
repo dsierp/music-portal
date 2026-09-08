@@ -14,6 +14,7 @@ import { Comments } from "@/components/comments";
 import { AlbumCard } from "@/components/cards";
 import { YoutubeVideos } from "@/components/youtube";
 import { relatedBands } from "@/lib/related";
+import { mergeDates, wdMembers, wdMemberships } from "@/lib/wikidata";
 import { CareerTimeline, LineupTimeline } from "@/components/lineup-timeline";
 import { dbSafe } from "@/lib/db-safe";
 import { DbWarning } from "@/components/db-warning";
@@ -135,7 +136,21 @@ async function RelatedSection({ artist, t }: { artist: Artist; t: Dict }) {
   );
 }
 
-async function ArtistDeepContent({ artist, mbid, locale, t }: { artist: Artist; mbid: string; locale: Locale; t: Dict }) {
+async function ArtistDeepContent({ artist: raw, mbid, locale, t }: { artist: Artist; mbid: string; locale: Locale; t: Dict }) {
+  // MusicBrainz nagminnie gubi daty przy członkostwie (Inferno w Behemocie od
+  // 1997 — relacja jest, dat nie ma). Wikidane trzymają to samo strukturalnie,
+  // więc zanim cokolwiek narysujemy, łatamy dziury stamtąd. Pytamy tylko wtedy,
+  // gdy naprawdę czegoś brakuje — jedna baza jako źródło jest mniej myląca.
+  const braki = (m: Membership[]) => m.some((x) => !x.begin || (!x.end && !x.current));
+  const [wdOf, wdIn] = await Promise.all([
+    braki(raw.memberOf) ? wdMemberships(raw.links).catch(() => []) : Promise.resolve([]),
+    braki(raw.members) ? wdMembers(raw.links).catch(() => []) : Promise.resolve([]),
+  ]);
+  const artist: Artist = {
+    ...raw,
+    memberOf: mergeDates(raw.memberOf, wdOf),
+    members: mergeDates(raw.members, wdIn),
+  };
   const [disco, played] = await Promise.all([
     getDiscography(mbid).catch(() => []),
     artist.isPerson ? getPlayedOn(mbid, artist.memberOf).catch(() => []) : Promise.resolve([]),
