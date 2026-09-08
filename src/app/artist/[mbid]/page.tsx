@@ -14,7 +14,7 @@ import { Comments } from "@/components/comments";
 import { AlbumCard } from "@/components/cards";
 import { YoutubeVideos } from "@/components/youtube";
 import { relatedBands } from "@/lib/related";
-import { LineupTimeline } from "@/components/lineup-timeline";
+import { CareerTimeline, LineupTimeline } from "@/components/lineup-timeline";
 import { dbSafe } from "@/lib/db-safe";
 import { DbWarning } from "@/components/db-warning";
 import type { Artist, Membership, PlayedOn } from "@/lib/musicbrainz";
@@ -144,6 +144,9 @@ async function ArtistDeepContent({ artist, mbid }: { artist: Artist; mbid: strin
   const current = artist.members.filter((m) => m.current);
   const former = artist.members.filter((m) => !m.current);
   const playedByBand = artist.isPerson ? groupByBand(played) : undefined;
+  // To samo, ale same płyty — pod oś czasu muzyka (romby na paskach zespołów).
+  const albumsByBand = new Map<string, typeof albums>();
+  for (const [band, items] of playedByBand ?? []) albumsByBand.set(band, items.map((p) => p.album));
   // Nie żywym czasie: skoro artysty już nie ma, nikt nie gra w zespole "obecnie".
   const deceased = artist.isPerson && artist.ended;
 
@@ -253,7 +256,18 @@ async function ArtistDeepContent({ artist, mbid }: { artist: Artist; mbid: strin
         </section>
       )}
 
-      {!artist.isPerson && <LineupTimeline members={artist.members.filter((m) => !m.supporting)} albums={albums} />}
+      {artist.isPerson ? (
+        // Odwrotność osi zespołu: po lewej zespoły, na paskach płyty nagrane
+        // w danym okresie. Sidemani też — u nich to często najważniejsze granie.
+        <CareerTimeline
+          name={artist.name}
+          bands={artist.memberOf}
+          albumsByBand={albumsByBand}
+          own={albums}
+        />
+      ) : (
+        <LineupTimeline members={artist.members.filter((m) => !m.supporting)} albums={albums} />
+      )}
 
       <Suspense fallback={<p className="mt-10 font-mono text-xs text-muted">Szukam powiązanych zespołów…</p>}>
         <RelatedSection artist={artist} />
