@@ -8,11 +8,11 @@ import { SearchBox } from "@/components/search-box";
 import { Banner } from "@/components/banner";
 import { Suspense } from "react";
 import { lineupNews } from "@/lib/lineup-news";
-import { getFavoriteArtists, getGenres, getLikedAlbums, recentComments } from "@/lib/user-data";
+import { getFavoriteArtists, getGenres, getLikedAlbums, getMyLists, listsForMe, recentComments } from "@/lib/user-data";
 import { genreToSection } from "@/lib/genres";
 import { SKIP_ONBOARDING } from "@/lib/onboarding";
 import { i18n } from "@/lib/t";
-import { fmt } from "@/lib/i18n";
+import { fmt, plural } from "@/lib/i18n";
 import { genreLabel } from "@/lib/dict";
 import type { Dict } from "@/lib/dict";
 
@@ -49,7 +49,7 @@ async function LineupNews({ bands, favorites, t }: { bands: { mbid: string; name
 }
 
 export default async function Home() {
-  const { t } = await i18n();
+  const { locale, t } = await i18n();
   const user = await currentUser();
   // Pierwsze wejście po zalogowaniu: nikt nie ma jeszcze stylów, a bez nich
   // portal nie wie, co komu pokazywać — więc zamiast wpuszczać na stronę
@@ -68,11 +68,19 @@ export default async function Home() {
   let prefSections: Set<string> | null = null;
   let liked: Awaited<ReturnType<typeof getLikedAlbums>> = [];
   let favs: Awaited<ReturnType<typeof getFavoriteArtists>> = [];
+  let mojeListy: Awaited<ReturnType<typeof getMyLists>> = [];
+  let dlaMnie: Awaited<ReturnType<typeof listsForMe>> = [];
   if (user) {
     const genres = await getGenres(user.id);
     const s = new Set(genres.filter((g) => g.weight >= 3).map((g) => genreToSection(g.genre)).filter(Boolean) as string[]);
     prefSections = s.size ? s : null;
     [liked, favs] = await Promise.all([getLikedAlbums(user.id), getFavoriteArtists(user.id)]);
+    // Listy na stronie głównej: to jest to, po co człowiek tu wraca — własna
+    // kolejka do posłuchania i to, co ktoś mu podsunął.
+    [mojeListy, dlaMnie] = await Promise.all([
+      getMyLists(user.id).catch(() => []),
+      listsForMe(user.id).catch(() => []),
+    ]);
   }
   const stars = rel.filter((r) => r.star === 1 && (!prefSections || prefSections.has(r.genre)));
 
@@ -118,6 +126,36 @@ export default async function Home() {
         </section>
 
         <aside className="space-y-6">
+          {user && (mojeListy.length > 0 || dlaMnie.length > 0) && (
+            <section className="card">
+              <div className="flex items-baseline justify-between">
+                <h2 className="text-xl">{t.lists.myListsTitle}</h2>
+                <Link href="/listy" className="text-xs text-muted hover:text-accent2">{t.common.showAll} →</Link>
+              </div>
+              {dlaMnie.length > 0 && (
+                <ul className="mt-2 space-y-1 text-sm">
+                  {dlaMnie.slice(0, 4).map((l) => (
+                    <li key={`s-${l.id}`} className="flex items-baseline justify-between gap-2">
+                      <Link href={`/lista/${l.id}`} className="truncate hover:text-accent2">
+                        <span className="text-accent2">★ </span>{l.title}
+                      </Link>
+                      <span className="shrink-0 font-mono text-[10px] text-faint">{fmt(t.lists.sharedBy, { name: l.from })}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {mojeListy.length > 0 && (
+                <ul className="mt-2 space-y-1 text-sm">
+                  {mojeListy.slice(0, 5).map((l) => (
+                    <li key={l.id} className="flex items-baseline justify-between gap-2">
+                      <Link href={`/lista/${l.id}`} className="truncate hover:text-accent2">{l.title}</Link>
+                      <span className="shrink-0 font-mono text-[10px] text-faint">{plural(locale, l.items, t.lists.itemsCount)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
           {best && (
             <section className="card">
               <div className="flex items-baseline justify-between">
