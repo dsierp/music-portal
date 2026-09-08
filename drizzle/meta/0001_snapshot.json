@@ -1,5 +1,5 @@
 {
-  "id": "39e4bdde-1cb7-4ecb-9b50-4b9745514c92",
+  "id": "96ed0187-b438-4bd7-8abd-318f418937a9",
   "prevId": "cd78fb1a-d94d-4a76-ad05-810317c7575d",
   "version": "7",
   "dialect": "postgresql",
@@ -945,6 +945,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "scope": {
+          "name": "scope",
+          "type": "area_scope",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
         "country": {
           "name": "country",
           "type": "text",
@@ -955,7 +962,8 @@
           "name": "city",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": "''"
         },
         "created_at": {
           "name": "created_at",
@@ -982,10 +990,11 @@
         }
       },
       "compositePrimaryKeys": {
-        "user_area_user_id_country_city_pk": {
-          "name": "user_area_user_id_country_city_pk",
+        "user_area_user_id_scope_country_city_pk": {
+          "name": "user_area_user_id_scope_country_city_pk",
           "columns": [
             "user_id",
+            "scope",
             "country",
             "city"
           ]
@@ -1149,6 +1158,14 @@
     }
   },
   "enums": {
+    "public.area_scope": {
+      "name": "area_scope",
+      "schema": "public",
+      "values": [
+        "genres",
+        "favorites"
+      ]
+    },
     "public.target_type": {
       "name": "target_type",
       "schema": "public",

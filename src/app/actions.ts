@@ -125,16 +125,18 @@ export async function skipOnboarding() {
 
 // ---------- Obszary koncertowe ----------
 
+const scopeOf = (v: FormDataEntryValue | null) => (String(v) === "favorites" ? "favorites" : "genres") as ud.AreaScope;
+
 export async function addAreaAction(formData: FormData) {
   const u = await requireUser();
-  await ud.addArea(u.id, String(formData.get("country") ?? ""), String(formData.get("city") ?? "") || null);
+  await ud.addArea(u.id, scopeOf(formData.get("scope")), String(formData.get("country") ?? ""), String(formData.get("city") ?? "") || null);
   revalidatePath("/ja");
   revalidatePath("/koncerty");
 }
 
 export async function removeAreaAction(formData: FormData) {
   const u = await requireUser();
-  await ud.removeArea(u.id, String(formData.get("country") ?? ""), String(formData.get("city") ?? "") || null);
+  await ud.removeArea(u.id, scopeOf(formData.get("scope")), String(formData.get("country") ?? ""), String(formData.get("city") ?? "") || null);
   revalidatePath("/ja");
   revalidatePath("/koncerty");
 }

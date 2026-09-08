@@ -144,7 +144,39 @@ async function tmSearch(area: Area, genre: string | null, size = 40): Promise<Co
   }).filter((c) => c.date);
 }
 
-/** Koncerty w moich obszarach i moich gatunkach. */
+/**
+ * Koncerty w obszarze prosto z MusicBrainz — bez żadnego klucza.
+ *
+ * MB trzyma wydarzenia z miejscem (place → area), więc da się zapytać
+ * „co gra w Krakowie do grudnia". Czego NIE da się zrobić: odsiać po gatunku,
+ * bo wydarzenia nie mają tagów gatunkowych — dlatego strona pisze wprost, że
+ * to wszystko, co MB wie o tym mieście, a nie wybór pod Twoje style.
+ *
+ * Pokrycie jest skromne: MusicBrainz to katalog nagrań, nie afisz koncertowy.
+ * Traktujemy je jako darmową podstawę, którą Ticketmaster (jeśli jest klucz)
+ * uzupełnia o duże sale i festiwale.
+ */
+export async function concertsByAreaMb(areas: Area[]): Promise<Concert[]> {
+  const { from, to } = concertWindow();
+  const out: Concert[] = [];
+  for (const area of areas.slice(0, 5)) {
+    const where = area.city ? `area:"${area.city}"` : `area:"${area.country}"`;
+    const url = new URL(`${MB_BASE}/event`);
+    url.searchParams.set("query", `${where} AND begin:[${from} TO ${to}]`);
+    url.searchParams.set("limit", "50");
+    url.searchParams.set("fmt", "json");
+    const key = `mb:events-area:v1:${area.country}:${area.city ?? "*"}:${from}`;
+    const data = await cached<{ events?: MbEvent[] }>(key, TTL.search, async () => {
+      const res = await fetch(url, { headers: mbHeaders(), cache: "no-store" });
+      if (!res.ok) throw new MbError(`MusicBrainz events ${res.status}`, res.status);
+      return (await res.json()) as { events?: MbEvent[] };
+    }).catch(() => ({ events: [] as MbEvent[] }));
+    out.push(...(data.events ?? []).filter((e) => !e.cancelled).map((e) => mbToConcert(e)).filter((c) => c.date >= from && c.date <= to));
+  }
+  return dedupe(out);
+}
+
+/** Koncerty w moich obszarach i moich gatunkach (Ticketmaster — wymaga klucza). */
 export async function concertsByArea(areas: Area[], categories: string[]): Promise<Concert[]> {
   if (!areas.length || !hasTicketmasterKey()) return [];
   const genres = tmGenres(categories);
@@ -156,6 +188,13 @@ export async function concertsByArea(areas: Area[], categories: string[]): Promi
     }
   }
   return dedupe(out);
+}
+
+function mbHeaders() {
+  return {
+    "User-Agent": (process.env.MUSICBRAINZ_USER_AGENT || "PureNewShit/0.1 ( https://music-travel.app )").trim(),
+    Accept: "application/json",
+  };
 }
 
 interface MbEvent {
@@ -171,6 +210,25 @@ interface MbEvent {
  * Koncerty ulubionego zespołu z MusicBrainz. Pytamy wyszukiwarką wydarzeń
  * po MBID artysty — MB nie ma osobnego „nadchodzące", więc odsiewamy datami.
  */
+function mbToConcert(e: MbEvent, artist?: { mbid: string; name: string }): Concert {
+  const place = e.relations?.find((r) => r.place)?.place;
+  const link = e.relations?.find((r) => r.url)?.url?.resource ?? null;
+  return {
+    id: `mb:${e.id}`,
+    name: e.name,
+    date: e["life-span"]?.begin ?? "",
+    time: e.time ?? null,
+    city: place?.area?.name ?? null,
+    country: null,
+    venue: place?.name ?? null,
+    url: link ?? `https://musicbrainz.org/event/${e.id}`,
+    source: "musicbrainz" as const,
+    artistName: artist?.name,
+    artistMbid: artist?.mbid,
+    genres: [],
+  };
+}
+
 export async function concertsByArtist(artist: { mbid: string; name: string }): Promise<Concert[]> {
   const { from, to } = concertWindow();
   const url = new URL(`${MB_BASE}/event`);
@@ -179,44 +237,48 @@ export async function concertsByArtist(artist: { mbid: string; name: string }): 
   url.searchParams.set("fmt", "json");
 
   const data = await cached<{ events?: MbEvent[] }>(`mb:events:v1:${artist.mbid}:${from}`, TTL.search, async () => {
-    const res = await fetch(url, {
-      headers: { "User-Agent": (process.env.MUSICBRAINZ_USER_AGENT || "PureNewShit/0.1 ( https://music-travel.app )").trim(), Accept: "application/json" },
-      cache: "no-store",
-    });
+    const res = await fetch(url, { headers: mbHeaders(), cache: "no-store" });
     if (!res.ok) throw new MbError(`MusicBrainz events ${res.status}`, res.status);
     return (await res.json()) as { events?: MbEvent[] };
   });
 
   return (data.events ?? [])
     .filter((e) => !e.cancelled)
-    .map((e) => {
-      const place = e.relations?.find((r) => r.place)?.place;
-      const link = e.relations?.find((r) => r.url)?.url?.resource ?? null;
-      return {
-        id: `mb:${e.id}`,
-        name: e.name,
-        date: e["life-span"]?.begin ?? "",
-        time: e.time ?? null,
-        city: place?.area?.name ?? null,
-        country: null,
-        venue: place?.name ?? null,
-        url: link ?? `https://musicbrainz.org/event/${e.id}`,
-        source: "musicbrainz" as const,
-        artistName: artist.name,
-        artistMbid: artist.mbid,
-        genres: [],
-      };
-    })
+    .map((e) => mbToConcert(e, artist))
     .filter((c) => c.date >= from && c.date <= to);
 }
 
-/** Koncerty ulubionych zespołów — po jednym zapytaniu na zespół (MB: 1/s). */
-export async function concertsForFavorites(artists: { mbid: string; name: string }[], max = 8): Promise<Concert[]> {
+/**
+ * Koncerty ulubionych zespołów — po jednym zapytaniu na zespół (MB: 1/s).
+ * `areas` (lista „ulubieni") zawęża wynik do wskazanych miast/krajów; pusta
+ * lista = pokazujemy wszystko, gdziekolwiek grają.
+ */
+export async function concertsForFavorites(
+  artists: { mbid: string; name: string }[],
+  areas: Area[] = [],
+  max = 8,
+): Promise<Concert[]> {
   const out: Concert[] = [];
   for (const a of artists.slice(0, max)) {
     out.push(...(await concertsByArtist(a).catch(() => [])));
   }
-  return dedupe(out);
+  return dedupe(areas.length ? out.filter((c) => inAnyArea(c, areas)) : out);
+}
+
+/**
+ * Czy koncert mieści się w którymś z obszarów.
+ *
+ * MusicBrainz podaje przy wydarzeniu nazwę obszaru („Kraków", „Poland"), a nie
+ * kod kraju — dlatego porównujemy po nazwie, bez wielkości liter, i dla całego
+ * kraju dopuszczamy też jego kod. To celowo luźne: lepiej pokazać koncert
+ * z sąsiedniej dzielnicy niż zgubić właściwy.
+ */
+export function inAnyArea(c: Concert, areas: Area[]): boolean {
+  const hay = [c.city, c.country, c.venue].filter(Boolean).join(" ").toLowerCase();
+  return areas.some((a) => {
+    const needle = (a.city ?? a.country).toLowerCase();
+    return hay.includes(needle) || (!a.city && c.country?.toLowerCase() === a.country.toLowerCase());
+  });
 }
 
 /** Ten sam koncert potrafi przyjść z obu źródeł — zostawiamy jeden. */

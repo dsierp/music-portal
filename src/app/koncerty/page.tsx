@@ -5,7 +5,7 @@ import { Masthead } from "@/components/masthead";
 import { heroArt, leadStyle } from "@/lib/lead-style";
 import { currentUser } from "@/lib/auth";
 import { getAreas, getFavoriteArtists, getGenres } from "@/lib/user-data";
-import { concertWindow, concertsByArea, concertsForFavorites, hasTicketmasterKey, type Concert } from "@/lib/concerts";
+import { concertWindow, concertsByArea, concertsByAreaMb, concertsForFavorites, dedupe, hasTicketmasterKey, type Concert } from "@/lib/concerts";
 import { dbSafe } from "@/lib/db-safe";
 
 export const metadata: Metadata = { title: "Koncerty" };
@@ -58,12 +58,18 @@ function ConcertList({ items }: { items: Concert[] }) {
 
 /** Koncerty w moich obszarach — osobny strumień, bo to kilka zapytań do TM. */
 async function ByArea({ areas, categories }: { areas: { country: string; city: string | null }[]; categories: string[] }) {
-  const items = await concertsByArea(areas, categories).catch(() => []);
+  // MusicBrainz zawsze (za darmo), Ticketmaster gdy jest klucz — i scalamy,
+  // bo dla czytelnika to jedna lista koncertów w jego mieście.
+  const [mb, tm] = await Promise.all([
+    concertsByAreaMb(areas).catch(() => []),
+    concertsByArea(areas, categories).catch(() => []),
+  ]);
+  const items = dedupe([...tm, ...mb]);
   if (!items.length) {
     return (
       <p className="text-sm text-muted">
-        Nic nie znalazłam w Twoich obszarach na najbliższe trzy miesiące. Ticketmaster zna głównie duże sale
-        i festiwale — małe kluby często się tam nie pojawiają.
+        Nic nie znalazłam w Twoich obszarach na najbliższe trzy miesiące.
+        {!hasTicketmasterKey() && " MusicBrainz to katalog nagrań, nie afisz koncertowy — zapowiedzi ma niewiele."}
       </p>
     );
   }
@@ -71,8 +77,8 @@ async function ByArea({ areas, categories }: { areas: { country: string; city: s
 }
 
 /** Koncerty ulubionych zespołów — MusicBrainz, jedno zapytanie na zespół (1/s). */
-async function ByFavorites({ artists }: { artists: { mbid: string; name: string }[] }) {
-  const items = await concertsForFavorites(artists).catch(() => []);
+async function ByFavorites({ artists, areas }: { artists: { mbid: string; name: string }[]; areas: { country: string; city: string | null }[] }) {
+  const items = await concertsForFavorites(artists, areas).catch(() => []);
   if (!items.length) {
     return <p className="text-sm text-muted">MusicBrainz nie ma zapowiedzi Twoich ulubionych zespołów na ten okres.</p>;
   }
@@ -100,7 +106,9 @@ export default async function ConcertsPage() {
     dbSafe(getGenres(user.id), [] as Awaited<ReturnType<typeof getGenres>>),
     dbSafe(getFavoriteArtists(user.id), [] as Awaited<ReturnType<typeof getFavoriteArtists>>),
   ]);
-  const areas = areasS.value;
+  const allAreas = areasS.value;
+  const genreAreas = allAreas.filter((a) => a.scope === "genres");
+  const favAreas = allAreas.filter((a) => a.scope === "favorites");
   const genres = genresS.value;
   const favs = favsS.value;
   const lead = leadStyle(genres);
@@ -116,8 +124,8 @@ export default async function ConcertsPage() {
           <>
             <span>{plDate(from)} – {plDate(to)}</span>
             <span className="ml-4">
-              {areas.length
-                ? areas.map((a) => (a.city ? `${a.city} (${a.country})` : a.country)).join(" · ")
+              {allAreas.length
+                ? allAreas.map((a) => (a.city ? `${a.city} (${a.country})` : a.country)).join(" · ")
                 : <Link href="/ja#obszary" className="underline">Ustaw swoje obszary</Link>}
             </span>
           </>
@@ -128,22 +136,20 @@ export default async function ConcertsPage() {
         <section>
           <h2 className="text-3xl">W Twoich gatunkach</h2>
           <p className="mb-3 text-sm text-muted">
-            Z obszarów wybranych w profilu, w kategoriach z wagą 3+.{" "}
+            Z listy &bdquo;dla moich gatunków&rdquo; w profilu.{" "}
+            {hasTicketmasterKey()
+              ? "Ticketmaster filtruje po Twoich kategoriach (waga 3+), MusicBrainz dokłada, co wie o tych miastach."
+              : "Bez klucza do Ticketmastera lecimy na samym MusicBrainz — a ten nie zna gatunków wydarzeń, więc to wszystko, co ma o tych miastach."}{" "}
             <Link href="/ja#obszary" className="underline">Zmień obszary</Link>
           </p>
-          {!hasTicketmasterKey() ? (
-            <p className="text-sm text-warn">
-              Brakuje klucza do Ticketmastera (<code>TICKETMASTER_API_KEY</code>) — bez niego nie mam skąd wziąć
-              koncertów po mieście i gatunku. Klucz jest darmowy: developer.ticketmaster.com.
-            </p>
-          ) : !areas.length ? (
+          {!genreAreas.length ? (
             <p className="text-sm text-muted">
               Nie masz jeszcze żadnego obszaru. <Link href="/ja#obszary" className="underline">Dodaj miasto albo kraj</Link>,
               a pokażę, co tam gra.
             </p>
           ) : (
             <Suspense fallback={<p className="font-mono text-xs text-muted">Sprawdzam, co gra w Twoich miastach…</p>}>
-              <ByArea areas={areas} categories={categories} />
+              <ByArea areas={genreAreas} categories={categories} />
             </Suspense>
           )}
         </section>
@@ -151,13 +157,15 @@ export default async function ConcertsPage() {
         <section>
           <h2 className="text-3xl">Twoje ulubione zespoły</h2>
           <p className="mb-3 text-sm text-muted">
-            Niezależnie od obszaru — jeśli zespół z gwiazdką gdziekolwiek gra i MusicBrainz o tym wie, zobaczysz to tutaj.
+            {favAreas.length
+              ? `Zawężone do listy „dla ulubionych": ${favAreas.map((a) => (a.city ? `${a.city} (${a.country})` : a.country)).join(", ")}.`
+              : "Bez zawężenia — jeśli zespół z gwiazdką gdziekolwiek gra i MusicBrainz o tym wie, zobaczysz to tutaj."}
           </p>
           {!favs.length ? (
             <p className="text-sm text-muted">Nie masz jeszcze ulubionych zespołów — oznacz je gwiazdką na stronie zespołu.</p>
           ) : (
             <Suspense fallback={<p className="font-mono text-xs text-muted">Pytam o trasy Twoich zespołów…</p>}>
-              <ByFavorites artists={favs.map((f) => ({ mbid: f.mbid, name: f.name }))} />
+              <ByFavorites artists={favs.map((f) => ({ mbid: f.mbid, name: f.name }))} areas={favAreas} />
             </Suspense>
           )}
         </section>

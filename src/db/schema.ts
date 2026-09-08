@@ -95,18 +95,29 @@ export const favoriteArtists = pgTable(
  * Obszary, z których użytkownik chce widzieć koncerty.
  *
  * Miasto ALBO cały kraj — dlatego `city` bywa puste. Kod kraju trzymamy zawsze,
- * bo to on identyfikuje rynek w Ticketmasterze („PL", „DE"), a nazwy miast
- * bywają w kilku wariantach (Warszawa/Warsaw) i same w sobie są niejednoznaczne.
+ * bo to on identyfikuje rynek („PL", „DE"), a nazwy miast bywają w kilku
+ * wariantach (Warszawa/Warsaw) i same w sobie są niejednoznaczne.
+ *
+ * `scope` to dwie NIEZALEŻNE listy, bo ludzie mają dwa różne apetyty:
+ * po ulubiony zespół jedzie się przez pół kraju, a „coś w moich gatunkach"
+ * ogląda się w swoim mieście. Stąd np. ulubieni → cała Polska, gatunki →
+ * Kraków i Warszawa.
  */
+export const areaScope = pgEnum("area_scope", ["genres", "favorites"]);
+
 export const userAreas = pgTable(
   "user_area",
   {
     userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    scope: areaScope("scope").notNull(),
     country: text("country").notNull(), // ISO-3166-1 alpha-2, np. "PL"
-    city: text("city"), // null = cały kraj
+    // Pusty tekst = cały kraj. Świadomie NOT NULL: `city` jest częścią klucza
+    // głównego, a NULL w kluczu Postgres odrzuca — więc „brak miasta" musi mieć
+    // swoją wartość. Warstwa wyżej (user-data.ts) zamienia "" na null i odwrotnie.
+    city: text("city").notNull().default(""),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   },
-  (t) => [primaryKey({ columns: [t.userId, t.country, t.city] })],
+  (t) => [primaryKey({ columns: [t.userId, t.scope, t.country, t.city] })],
 );
 
 // ---------- Oceny i komentarze ----------

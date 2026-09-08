@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { concertWindow, tmGenres, dedupe, type Concert } from "../src/lib/concerts";
+import { concertWindow, tmGenres, dedupe, inAnyArea, type Concert } from "../src/lib/concerts";
 
 test("okno koncertów to dokładnie trzy miesiące od dziś", () => {
   const w = concertWindow(new Date("2026-09-08T22:00:00Z"));
@@ -33,4 +33,19 @@ test("ten sam koncert z dwóch źródeł zostaje raz", () => {
 test("koncerty wychodzą w kolejności dat", () => {
   const out = dedupe([c({ date: "2026-11-01", name: "B" }), c({ date: "2026-09-20", name: "A" })]);
   assert.deepEqual(out.map((x) => x.date), ["2026-09-20", "2026-11-01"]);
+});
+
+test("lista ulubionych zawęża po nazwie miasta i po kraju", () => {
+  const warszawa = c({ city: "Warszawa", country: "PL", venue: "Stodoła" });
+  const berlin = c({ city: "Berlin", country: "DE", venue: "SO36" });
+  // MusicBrainz podaje nazwę obszaru, nie kod kraju — stąd dopasowanie po nazwie.
+  assert.equal(inAnyArea(warszawa, [{ country: "PL", city: "Warszawa" }]), true);
+  assert.equal(inAnyArea(berlin, [{ country: "PL", city: "Warszawa" }]), false);
+  assert.equal(inAnyArea(berlin, [{ country: "DE", city: null }]), true);
+});
+
+test("puste obszary nie zawężają niczego", () => {
+  const anywhere = c({ city: "Tokio", country: "JP" });
+  assert.equal(inAnyArea(anywhere, []), false, "pusta lista nie pasuje…");
+  // …a wywołujący traktuje pustą listę jako „bez filtra" (patrz concertsForFavorites).
 });
