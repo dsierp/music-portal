@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { ARTWORK_ROLES, albumCrew, getArtist, getDiscography, getPlayedOn, getProduced, guessRoles, MbError } from "@/lib/musicbrainz";
+import { ARTWORK_ROLES, albumCrew, getArtist, getDiscography, getPlayedOn, getProduced, guessRoles, topAlbum, MbError } from "@/lib/musicbrainz";
 import { wikiFromLinks, wikiLogo } from "@/lib/wikipedia";
 import { MbUnavailable } from "@/components/mb-unavailable";
 import { currentUser } from "@/lib/auth";
@@ -214,7 +214,7 @@ async function CrewSection({ albums, t }: { albums: AlbumSummary[]; t: Dict }) {
   );
 }
 
-async function ArtistDeepContent({ artist: raw, mbid, locale, t, chrono }: { artist: Artist; mbid: string; locale: Locale; t: Dict; chrono: boolean }) {
+async function ArtistDeepContent({ artist: raw, mbid, locale, t, odNajnowszych }: { artist: Artist; mbid: string; locale: Locale; t: Dict; odNajnowszych: boolean }) {
   // MusicBrainz nagminnie gubi daty przy członkostwie (Inferno w Behemocie od
   // 1997 — relacja jest, dat nie ma). Wikidane trzymają to samo strukturalnie,
   // więc zanim cokolwiek narysujemy, łatamy dziury stamtąd. Pytamy tylko wtedy,
@@ -259,6 +259,10 @@ async function ArtistDeepContent({ artist: raw, mbid, locale, t, chrono }: { art
       bandAlbums.set(b.mbid, discos[i].filter((a) => a.primaryType === "Album" && !a.secondaryTypes.length));
     });
   }
+  // Kolejność płyt: najpierw wskazujemy „tę jedną", potem cały dorobek
+  // kolejnością wydania — od debiutu, bo tak się czyta drogę zespołu.
+  const chronologicznie = odNajnowszych ? albums : [...albums].reverse();
+  const top = topAlbum(albums, ratings);
   // Nie żywym czasie: skoro artysty już nie ma, nikt nie gra w zespole "obecnie".
   const deceased = artist.isPerson && artist.ended;
   /**
@@ -376,16 +380,34 @@ async function ArtistDeepContent({ artist: raw, mbid, locale, t, chrono }: { art
         <section className="mt-8">
           <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-2xl">{t.artist.albumsHeading}</h2>
-            {/* Domyślnie od najnowszych — tak się zwykle sprawdza, co nowego.
-                Ale dorobek czyta się od początku, więc jedno kliknięcie odwraca. */}
+            {/* Domyślnie kolejnością wydania — dorobek czyta się od początku.
+                Jedno kliknięcie odwraca, gdy chodzi o „co nowego". */}
             <div className="flex gap-1">
-              <Link href={`/artist/${mbid}`} className={`chip text-[11px] ${chrono ? "" : "chip-on"}`}>{t.artist.sortNewest}</Link>
-              <Link href={`/artist/${mbid}?plyty=chrono`} className={`chip text-[11px] ${chrono ? "chip-on" : ""}`}>{t.artist.sortOldest}</Link>
+              <Link href={`/artist/${mbid}`} className={`chip text-[11px] ${odNajnowszych ? "" : "chip-on"}`}>{t.artist.sortOldest}</Link>
+              <Link href={`/artist/${mbid}?plyty=nowe`} className={`chip text-[11px] ${odNajnowszych ? "chip-on" : ""}`}>{t.artist.sortNewest}</Link>
             </div>
           </div>
+
+          {/* „Ta jedna płyta" na górze — punkt wejścia dla kogoś, kto zespołu nie
+              zna. Zostaje też niżej, na swoim miejscu w czasie: inaczej dorobek
+              miałby dziurę i nie dałoby się go przejrzeć chronologicznie. */}
+          {top && (
+            <div className="mb-4 rounded-lg border border-accent/50 bg-surface2 p-3">
+              <div className="label mb-2 text-accent2">
+                {top.source === "portal" ? t.artist.topFromPortal : t.artist.topFromMb}
+              </div>
+              <AlbumCard album={top.album} rating={ratings.get(top.album.mbid)} />
+            </div>
+          )}
+
           <div className="grid gap-2 sm:grid-cols-2">
-            {(chrono ? [...albums].reverse() : albums).map((a) => (
-              <AlbumCard key={a.mbid} album={a} rating={ratings.get(a.mbid)} />
+            {chronologicznie.map((a) => (
+              <AlbumCard
+                key={a.mbid}
+                album={a}
+                rating={ratings.get(a.mbid)}
+                extra={a.mbid === top?.album.mbid ? <div className="text-xs text-accent2">{t.artist.topBadge}</div> : undefined}
+              />
             ))}
           </div>
         </section>
@@ -476,7 +498,7 @@ export default async function ArtistPage({
   searchParams: Promise<{ plyty?: string }>;
 }) {
   const { mbid } = await params;
-  const chrono = (await searchParams).plyty === "chrono";
+  const odNajnowszych = (await searchParams).plyty === "nowe";
   if (!UUID.test(mbid)) notFound();
   const { locale, t } = await i18n();
   let artist;
@@ -596,7 +618,7 @@ export default async function ArtistPage({
         )}
 
         <Suspense fallback={<DeepContentLoading t={t} />}>
-          <ArtistDeepContent artist={artist} mbid={mbid} locale={locale} t={t} chrono={chrono} />
+          <ArtistDeepContent artist={artist} mbid={mbid} locale={locale} t={t} odNajnowszych={odNajnowszych} />
         </Suspense>
       </div>
 

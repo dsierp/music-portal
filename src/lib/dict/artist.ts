@@ -8,6 +8,9 @@
 import type { Locale } from "@/lib/i18n";
 
 const pl = {
+  topFromPortal: "Najwyżej oceniana w portalu",
+  topFromMb: "Najwyżej oceniana w MusicBrainz",
+  topBadge: "↑ ta z góry",
   producedHeading: "Wyprodukował, zrealizował, zmasterował",
   producedNote: "Płyty, przy których pracował przy pulpicie, a nie z instrumentem. Z relacji przy wydaniach w MusicBrainz — tam, gdzie zwykle wiszą kredyty producenckie.",
   producedMore: "Pokazujemy 60 najnowszych z {n}.",
@@ -94,6 +97,9 @@ const pl = {
 type T = typeof pl;
 
 const en: T = {
+  topFromPortal: "Highest rated here",
+  topFromMb: "Highest rated on MusicBrainz",
+  topBadge: "↑ the one above",
   producedHeading: "Produced, engineered, mastered",
   producedMore: "Showing the 60 most recent of {n}.",
   producedNote: "Albums they worked on at the desk rather than with an instrument. From release relationships on MusicBrainz — where production credits usually live.",
@@ -179,6 +185,9 @@ const en: T = {
 };
 
 const es: T = {
+  topFromPortal: "La mejor valorada aquí",
+  topFromMb: "La mejor valorada en MusicBrainz",
+  topBadge: "↑ la de arriba",
   producedHeading: "Produjo, grabó, masterizó",
   producedMore: "Mostramos los 60 más recientes de {n}.",
   producedNote: "Discos en los que trabajó desde la mesa, no con un instrumento. De las relaciones de las ediciones en MusicBrainz, donde suelen estar los créditos de producción.",
@@ -264,6 +273,9 @@ const es: T = {
 };
 
 const de: T = {
+  topFromPortal: "Hier am besten bewertet",
+  topFromMb: "Bei MusicBrainz am besten bewertet",
+  topBadge: "↑ die von oben",
   producedHeading: "Produziert, aufgenommen, gemastert",
   producedMore: "Wir zeigen die 60 neuesten von {n}.",
   producedNote: "Alben, an denen er am Pult gearbeitet hat, nicht am Instrument. Aus den Beziehungen der Veröffentlichungen bei MusicBrainz — dort stehen Produktionscredits üblicherweise.",

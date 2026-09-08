@@ -189,6 +189,12 @@ export interface AlbumSummary {
   primaryType: string | null;
   secondaryTypes: string[];
   disambiguation: string | null;
+  /**
+   * Ocena społeczności MusicBrainz (1–5) i liczba głosów. Przychodzi za darmo
+   * razem z dyskografią, a pozwala wskazać „tę jedną" płytę zespołu, zanim
+   * ktokolwiek oceni cokolwiek w portalu.
+   */
+  mbRating?: { value: number; votes: number } | null;
 }
 export interface Links {
   spotify: string;
@@ -354,6 +360,10 @@ export function normReleaseGroup(rg: MbReleaseGroup | NonNullable<MbReleaseStub[
     primaryType: rg["primary-type"] ?? null,
     secondaryTypes: rg["secondary-types"] ?? [],
     disambiguation: ("disambiguation" in rg && rg.disambiguation) || null,
+    mbRating:
+      "rating" in rg && rg.rating?.value != null
+        ? { value: rg.rating.value, votes: rg.rating["votes-count"] ?? 0 }
+        : null,
   };
 }
 
@@ -690,7 +700,7 @@ export async function getDiscography(mbid: string): Promise<AlbumSummary[]> {
     const out: MbReleaseGroup[] = [];
     for (let offset = 0; offset < 300; offset += 100) {
       const page = await mbFetch<{ "release-groups": MbReleaseGroup[]; "release-group-count": number }>("/release-group/", {
-        artist: mbid, limit: 100, offset, inc: "artist-credits",
+        artist: mbid, limit: 100, offset, inc: "artist-credits+ratings",
       });
       out.push(...page["release-groups"]);
       if (out.length >= page["release-group-count"]) break;
@@ -912,4 +922,30 @@ export async function guessRoles(mbids: string[], skipBandMbid?: string, limit =
     if (najczestsze.length) out.set(id, najczestsze);
   }
   return out;
+}
+
+/**
+ * „Ta jedna płyta" zespołu — od której się zaczyna.
+ *
+ * Kolejność źródeł: najpierw oceny z portalu (to nasi ludzie i nasza skala
+ * 1–10), a gdy jeszcze ich nie ma — ocena społeczności MusicBrainz. Przy niej
+ * wymagamy kilku głosów, bo pojedyncza piątka od jednej osoby nie mówi nic.
+ * Gdy nie ma nic, nie wskazujemy nic: zgadywanie „najlepszej" po dacie albo
+ * długości byłoby udawaniem wiedzy.
+ */
+export function topAlbum(
+  albums: AlbumSummary[],
+  portal?: Map<string, { avg: number; count: number }>,
+  minVotes = 3,
+): { album: AlbumSummary; source: "portal" | "musicbrainz" } | null {
+  const zPortalu = albums
+    .map((a) => ({ a, r: portal?.get(a.mbid) }))
+    .filter((x): x is { a: AlbumSummary; r: { avg: number; count: number } } => !!x.r && x.r.count > 0)
+    .sort((x, y) => y.r.avg - x.r.avg || y.r.count - x.r.count);
+  if (zPortalu.length) return { album: zPortalu[0].a, source: "portal" };
+
+  const zMb = albums
+    .filter((a) => (a.mbRating?.votes ?? 0) >= minVotes)
+    .sort((x, y) => (y.mbRating!.value - x.mbRating!.value) || (y.mbRating!.votes - x.mbRating!.votes));
+  return zMb.length ? { album: zMb[0], source: "musicbrainz" } : null;
 }
