@@ -85,6 +85,33 @@ export function tmGenres(categories: string[]): string[] {
   return [...out];
 }
 
+/**
+ * Czy ten koncert w ogóle jest w moich gatunkach.
+ *
+ * Ticketmaster traktuje `classificationName` jak podpowiedź, nie filtr: zapytanie
+ * o „Metal" wraca z Melanie Martinez (Pop) i chórem a cappella. Dlatego jeszcze
+ * raz sprawdzamy TO, CO PRZYSZŁO — po etykietach z odpowiedzi, w obie strony,
+ * bo TM pisze „Death Metal/Black Metal", a my prosimy o „Metal".
+ *
+ * Koncerty bez żadnej etykiety (MusicBrainz nie zna gatunków wydarzeń) nie są
+ * odrzucane — o nich po prostu nic nie wiadomo i wołający decyduje, co z nimi
+ * zrobić.
+ */
+export function matchesGenres(c: Concert, wanted: string[]): boolean {
+  if (!wanted.length) return true;
+  if (!c.genres.length) return true;
+  const chce = wanted.map((g) => g.toLowerCase());
+  return c.genres.some((g) => {
+    const label = g.toLowerCase();
+    return chce.some((w) => label.includes(w) || w.includes(label));
+  });
+}
+
+/** Ma etykiety gatunków, ale żadna nie pasuje — czyli świadomie nie moje. */
+export function offGenre(c: Concert, wanted: string[]): boolean {
+  return wanted.length > 0 && c.genres.length > 0 && !matchesGenres(c, wanted);
+}
+
 export const hasTicketmasterKey = () => Boolean((process.env.TICKETMASTER_API_KEY ?? "").trim());
 
 interface TmEvent {

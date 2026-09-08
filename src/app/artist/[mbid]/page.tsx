@@ -6,7 +6,8 @@ import { ARTWORK_ROLES, albumCrew, getArtist, getDiscography, getPlayedOn, getPr
 import { wikiFromLinks, wikiLogo } from "@/lib/wikipedia";
 import { MbUnavailable } from "@/components/mb-unavailable";
 import { currentUser } from "@/lib/auth";
-import { artistSentiment, commentTree, favoriteCount, ratingAverages, ratingSummary } from "@/lib/user-data";
+import { artistSentiment, commentTree, favoriteCount, getMyLists, listsWith, ratingAverages, ratingSummary } from "@/lib/user-data";
+import { AddToList } from "@/components/add-to-list";
 import { toggleFavorite } from "@/app/actions";
 import { LinksRow } from "@/components/links";
 import { RatingBadge, RatingPanel } from "@/components/rating";
@@ -14,12 +15,13 @@ import { Comments } from "@/components/comments";
 import { AlbumCard } from "@/components/cards";
 import { YoutubeVideos } from "@/components/youtube";
 import { relatedBands } from "@/lib/related";
+import { concertsByArtist } from "@/lib/concerts";
 import { mergeDates, wdGenres, wdMembers, wdMemberships } from "@/lib/wikidata";
 import { CareerTimeline, LineupTimeline } from "@/components/lineup-timeline";
 import { dbSafe } from "@/lib/db-safe";
 import { DbWarning } from "@/components/db-warning";
 import { i18n } from "@/lib/t";
-import { fmt, wikiLangs, type Locale } from "@/lib/i18n";
+import { fmt, formatDate, wikiLangs, type Locale } from "@/lib/i18n";
 import type { Dict } from "@/lib/dict";
 import type { AlbumSummary, Artist, Membership, PlayedOn } from "@/lib/musicbrainz";
 
@@ -211,6 +213,54 @@ async function CrewSection({ albums, t }: { albums: AlbumSummary[]; t: Dict }) {
       <Lista title={t.artist.crewStudio} items={studio} />
       <Lista title={t.artist.crewArtwork} items={okladki} />
     </section>
+  );
+}
+
+/**
+ * Czy i gdzie ten zespół gra — z zapowiedzi MusicBrainz.
+ *
+ * W osobnym strumieniu i domyślnie zwinięte: to kolejne zapytanie (limit 1/s),
+ * a przy większości artystów zapowiedzi po prostu nie ma. MusicBrainz jest
+ * katalogiem nagrań, nie afiszem — więc gdy milczy, mówimy to wprost zamiast
+ * udawać, że zespół nie koncertuje.
+ */
+async function ConcertsSection({ mbid, name, locale, t }: { mbid: string; name: string; locale: Locale; t: Dict }) {
+  const items = await concertsByArtist({ mbid, name }).catch(() => []);
+  return (
+    <details className="mt-10">
+      <summary className="cursor-pointer text-2xl text-muted hover:text-accent2">
+        {t.artist.concertsHeading}
+        {items.length > 0 && <span className="ml-2 font-mono text-sm text-accent2">{items.length}</span>}
+      </summary>
+      {items.length ? (
+        <ul className="mt-3 space-y-2">
+          {items.map((c) => (
+            <li key={c.id} className="rounded-lg border border-rule bg-surface2 px-3 py-2">
+              <div className="flex flex-wrap items-baseline gap-x-3">
+                <span className="font-mono text-xs text-accent2">
+                  {formatDate(c.date, locale, { year: true })}
+                  {c.time ? `, ${c.time.slice(0, 5)}` : ""}
+                </span>
+                {c.url ? (
+                  <a href={c.url} target="_blank" rel="noopener" className="display text-lg leading-tight hover:text-accent2 hover:underline">{c.name}</a>
+                ) : (
+                  <span className="display text-lg leading-tight">{c.name}</span>
+                )}
+              </div>
+              <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-xs text-muted">
+                {c.venue && <span>{c.venue}</span>}
+                {c.city && <span>· {c.city}{c.country ? `, ${c.country}` : ""}</span>}
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-3 text-sm text-muted">{t.artist.concertsNone}</p>
+      )}
+      <p className="mt-2 text-[10px] text-faint">
+        {t.artist.concertsNote} <Link href="/koncerty" className="underline">{t.artist.concertsMine}</Link>
+      </p>
+    </details>
   );
 }
 
@@ -468,6 +518,10 @@ async function ArtistDeepContent({ artist: raw, mbid, locale, t, odNajnowszych }
         <LineupTimeline members={artist.members.filter((m) => !m.supporting)} albums={albums} locale={locale} t={t.artist.timeline} />
       )}
 
+      <Suspense fallback={<p className="mt-10 font-mono text-xs text-muted">{t.artist.concertsLoading}</p>}>
+        <ConcertsSection mbid={mbid} name={artist.name} locale={locale} t={t} />
+      </Suspense>
+
       <Suspense fallback={<p className="mt-10 font-mono text-xs text-muted">{t.artist.crewLoading}</p>}>
         <CrewSection albums={albums.length ? albums : disco.slice(0, 6)} t={t} />
       </Suspense>
@@ -529,6 +583,9 @@ export default async function ArtistPage({
     artist.genres.length || artist.tags.length ? Promise.resolve([] as string[]) : wdGenres(artist.links, locale).catch(() => []),
   ]);
   const [summary, tree, fav, favs] = [summaryS.value, treeS.value, favS.value, favsS.value];
+  const [mojeListy, naListach] = user
+    ? await Promise.all([getMyLists(user.id).catch(() => []), listsWith(user.id, "ARTIST", mbid).catch(() => [])])
+    : [[] as Awaited<ReturnType<typeof getMyLists>>, [] as string[]];
   const dbDown = summaryS.failed || treeS.failed || favS.failed || favsS.failed;
 
   // Styl zespołu z pierwszego źródła, które cokolwiek wie.
@@ -604,6 +661,23 @@ export default async function ArtistPage({
                 </>
               ) : (
                 <Link href={`/login?callbackUrl=/artist/${mbid}`} className="btn">{t.artist.favoriteAdd}</Link>
+              )}
+              {user && (
+                <AddToList
+                  type="ARTIST"
+                  mbid={mbid}
+                  label={artist.name}
+                  lists={mojeListy}
+                  already={naListach}
+                  t={{
+                    addTo: t.lists.addTo,
+                    pick: t.lists.pickList,
+                    newList: t.lists.orNewList,
+                    newPlaceholder: t.lists.newListPlaceholder,
+                    add: t.lists.addToSubmit,
+                    onList: t.lists.onLists,
+                  }}
+                />
               )}
               {favs > 0 && <span className="font-mono text-xs text-muted">{fmt(t.artist.favoritesCount, { n: favs })}</span>}
             </div>

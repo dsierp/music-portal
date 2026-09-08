@@ -6,7 +6,8 @@ import { wikiAlbumRatings, wikiFromLinks, wikiPersonnel } from "@/lib/wikipedia"
 import { nameKeys } from "@/lib/names";
 import { MbUnavailable } from "@/components/mb-unavailable";
 import { currentUser } from "@/lib/auth";
-import { albumSentiment, commentTree, likeCount, ratingAverages, ratingSummary } from "@/lib/user-data";
+import { albumSentiment, commentTree, getMyLists, likeCount, listsWith, ratingAverages, ratingSummary } from "@/lib/user-data";
+import { AddToList } from "@/components/add-to-list";
 import { toggleFavorite, toggleLike } from "@/app/actions";
 import { LinksRow, ReviewLinks } from "@/components/links";
 import { getExternalRatings } from "@/lib/externalRatings";
@@ -79,6 +80,9 @@ export default async function AlbumPage({
   const liked = likedS.value;
   const likes = likesS.value;
   const others = more.filter((a) => a.mbid !== mbid && a.primaryType === "Album" && !a.secondaryTypes.length).slice(0, 8);
+  const [mojeListy, naListach] = user
+    ? await Promise.all([getMyLists(user.id).catch(() => []), listsWith(user.id, "ALBUM", mbid).catch(() => [])])
+    : [[] as Awaited<ReturnType<typeof getMyLists>>, [] as string[]];
   const otherRatingsS = await dbSafe(ratingAverages("ALBUM", others.map((a) => a.mbid)), new Map<string, { avg: number; count: number }>());
   const otherRatings = otherRatingsS.value;
   const dbDown = summaryS.failed || treeS.failed || likedS.failed || likesS.failed || otherRatingsS.failed;
@@ -197,6 +201,23 @@ export default async function AlbumPage({
                 </>
               ) : (
                 <Link href={`/login?callbackUrl=/album/${mbid}`} className="btn">{t.album.likeAdd}</Link>
+              )}
+              {user && (
+                <AddToList
+                  type="ALBUM"
+                  mbid={mbid}
+                  label={`${album.artistText} – ${album.title}`}
+                  lists={mojeListy}
+                  already={naListach}
+                  t={{
+                    addTo: t.lists.addTo,
+                    pick: t.lists.pickList,
+                    newList: t.lists.orNewList,
+                    newPlaceholder: t.lists.newListPlaceholder,
+                    add: t.lists.addToSubmit,
+                    onList: t.lists.onLists,
+                  }}
+                />
               )}
               {likes > 0 && <span className="font-mono text-xs text-muted">{plural(locale, likes, t.album.likesCount)}</span>}
             </div>

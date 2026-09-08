@@ -327,3 +327,193 @@ export async function usersCount(): Promise<number> {
   const [row] = await db.select({ n: count() }).from(schema.users);
   return Number(row?.n ?? 0);
 }
+
+// ---------- listy użytkowników ----------
+
+/** Na listę wchodzi też koncert — patrz komentarz przy `listTarget` w schemacie. */
+export type ListTarget = "ALBUM" | "ARTIST" | "CONCERT";
+
+export interface ListItem {
+  targetType: ListTarget;
+  targetMbid: string;
+  label: string;
+  note: string | null;
+  position: number;
+}
+
+/** Listy, które ktoś prowadzi — od ostatnio ruszanej. */
+export async function getMyLists(userId: string) {
+  const rows = await db
+    .select({
+      id: schema.lists.id,
+      title: schema.lists.title,
+      description: schema.lists.description,
+      updatedAt: schema.lists.updatedAt,
+      items: count(schema.listItems.targetMbid),
+    })
+    .from(schema.lists)
+    .leftJoin(schema.listItems, eq(schema.listItems.listId, schema.lists.id))
+    .where(eq(schema.lists.userId, userId))
+    .groupBy(schema.lists.id)
+    .orderBy(desc(schema.lists.updatedAt));
+  return rows.map((r) => ({ ...r, items: Number(r.items) }));
+}
+
+export async function getList(id: string) {
+  const list = await db.query.lists.findFirst({ where: eq(schema.lists.id, id) });
+  if (!list) return null;
+  const items = await db
+    .select()
+    .from(schema.listItems)
+    .where(eq(schema.listItems.listId, id))
+    .orderBy(asc(schema.listItems.position), asc(schema.listItems.createdAt));
+  return { list, items };
+}
+
+export async function createList(userId: string, title: string, description?: string | null) {
+  const [row] = await db
+    .insert(schema.lists)
+    .values({ userId, title: title.slice(0, 200), description: description?.slice(0, 2000) ?? null })
+    .returning();
+  return row;
+}
+
+export async function deleteList(userId: string, id: string) {
+  await db.delete(schema.lists).where(and(eq(schema.lists.id, id), eq(schema.lists.userId, userId)));
+}
+
+/** Dopisanie pozycji. Nowa ląduje na końcu — kolejność na liście jest treścią. */
+export async function addToList(
+  userId: string,
+  listId: string,
+  item: { targetType: ListTarget; targetMbid: string; label: string; note?: string | null; url?: string | null },
+) {
+  const owner = await db.query.lists.findFirst({ where: and(eq(schema.lists.id, listId), eq(schema.lists.userId, userId)) });
+  if (!owner) return false;
+  const [last] = await db
+    .select({ p: sql<number>`coalesce(max(${schema.listItems.position}), 0)` })
+    .from(schema.listItems)
+    .where(eq(schema.listItems.listId, listId));
+  await db
+    .insert(schema.listItems)
+    .values({ listId, ...item, note: item.note ?? null, url: item.url ?? null, position: Number(last?.p ?? 0) + 1 })
+    .onConflictDoUpdate({
+      target: [schema.listItems.listId, schema.listItems.targetType, schema.listItems.targetMbid],
+      set: { note: item.note ?? null },
+    });
+  await db.update(schema.lists).set({ updatedAt: new Date() }).where(eq(schema.lists.id, listId));
+  return true;
+}
+
+export async function removeFromList(userId: string, listId: string, targetType: ListTarget, targetMbid: string) {
+  const owner = await db.query.lists.findFirst({ where: and(eq(schema.lists.id, listId), eq(schema.lists.userId, userId)) });
+  if (!owner) return;
+  await db
+    .delete(schema.listItems)
+    .where(
+      and(
+        eq(schema.listItems.listId, listId),
+        eq(schema.listItems.targetType, targetType),
+        eq(schema.listItems.targetMbid, targetMbid),
+      ),
+    );
+}
+
+/** Na której z moich list to już jest — do podpowiedzi przy przycisku. */
+export async function listsWith(userId: string, targetType: ListTarget, targetMbid: string): Promise<string[]> {
+  const rows = await db
+    .select({ id: schema.lists.id })
+    .from(schema.listItems)
+    .innerJoin(schema.lists, eq(schema.lists.id, schema.listItems.listId))
+    .where(
+      and(
+        eq(schema.lists.userId, userId),
+        eq(schema.listItems.targetType, targetType),
+        eq(schema.listItems.targetMbid, targetMbid),
+      ),
+    );
+  return rows.map((r) => r.id);
+}
+
+/**
+ * Ludzie, którym można polecić listę. Świadomie BEZ adresów e-mail — do wskazania
+ * odbiorcy wystarczy nazwa, a adres to nie nasza rzecz do pokazywania.
+ */
+export async function otherUsers(userId: string) {
+  const rows = await db
+    .select({ id: schema.users.id, name: schema.users.name, email: schema.users.email })
+    .from(schema.users)
+    .orderBy(asc(schema.users.name));
+  return rows
+    .filter((u) => u.id !== userId)
+    .map((u) => ({ id: u.id, name: u.name || u.email.split("@")[0] }));
+}
+
+export async function shareList(userId: string, listId: string, toUserIds: string[], note?: string | null) {
+  const owner = await db.query.lists.findFirst({ where: and(eq(schema.lists.id, listId), eq(schema.lists.userId, userId)) });
+  if (!owner || !toUserIds.length) return;
+  for (const toUserId of toUserIds) {
+    if (toUserId === userId) continue;
+    await db
+      .insert(schema.listShares)
+      .values({ listId, toUserId, note: note?.slice(0, 500) ?? null })
+      // Ponowne polecenie odświeża notkę i wyciąga listę z powrotem na wierzch.
+      .onConflictDoUpdate({
+        target: [schema.listShares.listId, schema.listShares.toUserId],
+        set: { note: note?.slice(0, 500) ?? null, dismissedAt: null, createdAt: new Date() },
+      });
+  }
+}
+
+/** Komu już poleciłem tę listę. */
+export async function sharedWith(listId: string) {
+  return db
+    .select({ userId: schema.listShares.toUserId, dismissedAt: schema.listShares.dismissedAt })
+    .from(schema.listShares)
+    .where(eq(schema.listShares.listId, listId));
+}
+
+/** Listy polecone mnie — z nazwiskiem polecającego. */
+export async function listsForMe(userId: string, includeDismissed = false) {
+  const rows = await db
+    .select({
+      id: schema.lists.id,
+      title: schema.lists.title,
+      description: schema.lists.description,
+      note: schema.listShares.note,
+      createdAt: schema.listShares.createdAt,
+      dismissedAt: schema.listShares.dismissedAt,
+      fromName: schema.users.name,
+      fromEmail: schema.users.email,
+      items: count(schema.listItems.targetMbid),
+    })
+    .from(schema.listShares)
+    .innerJoin(schema.lists, eq(schema.lists.id, schema.listShares.listId))
+    .innerJoin(schema.users, eq(schema.users.id, schema.lists.userId))
+    .leftJoin(schema.listItems, eq(schema.listItems.listId, schema.lists.id))
+    .where(
+      includeDismissed
+        ? eq(schema.listShares.toUserId, userId)
+        : and(eq(schema.listShares.toUserId, userId), isNull(schema.listShares.dismissedAt)),
+    )
+    .groupBy(schema.lists.id, schema.listShares.note, schema.listShares.createdAt, schema.listShares.dismissedAt, schema.users.name, schema.users.email)
+    .orderBy(desc(schema.listShares.createdAt));
+  return rows.map((r) => ({ ...r, items: Number(r.items), from: r.fromName || r.fromEmail.split("@")[0] }));
+}
+
+export async function dismissShare(userId: string, listId: string) {
+  await db
+    .update(schema.listShares)
+    .set({ dismissedAt: new Date() })
+    .where(and(eq(schema.listShares.listId, listId), eq(schema.listShares.toUserId, userId)));
+}
+
+/** Czy wolno mi tę listę oglądać: moja albo mnie polecona. */
+export async function canSeeList(userId: string | null, listId: string, ownerId: string) {
+  if (userId && userId === ownerId) return true;
+  if (!userId) return false;
+  const share = await db.query.listShares.findFirst({
+    where: and(eq(schema.listShares.listId, listId), eq(schema.listShares.toUserId, userId)),
+  });
+  return !!share;
+}

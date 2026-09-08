@@ -175,6 +175,75 @@ export const commentsRelations = relations(comments, ({ one }) => ({
 }));
 export const usersRelations = relations(users, ({ many }) => ({ comments: many(comments) }));
 
+// ---------- Listy użytkowników ----------
+
+/**
+ * Własna lista: „Death metal dla początkujących", „Płyty, które zmieniły mi rok".
+ *
+ * Świadomie MIESZANA — jedna lista trzyma i płyty, i zespoły, i muzyków, bo
+ * tak się o muzyce opowiada: „posłuchaj tej płyty, a potem sprawdź, co jeszcze
+ * nagrał ten producent". Rozbicie na osobne listy płyt i artystów byłoby
+ * wygodne dla bazy i nienaturalne dla człowieka.
+ */
+export const lists = pgTable(
+  "list",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [index("list_user").on(t.userId, t.updatedAt)],
+);
+
+/**
+ * Pozycja listy. `label` to migawka nazwy z chwili dodania — dzięki niej lista
+ * renderuje się bez pytania MusicBrainz o każdą pozycję (limit 1/s zabiłby
+ * dwudziestoelementową listę).
+ */
+/**
+ * Co może trafić na listę. Poza płytą i artystą także KONCERT — „jedziemy na to
+ * razem" jest równie dobrym powodem do zrobienia listy, co „posłuchaj tego".
+ * Koncert nie ma MBID-u w naszym rozumieniu (bywa z Ticketmastera) i nie ma
+ * u nas własnej strony, więc trzyma przy sobie adres do afisza.
+ */
+export const listTarget = pgEnum("list_target", ["ALBUM", "ARTIST", "CONCERT"]);
+
+export const listItems = pgTable(
+  "list_item",
+  {
+    listId: text("list_id").notNull().references(() => lists.id, { onDelete: "cascade" }),
+    targetType: listTarget("target_type").notNull(),
+    targetMbid: text("target_mbid").notNull(),
+    label: text("label").notNull(),
+    note: text("note"),
+    /** dla koncertu: link do afisza; dla płyty i zespołu null (mają swoje strony) */
+    url: text("url"),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.listId, t.targetType, t.targetMbid] }), index("list_item_list").on(t.listId, t.position)],
+);
+
+/**
+ * Polecenie listy komuś. Klucz (lista, odbiorca) — tej samej listy nie poleca
+ * się dwa razy; ponowne wysłanie odświeża notkę. `dismissedAt` pozwala odbiorcy
+ * schować polecenie, nie kasując go nadawcy sprzed nosa.
+ */
+export const listShares = pgTable(
+  "list_share",
+  {
+    listId: text("list_id").notNull().references(() => lists.id, { onDelete: "cascade" }),
+    toUserId: text("to_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    note: text("note"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    dismissedAt: timestamp("dismissed_at", { mode: "date" }),
+  },
+  (t) => [primaryKey({ columns: [t.listId, t.toUserId] }), index("list_share_to").on(t.toUserId, t.createdAt)],
+);
+
 // ---------- Premiery piątkowe (import z Pure New Shit) ----------
 
 export const releaseSections = pgTable("release_section", {

@@ -188,3 +188,76 @@ export async function setLocaleAction(formData: FormData) {
   revalidatePath(back.startsWith("/") ? back : "/", "layout");
   redirect(back.startsWith("/") ? back : "/");
 }
+
+// ---------- listy użytkowników ----------
+
+/**
+ * Dodanie do listy. `listId` puste = nowa lista o nazwie z pola „newList" —
+ * dzięki temu z poziomu płyty da się założyć listę jednym ruchem, bez skoku
+ * do osobnego ekranu i z powrotem.
+ */
+const listTarget = z.enum(["ALBUM", "ARTIST", "CONCERT"]);
+
+export async function addToListAction(formData: FormData) {
+  const u = await requireUser();
+  const type = listTarget.parse(formData.get("type"));
+  // Koncert nie ma MBID-u (bywa z Ticketmastera), więc UUID sprawdzamy tylko
+  // tam, gdzie faktycznie jest wymagany.
+  const id = type === "CONCERT" ? String(formData.get("mbid") ?? "").slice(0, 120) : mbid.parse(formData.get("mbid"));
+  if (!id) return;
+  const label = String(formData.get("label") ?? "").slice(0, 300);
+  let listId = String(formData.get("listId") ?? "");
+  const nowa = String(formData.get("newList") ?? "").trim();
+  if (!listId && nowa) listId = (await ud.createList(u.id, nowa)).id;
+  if (!listId) return;
+  await ud.addToList(u.id, listId, {
+    targetType: type,
+    targetMbid: id,
+    label,
+    url: String(formData.get("url") ?? "") || null,
+  });
+  if (type !== "CONCERT") revalidatePath(pathFor(type, id));
+  else revalidatePath("/koncerty");
+  revalidatePath(`/lista/${listId}`);
+  revalidatePath("/listy");
+}
+
+export async function removeFromListAction(formData: FormData) {
+  const u = await requireUser();
+  const listId = String(formData.get("listId") ?? "");
+  await ud.removeFromList(u.id, listId, listTarget.parse(formData.get("type")), String(formData.get("mbid") ?? ""));
+  revalidatePath(`/lista/${listId}`);
+}
+
+export async function createListAction(formData: FormData) {
+  const u = await requireUser();
+  const title = String(formData.get("title") ?? "").trim();
+  if (!title) return;
+  const list = await ud.createList(u.id, title, String(formData.get("description") ?? "") || null);
+  revalidatePath("/listy");
+  redirect(`/lista/${list.id}`);
+}
+
+export async function deleteListAction(formData: FormData) {
+  const u = await requireUser();
+  await ud.deleteList(u.id, String(formData.get("listId") ?? ""));
+  revalidatePath("/listy");
+  redirect("/listy");
+}
+
+/** Polecenie listy — wielu naraz, bo zwykle poleca się tym samym ludziom. */
+export async function shareListAction(formData: FormData) {
+  const u = await requireUser();
+  const listId = String(formData.get("listId") ?? "");
+  const to = formData.getAll("to").map(String).filter(Boolean);
+  await ud.shareList(u.id, listId, to, String(formData.get("note") ?? "") || null);
+  revalidatePath(`/lista/${listId}`);
+  revalidatePath("/listy");
+}
+
+export async function dismissShareAction(formData: FormData) {
+  const u = await requireUser();
+  await ud.dismissShare(u.id, String(formData.get("listId") ?? ""));
+  revalidatePath("/listy");
+  revalidatePath("/ja");
+}

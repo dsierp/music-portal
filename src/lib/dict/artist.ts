@@ -8,6 +8,11 @@
 import type { Locale } from "@/lib/i18n";
 
 const pl = {
+  concertsHeading: "Koncerty",
+  concertsLoading: "Sprawdzam, czy i gdzie grają…",
+  concertsNone: "MusicBrainz nie ma zapowiedzi koncertów tego artysty. To katalog nagrań, nie afisz — brak wpisu nie znaczy, że nie grają.",
+  concertsNote: "Z zapowiedzi w MusicBrainz.",
+  concertsMine: "Koncerty w moich miastach →",
   topFromPortal: "Najwyżej oceniana w portalu",
   topFromMb: "Najwyżej oceniana w MusicBrainz",
   topBadge: "↑ ta z góry",
@@ -97,6 +102,11 @@ const pl = {
 type T = typeof pl;
 
 const en: T = {
+  concertsHeading: "Concerts",
+  concertsLoading: "Checking whether and where they play…",
+  concertsNone: "MusicBrainz has no upcoming shows for this artist. It's a recording catalogue, not a listings site — no entry doesn't mean no gigs.",
+  concertsNote: "From MusicBrainz event listings.",
+  concertsMine: "Concerts in my cities →",
   topFromPortal: "Highest rated here",
   topFromMb: "Highest rated on MusicBrainz",
   topBadge: "↑ the one above",
@@ -185,6 +195,11 @@ const en: T = {
 };
 
 const es: T = {
+  concertsHeading: "Conciertos",
+  concertsLoading: "Miro si tocan y dónde…",
+  concertsNone: "MusicBrainz no tiene conciertos anunciados de este artista. Es un catálogo de grabaciones, no una cartelera — que no haya entrada no significa que no toquen.",
+  concertsNote: "De los eventos anunciados en MusicBrainz.",
+  concertsMine: "Conciertos en mis ciudades →",
   topFromPortal: "La mejor valorada aquí",
   topFromMb: "La mejor valorada en MusicBrainz",
   topBadge: "↑ la de arriba",
@@ -273,6 +288,11 @@ const es: T = {
 };
 
 const de: T = {
+  concertsHeading: "Konzerte",
+  concertsLoading: "Schaue nach, ob und wo sie spielen…",
+  concertsNone: "MusicBrainz kennt keine angekündigten Konzerte dieses Artists. Es ist ein Aufnahmekatalog, kein Veranstaltungskalender — kein Eintrag heißt nicht, dass nichts läuft.",
+  concertsNote: "Aus den Veranstaltungen bei MusicBrainz.",
+  concertsMine: "Konzerte in meinen Städten →",
   topFromPortal: "Hier am besten bewertet",
   topFromMb: "Bei MusicBrainz am besten bewertet",
   topBadge: "↑ die von oben",

@@ -5,9 +5,10 @@ import { desc, isNotNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { mostCommented, topRated } from "@/lib/user-data";
 import { currentUser } from "@/lib/auth";
-import { getFavoriteArtists, getLikedAlbums } from "@/lib/user-data";
+import { getFavoriteArtists, getLikedAlbums, getMyLists, listsForMe } from "@/lib/user-data";
+import { createListAction, dismissShareAction } from "@/app/actions";
 import { i18n } from "@/lib/t";
-import { fmt } from "@/lib/i18n";
+import { fmt, plural } from "@/lib/i18n";
 
 /** Tytuł w zakładce też idzie w języku czytelnika. */
 export async function generateMetadata(): Promise<Metadata> {
@@ -34,9 +35,12 @@ async function labelsFor(type: "ALBUM" | "ARTIST", mbids: string[]) {
 }
 
 export default async function ListsPage() {
-  const { t } = await i18n();
+  const { locale, t } = await i18n();
   const user = await currentUser();
   const [topAlbums, topArtists, comAlbums, comArtists] = await Promise.all([topRated("ALBUM", 15), topRated("ARTIST", 15), mostCommented("ALBUM", 10), mostCommented("ARTIST", 10)]);
+  const [moje, dlaMnie] = user
+    ? await Promise.all([getMyLists(user.id).catch(() => []), listsForMe(user.id).catch(() => [])])
+    : [[] as Awaited<ReturnType<typeof getMyLists>>, [] as Awaited<ReturnType<typeof listsForMe>>];
   const mostLiked = await db.select({ mbid: schema.likedAlbums.mbid, n: sql<number>`count(*)` }).from(schema.likedAlbums).groupBy(schema.likedAlbums.mbid).orderBy(desc(sql`count(*)`)).limit(15);
   const mostFav = await db.select({ mbid: schema.favoriteArtists.mbid, n: sql<number>`count(*)` }).from(schema.favoriteArtists).groupBy(schema.favoriteArtists.mbid).orderBy(desc(sql`count(*)`)).limit(15);
   const albumIds = [...new Set([...topAlbums, ...comAlbums, ...mostLiked].map((x) => x.mbid))];
@@ -73,6 +77,58 @@ export default async function ListsPage() {
           <Link href="/best-of" className="underline">{t.lists.bestOfLink}</Link>{t.lists.bannerOutro}
         </p>
       </Banner>
+      {/* Własne listy najpierw: rankingi portalu są ciekawe, ale to, co człowiek
+          sam ułożył (i co dostał od kogoś), jest jego. */}
+      {user && (
+        <div className="grid gap-4 md:grid-cols-2">
+          <section className="card">
+            <h2 className="text-xl">{t.lists.myListsTitle}</h2>
+            <p className="mt-1 text-xs text-muted">{t.lists.myListsIntro}</p>
+            {moje.length ? (
+              <ul className="mt-3 space-y-1 text-sm">
+                {moje.map((l) => (
+                  <li key={l.id} className="flex items-baseline justify-between gap-2">
+                    <Link href={`/lista/${l.id}`} className="truncate font-medium hover:text-accent2">{l.title}</Link>
+                    <span className="shrink-0 font-mono text-[10px] text-faint">{plural(locale, l.items, t.lists.itemsCount)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-3 text-sm text-muted">{t.lists.noMyLists}</p>
+            )}
+            <form action={createListAction} className="mt-3 space-y-2">
+              <input name="title" placeholder={t.lists.newListPlaceholder} className="input py-1 text-sm" autoComplete="off" required />
+              <input name="description" placeholder={t.lists.newListDescription} className="input py-1 text-sm" autoComplete="off" />
+              <button className="btn">{t.lists.createList}</button>
+            </form>
+          </section>
+
+          <section className="card">
+            <h2 className="text-xl">{t.lists.sharedWithMeTitle}</h2>
+            {dlaMnie.length ? (
+              <ul className="mt-3 space-y-2 text-sm">
+                {dlaMnie.map((l) => (
+                  <li key={l.id} className="rounded border border-rule bg-surface2 p-2">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <Link href={`/lista/${l.id}`} className="truncate font-medium hover:text-accent2">{l.title}</Link>
+                      <span className="shrink-0 font-mono text-[10px] text-faint">{plural(locale, l.items, t.lists.itemsCount)}</span>
+                    </div>
+                    <div className="text-xs text-muted">{fmt(t.lists.sharedBy, { name: l.from })}</div>
+                    {l.note && <p className="mt-0.5 text-xs text-text2">„{l.note}”</p>}
+                    <form action={dismissShareAction} className="mt-1">
+                      <input type="hidden" name="listId" value={l.id} />
+                      <button className="text-[10px] text-faint hover:text-accent2">{t.lists.hideShare}</button>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-3 text-sm text-muted">{t.lists.noSharedWithMe}</p>
+            )}
+          </section>
+        </div>
+      )}
+
       <div className="grid gap-4 md:grid-cols-2">
         <List title={t.lists.titleTopAlbums} type="album" items={topAlbums.map((x) => ({ mbid: x.mbid, v: `${Number(x.avg).toFixed(1)} (${x.n})` }))} />
         <List title={t.lists.titleTopArtists} type="artist" items={topArtists.map((x) => ({ mbid: x.mbid, v: `${Number(x.avg).toFixed(1)} (${x.n})` }))} />

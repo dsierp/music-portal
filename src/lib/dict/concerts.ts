@@ -2,6 +2,9 @@
 import type { Locale } from "@/lib/i18n";
 
 const pl = {
+  hiddenOffGenre: "Schowałam {n} koncertów spoza Twoich gatunków — Ticketmaster traktuje gatunek jak podpowiedź, nie filtr.",
+  showOffGenre: "pokaż wszystko",
+  hideOffGenre: "pokaż tylko moje gatunki",
   title: "Koncerty",
   heroTitle: "Co gra w okolicy",
   loginIntro: "i wskaż w profilu miasta albo kraje, które Cię interesują — pokażę koncerty na najbliższe trzy miesiące, w Twoich gatunkach i z Twoich ulubionych zespołów.",
@@ -31,6 +34,9 @@ const pl = {
 type T = typeof pl;
 
 const en: T = {
+  hiddenOffGenre: "Hidden {n} concerts outside your genres — Ticketmaster treats genre as a hint, not a filter.",
+  showOffGenre: "show everything",
+  hideOffGenre: "show only my genres",
   title: "Concerts",
   heroTitle: "What's on nearby",
   loginIntro: "and set the cities or countries you care about in your profile — I'll show concerts for the next three months, in your genres and from your favourite bands.",
@@ -59,6 +65,9 @@ const en: T = {
 };
 
 const es: T = {
+  hiddenOffGenre: "He ocultado {n} conciertos fuera de tus géneros — Ticketmaster trata el género como una pista, no como un filtro.",
+  showOffGenre: "mostrar todo",
+  hideOffGenre: "mostrar solo mis géneros",
   title: "Conciertos",
   heroTitle: "Qué suena por aquí",
   loginIntro: "e indica en tu perfil las ciudades o países que te interesan — te enseñaré los conciertos de los próximos tres meses, en tus géneros y de tus bandas favoritas.",
@@ -87,6 +96,9 @@ const es: T = {
 };
 
 const de: T = {
+  hiddenOffGenre: "{n} Konzerte außerhalb deiner Genres ausgeblendet — Ticketmaster versteht das Genre als Hinweis, nicht als Filter.",
+  showOffGenre: "alles anzeigen",
+  hideOffGenre: "nur meine Genres",
   title: "Konzerte",
   heroTitle: "Was hier los ist",
   loginIntro: "und gib in deinem Profil die Städte oder Länder an, die dich interessieren — ich zeige dir Konzerte für die nächsten drei Monate, in deinen Genres und von deinen Lieblingsbands.",

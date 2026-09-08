@@ -29,6 +29,13 @@
       "when": 1788900460591,
       "tag": "0003_handy_silver_centurion",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788901721068,
+      "tag": "0004_bent_black_knight",
+      "breakpoints": true
     }
   ]
 }

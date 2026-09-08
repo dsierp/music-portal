@@ -2,10 +2,11 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Masthead } from "@/components/masthead";
+import { AddToList } from "@/components/add-to-list";
 import { heroArt, leadStyle } from "@/lib/lead-style";
 import { currentUser } from "@/lib/auth";
-import { getAreas, getFavoriteArtists, getGenres, getUserLocale } from "@/lib/user-data";
-import { concertWindow, concertsByArea, concertsByAreaMb, concertsForFavorites, dedupe, hasTicketmasterKey, type Concert } from "@/lib/concerts";
+import { getAreas, getFavoriteArtists, getGenres, getUserLocale, getMyLists } from "@/lib/user-data";
+import { concertWindow, concertsByArea, concertsByAreaMb, concertsForFavorites, dedupe, hasTicketmasterKey, offGenre, tmGenres, type Concert } from "@/lib/concerts";
 import { dbSafe } from "@/lib/db-safe";
 import { i18n } from "@/lib/t";
 import { fmt, formatDate, type Locale } from "@/lib/i18n";
@@ -18,7 +19,18 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 export const dynamic = "force-dynamic";
 
-function ConcertList({ items, locale, t }: { items: Concert[]; locale: Locale; t: Dict }) {
+function ConcertList({
+  items,
+  locale,
+  t,
+  lists,
+}: {
+  items: Concert[];
+  locale: Locale;
+  t: Dict;
+  /** listy zalogowanego — koncert też można komuś polecić */
+  lists?: { id: string; title: string }[];
+}) {
   return (
     <ul className="space-y-2">
       {items.map((c) => (
@@ -43,6 +55,26 @@ function ConcertList({ items, locale, t }: { items: Concert[]; locale: Locale; t
             {/* Nazwy własne źródeł danych — nie tłumaczymy. */}
             <span className="font-mono text-[10px] text-faint">{c.source === "ticketmaster" ? "Ticketmaster" : "MusicBrainz"}</span>
           </div>
+          {lists && (
+            <div className="mt-1">
+              <AddToList
+                type="CONCERT"
+                mbid={c.id}
+                label={`${c.name}${c.city ? ` — ${c.city}` : ""} (${c.date})`}
+                url={c.url}
+                lists={lists}
+                already={[]}
+                t={{
+                  addTo: t.lists.addTo,
+                  pick: t.lists.pickList,
+                  newList: t.lists.orNewList,
+                  newPlaceholder: t.lists.newListPlaceholder,
+                  add: t.lists.addToSubmit,
+                  onList: t.lists.onLists,
+                }}
+              />
+            </div>
+          )}
           {c.genres.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-1">
               {c.genres.slice(0, 3).map((g) => <span key={g} className="chip text-[10px]">{g}</span>)}
@@ -80,22 +112,43 @@ function GenreChips({ items, wybrany, locale, t }: { items: Concert[]; wybrany: 
 }
 
 /** Koncerty w moich obszarach — osobny strumień, bo to kilka zapytań do TM. */
-async function ByArea({ areas, categories, wybrany, locale, t }: { areas: { country: string; city: string | null }[]; categories: string[]; wybrany: string; locale: Locale; t: Dict }) {
+async function ByArea({
+  areas,
+  categories,
+  wybrany,
+  wszystko,
+  locale,
+  t,
+  lists,
+}: {
+  areas: { country: string; city: string | null }[];
+  categories: string[];
+  wybrany: string;
+  /** ?w=1 — pokaż też to, co Ticketmaster dorzucił poza moimi gatunkami */
+  wszystko: boolean;
+  locale: Locale;
+  t: Dict;
+  lists?: { id: string; title: string }[];
+}) {
   // MusicBrainz zawsze (za darmo), Ticketmaster gdy jest klucz — i scalamy,
   // bo dla czytelnika to jedna lista koncertów w jego mieście.
   const [mb, tm] = await Promise.all([
     concertsByAreaMb(areas).catch(() => []),
     concertsByArea(areas, categories).catch(() => []),
   ]);
-  const wszystkie = dedupe([...tm, ...mb]);
-  // Filtrujemy dopiero na wyświetlaniu, żeby chipsy zawsze pokazywały pełny
-  // obraz tygodnia — inaczej po zawężeniu zniknęłyby pozostałe gatunki.
+  const zebrane = dedupe([...tm, ...mb]);
+  // Ticketmaster traktuje gatunek jak podpowiedź, nie filtr — stąd Melanie
+  // Martinez w wynikach zapytania o metal. Odsiewamy to, co ma etykiety i żadna
+  // nie pasuje; koncerty bez etykiet zostają, bo o nich po prostu nic nie wiemy.
+  const moje = tmGenres(categories);
+  const obce = zebrane.filter((c) => offGenre(c, moje));
+  const wszystkie = wszystko ? zebrane : zebrane.filter((c) => !offGenre(c, moje));
   const items = wybrany ? wszystkie.filter((c) => c.genres.includes(wybrany)) : wszystkie;
-  if (!wszystkie.length) {
+  if (!zebrane.length) {
     return (
       <p className="text-sm text-muted">
         {t.concerts.nothingInAreas}
-        {!hasTicketmasterKey() && t.concerts.mbNotAnAgenda}
+        {!hasTicketmasterKey() && ` ${t.concerts.mbNotAnAgenda}`}
       </p>
     );
   }
@@ -103,25 +156,38 @@ async function ByArea({ areas, categories, wybrany, locale, t }: { areas: { coun
     <>
       <GenreChips items={wszystkie} wybrany={wybrany} locale={locale} t={t} />
       {items.length ? (
-        <ConcertList items={items} locale={locale} t={t} />
+        <ConcertList items={items} locale={locale} t={t} lists={lists} />
       ) : (
-        <p className="text-sm text-muted">{t.concerts.nothingInGenre} <Link href="/koncerty" className="underline">{t.concerts.showAll}</Link></p>
+        <p className="text-sm text-muted">
+          {t.concerts.nothingInGenre} <Link href="/koncerty" className="underline">{t.common.showAll}</Link>
+        </p>
+      )}
+      {/* Uczciwie mówimy, ile schowaliśmy i czemu — zamiast po cichu ucinać. */}
+      {obce.length > 0 && (
+        <p className="mt-3 font-mono text-[10px] text-faint">
+          {fmt(t.concerts.hiddenOffGenre, { n: obce.length })}{" "}
+          <Link href={wszystko ? "/koncerty" : "/koncerty?w=1"} className="underline">
+            {wszystko ? t.concerts.hideOffGenre : t.concerts.showOffGenre}
+          </Link>
+        </p>
       )}
     </>
   );
 }
 
 /** Koncerty ulubionych zespołów — MusicBrainz, jedno zapytanie na zespół (1/s). */
-async function ByFavorites({ artists, areas, locale, t }: { artists: { mbid: string; name: string }[]; areas: { country: string; city: string | null }[]; locale: Locale; t: Dict }) {
+async function ByFavorites({ artists, areas, locale, t, lists }: { artists: { mbid: string; name: string }[]; areas: { country: string; city: string | null }[]; locale: Locale; t: Dict; lists?: { id: string; title: string }[] }) {
   const items = await concertsForFavorites(artists, areas).catch(() => []);
   if (!items.length) {
     return <p className="text-sm text-muted">{t.concerts.noFavoriteConcerts}</p>;
   }
-  return <ConcertList items={items} locale={locale} t={t} />;
+  return <ConcertList items={items} locale={locale} t={t} lists={lists} />;
 }
 
-export default async function ConcertsPage({ searchParams }: { searchParams: Promise<{ g?: string }> }) {
-  const wybrany = (await searchParams).g ?? "";
+export default async function ConcertsPage({ searchParams }: { searchParams: Promise<{ g?: string; w?: string }> }) {
+  const params = await searchParams;
+  const wybrany = params.g ?? "";
+  const wszystko = params.w === "1";
   const user = await currentUser();
   const profileLocale = user ? await getUserLocale(user.id).catch(() => null) : null;
   const { locale, t } = await i18n(profileLocale);
@@ -150,6 +216,8 @@ export default async function ConcertsPage({ searchParams }: { searchParams: Pro
   const favs = favsS.value;
   const lead = leadStyle(genres);
   const categories = genres.filter((g) => g.weight >= 3).map((g) => g.genre);
+  // Koncert też można komuś polecić — listy ładujemy raz, dla całej strony.
+  const mojeListy = await getMyLists(user.id).catch(() => []);
 
   return (
     <>
@@ -183,7 +251,7 @@ export default async function ConcertsPage({ searchParams }: { searchParams: Pro
             </p>
           ) : (
             <Suspense fallback={<p className="font-mono text-xs text-muted">{t.concerts.loadingAreaConcerts}</p>}>
-              <ByArea areas={genreAreas} categories={categories} wybrany={wybrany} locale={locale} t={t} />
+              <ByArea areas={genreAreas} categories={categories} wybrany={wybrany} wszystko={wszystko} locale={locale} t={t} lists={mojeListy} />
             </Suspense>
           )}
         </section>
@@ -199,7 +267,7 @@ export default async function ConcertsPage({ searchParams }: { searchParams: Pro
             <p className="text-sm text-muted">{t.concerts.noFavoritesYet}</p>
           ) : (
             <Suspense fallback={<p className="font-mono text-xs text-muted">{t.concerts.loadingFavoriteConcerts}</p>}>
-              <ByFavorites artists={favs.map((f) => ({ mbid: f.mbid, name: f.name }))} areas={favAreas} locale={locale} t={t} />
+              <ByFavorites artists={favs.map((f) => ({ mbid: f.mbid, name: f.name }))} areas={favAreas} locale={locale} t={t} lists={mojeListy} />
             </Suspense>
           )}
         </section>
