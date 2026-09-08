@@ -153,6 +153,48 @@ płatnego konta developerskiego (99 USD/rok) i sekretu, który wygasa po pół r
 
 ---
 
+## Języki
+
+Portal mówi po **polsku, angielsku, hiszpańsku i niemiecku**. Adresy są wspólne —
+`/artist/…` jest jedno, niezależnie od języka (bez `/en/…`).
+
+Skąd portal wie, jaki język pokazać, w tej kolejności:
+
+1. ciasteczko `pns_lang` (ustawia je przełącznik, ważne rok),
+2. kolumna `locale` w tabeli `user` — dla zalogowanych, dzięki temu wybór idzie za
+   człowiekiem na telefon,
+3. nagłówek `Accept-Language` z przeglądarki,
+4. polski.
+
+Gdzie co siedzi:
+
+| Plik | Po co |
+|---|---|
+| `src/lib/i18n.ts` | stałe, `formatDate`, `formatNumber`, `plural`, `fmt`, `wikiLangs`. **Czysty** — bez `next/headers`, bo importują go komponenty klienckie |
+| `src/lib/t.ts` | `i18n()` → `{ locale, t }`; tylko tu czytamy ciasteczko i nagłówki |
+| `src/lib/dict/*.ts` | słownik: jeden plik na ekran, w każdym cztery języki obok siebie |
+| `src/components/language-picker.tsx` | przełącznik (nagłówek + profil) |
+
+**Dokładając napis**: dopisujesz go w `const pl` swojego pliku w `src/lib/dict/`
+i w trzech pozostałych językach. Typ bierze się z polskiego, więc brak
+tłumaczenia **wywala build** — to celowe: lepiej złamany build niż polski
+komunikat u kogoś w Madrycie. `tests/i18n.test.ts` pilnuje kompletu kluczy
+i tego, żeby nie została zaślepka.
+
+Komponenty klienckie (`"use client"`) nie wołają `i18n()` — dostają napisy
+propsami od rodzica-servera. Wyjątek: `src/app/error.tsx` jest dwujęzyczny
+(PL/EN), bo boundary błędu musi wyrenderować się natychmiast.
+
+Za językiem idą też treści z zewnątrz: Wikipedia pobierana najpierw w języku
+czytelnika (potem `en`, `pl`), daty i liczby przez `Intl`, liczba mnoga przez
+`Intl.PluralRules` (polski ma trzy formy, reszta dwie). Nazwy własne zostają
+oryginalne: zespoły, płyty, gatunki, „Pure New Shit".
+
+⚠️ Kolumna `locale` przyjechała migracją `0002`. Po wdrożeniu trzeba ją wpuścić
+do Neona: `npm run neon:setup -- --tylko-migracje`.
+
+---
+
 ## Skąd biorą się dane
 
 | Źródło | Po co | Ograniczenia |
