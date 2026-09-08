@@ -33,7 +33,7 @@ export default async function ListPage({ params }: { params: Promise<{ id: strin
 
   const [ludzie, wyslane] = moja
     ? await Promise.all([otherUsers(user!.id), sharedWith(id)])
-    : [[] as { id: string; name: string }[], [] as { userId: string; dismissedAt: Date | null }[]];
+    : [[] as { id: string; name: string; me: boolean }[], [] as { userId: string; dismissedAt: Date | null }[]];
   const juzPolecone = new Set(wyslane.map((w) => w.userId));
 
   return (
@@ -102,7 +102,7 @@ export default async function ListPage({ params }: { params: Promise<{ id: strin
                 {ludzie.map((p) => (
                   <label key={p.id} className="flex items-center gap-1.5 text-sm">
                     <input type="checkbox" name="to" value={p.id} defaultChecked={juzPolecone.has(p.id)} />
-                    {p.name}
+                    {p.me ? t.lists.meLabel : p.name}
                   </label>
                 ))}
               </div>

@@ -444,16 +444,15 @@ export async function otherUsers(userId: string) {
     .select({ id: schema.users.id, name: schema.users.name, email: schema.users.email })
     .from(schema.users)
     .orderBy(asc(schema.users.name));
-  return rows
-    .filter((u) => u.id !== userId)
-    .map((u) => ({ id: u.id, name: u.name || u.email.split("@")[0] }));
+  // Siebie zostawiamy na liście: „poleć sobie" to zwykła kolejka do posłuchania,
+  // a nie dziwactwo — odfiltrowanie samego siebie było moim błędem założenia.
+  return rows.map((u) => ({ id: u.id, name: u.name || u.email.split("@")[0], me: u.id === userId }));
 }
 
 export async function shareList(userId: string, listId: string, toUserIds: string[], note?: string | null) {
   const owner = await db.query.lists.findFirst({ where: and(eq(schema.lists.id, listId), eq(schema.lists.userId, userId)) });
   if (!owner || !toUserIds.length) return;
   for (const toUserId of toUserIds) {
-    if (toUserId === userId) continue;
     await db
       .insert(schema.listShares)
       .values({ listId, toUserId, note: note?.slice(0, 500) ?? null })

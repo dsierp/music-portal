@@ -8,6 +8,7 @@
 import type { Locale } from "@/lib/i18n";
 
 const pl = {
+  meLabel: "sobie (do posłuchania)",
   myListsTitle: "Twoje listy",
   myListsIntro: "Własne zestawienia: płyty, zespoły, muzycy — co chcesz, w jednej liście. Możesz je polecić innym.",
   newListTitle: "Nowa lista",
@@ -62,6 +63,7 @@ const pl = {
 type T = typeof pl;
 
 const en: T = {
+  meLabel: "myself (to listen to)",
   myListsTitle: "Your lists",
   myListsIntro: "Your own line-ups: albums, bands, musicians — whatever you want, in one list. You can recommend them to other people.",
   newListTitle: "New list",
@@ -115,6 +117,7 @@ const en: T = {
 };
 
 const es: T = {
+  meLabel: "a mí (para escuchar)",
   myListsTitle: "Tus listas",
   myListsIntro: "Tus propias selecciones: discos, bandas, músicos — lo que quieras, en una lista. Puedes recomendarlas a otras personas.",
   newListTitle: "Nueva lista",
@@ -168,6 +171,7 @@ const es: T = {
 };
 
 const de: T = {
+  meLabel: "mir selbst (zum Anhören)",
   myListsTitle: "Deine Listen",
   myListsIntro: "Eigene Zusammenstellungen: Alben, Bands, Musiker — was du willst, in einer Liste. Du kannst sie anderen empfehlen.",
   newListTitle: "Neue Liste",
