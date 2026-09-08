@@ -5,6 +5,7 @@ import { currentUser } from "@/lib/auth";
 import { getFavoriteArtists, getGenres, getLikedAlbums, myRatings } from "@/lib/user-data";
 import { setGenreAction, skipOnboarding, toggleFavorite, toggleLike } from "@/app/actions";
 import { MAIN_CATEGORIES, WEIGHT_LABELS } from "@/lib/genres";
+import { orderByPopularity } from "@/lib/popularity";
 import { genreImage } from "@/lib/genre-art";
 import { Cover } from "@/components/cover";
 
@@ -19,6 +20,12 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
     getGenres(user.id), getLikedAlbums(user.id), getFavoriteArtists(user.id), myRatings(user.id, "ALBUM"), myRatings(user.id, "ARTIST"),
   ]);
   const weightOf = new Map(genres.map((g) => [g.genre, g.weight]));
+  // Kafelki: najpierw to, co już masz (od największej wagi), potem reszta
+  // według popularności wśród użytkowników portalu.
+  const bySlug = new Map(MAIN_CATEGORIES.map((c) => [c.slug, c]));
+  const mineFirst = genres.slice().sort((a, b) => b.weight - a.weight).map((g) => g.genre).filter((g) => bySlug.has(g));
+  const restOrder = await orderByPopularity(MAIN_CATEGORIES.map((c) => c.slug).filter((s) => !mineFirst.includes(s)));
+  const tiles = [...mineFirst, ...restOrder].map((slug) => bySlug.get(slug)!);
   const custom = genres.filter((g) => !MAIN_CATEGORIES.some((c) => c.slug === g.genre));
 
   return (
@@ -67,7 +74,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           </div>
         )}
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {MAIN_CATEGORIES.map((c) => {
+          {tiles.map((c) => {
             const on = weightOf.has(c.slug);
             const img = genreImage(c.label, c.slug, c.tags[0] ?? "");
             return (

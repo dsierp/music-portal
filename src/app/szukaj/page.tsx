@@ -17,6 +17,13 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   // pytamy MusicBrainz dokładnie o to pole, zamiast szukać słowa wszędzie.
   const narrowed = artistQ.trim().length > 1 || titleQ.trim().length > 1;
   const shown = narrowed ? [artistQ, titleQ].filter(Boolean).join(" — ") : q;
+
+  // Który zakres wyników pokazujemy (i o który w ogóle pytamy).
+  const showAlbums = f === "" || f === "plyty";
+  const showBands = f === "" || f === "zespoly";
+  const showPeople = f === "" || f === "ludzie";
+  const showArtists = showBands || showPeople;
+  const showMine = f === "" || f === "portal";
   const user = await currentUser();
   let albums: Awaited<ReturnType<typeof searchAlbums>> = [];
   let artists: Awaited<ReturnType<typeof searchArtists>> = [];
@@ -30,10 +37,22 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       : [];
   if (narrowed || q.trim()) {
     try {
+      // Zakres zmienia SAMO PYTANIE, nie tylko to, co pokazujemy: „Zespoły"
+      // pyta MusicBrainz o `type:group`, „Ludzie" o `type:person`, a „Płyty"
+      // w ogóle nie zawraca głowy indeksowi artystów. Dzięki temu w zawężeniu
+      // mieści się więcej trafień tego jednego rodzaju, zamiast dziesięciu
+      // wymieszanych.
+      const kind = f === "zespoly" ? ("group" as const) : f === "ludzie" ? ("person" as const) : undefined;
+      const artistTerm = narrowed ? artistQ.trim() : q;
       [albums, artists] = await Promise.all([
-        narrowed ? searchAlbumsBy({ artist: artistQ, title: titleQ }, 15) : searchAlbums(q, 15),
-        // Przy zawężeniu lista artystów ma sens tylko dla pola „artysta".
-        narrowed ? (artistQ.trim() ? searchArtists(artistQ, 10) : Promise.resolve([])) : searchArtists(q, 10),
+        !showAlbums
+          ? Promise.resolve([])
+          : narrowed
+            ? searchAlbumsBy({ artist: artistQ, title: titleQ }, f === "plyty" ? 30 : 15)
+            : searchAlbums(q, f === "plyty" ? 30 : 15),
+        !showArtists || !artistTerm
+          ? Promise.resolve([])
+          : searchArtists(artistTerm, kind ? 25 : 10, kind),
       ]);
     } catch (e) {
       error = e instanceof Error ? e.message : "Błąd wyszukiwania";
@@ -43,9 +62,6 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
 
   // Filtr typu wyniku — jak w odtwarzaczach: „wszystko" i zawężenia.
   // Trzyma się w adresie, więc wynik da się wysłać linkiem.
-  const showAlbums = f === "" || f === "plyty";
-  const showArtists = f === "" || f === "artysci";
-  const showMine = f === "" || f === "portal";
   const params = (kind: string) => {
     const sp = new URLSearchParams();
     if (q) sp.set("q", q);
@@ -57,7 +73,8 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   const FILTERS: { id: string; label: string; count: number }[] = [
     { id: "", label: "Wszystko", count: albums.length + artists.length + mine.length },
     { id: "plyty", label: "Płyty", count: albums.length },
-    { id: "artysci", label: "Artyści", count: artists.length },
+    { id: "zespoly", label: "Zespoły", count: artists.filter((a) => !a.isPerson).length },
+    { id: "ludzie", label: "Ludzie", count: artists.filter((a) => a.isPerson).length },
     { id: "portal", label: "W portalu", count: mine.length },
   ];
   return (
@@ -140,7 +157,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
           )}
           {showArtists && (
           <section>
-            <h2 className="label mb-3">Artyści i muzycy</h2>
+            <h2 className="label mb-3">{f === "zespoly" ? "Zespoły" : f === "ludzie" ? "Ludzie" : "Artyści i muzycy"}</h2>
             {artists.length ? (
               <div className="grid gap-2">
                 {artists.map((a) => (
@@ -148,7 +165,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
                 ))}
               </div>
             ) : (
-              <Empty>Brak artystów.</Empty>
+              <Empty>{f === "zespoly" ? "Brak zespołów." : f === "ludzie" ? "Brak osób." : "Brak artystów."}</Empty>
             )}
           </section>
           )}

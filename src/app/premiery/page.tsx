@@ -3,7 +3,8 @@ import type { Metadata } from "next";
 import { ReleaseSection } from "@/components/release-list";
 import { Masthead } from "@/components/masthead";
 import { heroArt, leadStyle } from "@/lib/lead-style";
-import { GENRE_ORDER, allSections, genreLabel, latestSections, releasesFor, splitDb, styleToCategory } from "@/lib/lists";
+import { allSections, genreLabel, latestSections, releasesFor, splitDb, styleToCategory } from "@/lib/lists";
+import { orderByPopularity } from "@/lib/popularity";
 import { currentUser } from "@/lib/auth";
 import { getGenres } from "@/lib/user-data";
 
@@ -45,12 +46,12 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
   }
   const mine = [...new Set(prefs.slice().sort((a, b) => b.weight - a.weight).map((p) => styleToCategory(p.genre)))];
   const present = [...counts.keys()];
+  // Bez preferencji (albo bez logowania) kolejność robi popularność, nie
+  // sztywna lista z zestawienia — pierwszy ekran ma zaczynać od tego, czego
+  // słucha najwięcej ludzi.
   const available = mine.length
-    ? [...mine, ...present.filter((g) => !mine.includes(g))]
-    : [
-        ...GENRE_ORDER.filter((g) => present.includes(g)),
-        ...present.filter((g) => !GENRE_ORDER.includes(g)).sort((a, b) => a.localeCompare(b, "pl")),
-      ];
+    ? [...mine, ...(await orderByPopularity(present.filter((g) => !mine.includes(g))))]
+    : await orderByPopularity(present);
   return (
     <>
     <Masthead

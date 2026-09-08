@@ -1,6 +1,7 @@
 import type { InferSelectModel } from "drizzle-orm";
 import { schema } from "@/db";
-import { GENRE_ORDER, genreLabel, sectionImage, splitDb } from "@/lib/lists";
+import { genreLabel, sectionImage, splitDb } from "@/lib/lists";
+import { sortByPopularity, categoryVotes } from "@/lib/popularity";
 import { PickCard, ReleaseCard } from "./release-card";
 import { SectionHead } from "./masthead";
 import { sectionHeroArt } from "@/lib/lead-style";
@@ -12,7 +13,7 @@ export interface ReleaseFilter { genres: string[]; starOnly: boolean; showFlagge
 
 export { ReleaseCard as ReleaseRow } from "./release-card";
 
-export function ReleaseSection({ section, releases, filter }: { section: Section; releases: Release[]; filter: ReleaseFilter }) {
+export async function ReleaseSection({ section, releases, filter }: { section: Section; releases: Release[]; filter: ReleaseFilter }) {
   const visible = releases.filter((r) => {
     if (filter.genres.length && !filter.genres.includes(splitDb(r.genre, r.description))) return false;
     if (filter.starOnly && r.star !== 1) return false;
@@ -24,13 +25,11 @@ export function ReleaseSection({ section, releases, filter }: { section: Section
   // Płyta tygodnia zostaje TAKŻE w liście swojego gatunku — tak jest w oryginalnym
   // zestawieniu i tak to ma sens: pick to wyróżnienie, a nie wyjęcie z zestawu.
   const rest = visible;
-  // Gatunki w kolejności: najpierw te z importu PNS, potem style dobrane z MB.
   const gOf = (r: Release) => splitDb(r.genre, r.description);
   const present = [...new Set(rest.map(gOf))];
-  const order = [
-    ...GENRE_ORDER.filter((g) => present.includes(g)),
-    ...present.filter((g) => !GENRE_ORDER.includes(g)).sort((a, b) => a.localeCompare(b, "pl")),
-  ];
+  // Kolejność gatunków w sekcji: popularność wśród użytkowników portalu,
+  // a przy braku danych — lista zapasowa (patrz popularity.ts).
+  const order = sortByPopularity(present, await categoryVotes());
   const groups = order.map((g) => ({ g, items: rest.filter((r) => gOf(r) === g) })).filter((x) => x.items.length);
   // Tło nagłówka bierzemy z gatunku, który w tym tygodniu dominuje.
   const lead = groups[0]?.g ?? "db";

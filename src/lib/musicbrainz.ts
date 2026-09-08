@@ -430,11 +430,27 @@ export async function releaseGroupOfRelease(releaseMbid: string): Promise<string
   });
 }
 
-export async function searchArtists(query: string, limit = 20): Promise<Pick<Artist, "mbid" | "name" | "type" | "country" | "disambiguation" | "isPerson">[]> {
+/** Zapytanie do indeksu artystów: sam tekst albo tekst zawężony do typu. */
+export function artistQuery(query: string, kind?: "group" | "person"): string {
   const q = lucene(query);
-  if (!q) return [];
-  const data = await cached(`mb:artist-search:${q}:${limit}`, TTL.search, () =>
-    mbFetch<{ artists: MbArtist[] }>("/artist/", { query: q, limit }),
+  if (!q) return "";
+  return kind ? `${q} AND type:${kind}` : q;
+}
+
+/**
+ * `kind` zawęża do zespołu albo do człowieka. MusicBrainz trzyma jednych
+ * i drugich w tym samym indeksie, więc bez tego „Cynic" zwraca i kapelę,
+ * i producenta d&b — a szuka się zwykle albo jednego, albo drugiego.
+ */
+export async function searchArtists(
+  query: string,
+  limit = 20,
+  kind?: "group" | "person",
+): Promise<Pick<Artist, "mbid" | "name" | "type" | "country" | "disambiguation" | "isPerson">[]> {
+  const full = artistQuery(query, kind);
+  if (!full) return [];
+  const data = await cached(`mb:artist-search:${full}:${limit}`, TTL.search, () =>
+    mbFetch<{ artists: MbArtist[] }>("/artist/", { query: full, limit }),
   );
   return data.artists.map((a) => ({
     mbid: a.id,

@@ -6,6 +6,7 @@ import { currentUser } from "@/lib/auth";
 import { getGenres } from "@/lib/user-data";
 import type { Metadata } from "next";
 import { BEST_CATS, BEST_ORDER, bestOf, bestOfYears } from "@/lib/lists";
+import { orderByPopularity } from "@/lib/popularity";
 import { searchLinks } from "@/components/links";
 
 export const metadata: Metadata = { title: "Best of" };
@@ -20,7 +21,12 @@ export default async function BestOfPage({ searchParams }: { searchParams: Promi
   const user = await currentUser();
   const lead = leadStyle(user ? await getGenres(user.id) : []);
   const chosenCats = sp.kat ? sp.kat.split(",").filter(Boolean) : [];
-  const cats = chosenCats.length ? BEST_ORDER.filter((c) => chosenCats.includes(c)) : BEST_ORDER;
+  // Kolejność kategorii: najpierw style użytkownika, potem popularność.
+  const myCats = [...new Set((user ? await getGenres(user.id) : []).slice().sort((a, b) => b.weight - a.weight).map((g) => g.genre))]
+    .filter((g) => BEST_ORDER.includes(g));
+  const byPop = await orderByPopularity(BEST_ORDER.filter((c) => !myCats.includes(c)));
+  const order = [...myCats, ...byPop];
+  const cats = chosenCats.length ? order.filter((c) => chosenCats.includes(c)) : order;
 
   return (
     <>
@@ -42,13 +48,13 @@ export default async function BestOfPage({ searchParams }: { searchParams: Promi
         {/* Brak wyboru = wszystkie kategorie włączone. Klik wyłącza/włącza pojedynczą,
             więc nie ma osobnego przycisku „wszystkie" — pusty wybór to i tak komplet. */}
         <div className="flex flex-col gap-1.5">
-          {BEST_ORDER.map((c) => {
+          {order.map((c) => {
             const chosen = sp.kat ? sp.kat.split(",").filter(Boolean) : [];
             const on = !chosen.length || chosen.includes(c);
             const next = chosen.length
               ? chosen.includes(c) ? chosen.filter((x) => x !== c) : [...chosen, c]
-              : BEST_ORDER.filter((x) => x !== c);
-            const q = next.length && next.length < BEST_ORDER.length ? `?rok=${year}&kat=${next.join(",")}` : `?rok=${year}`;
+              : order.filter((x) => x !== c);
+            const q = next.length && next.length < order.length ? `?rok=${year}&kat=${next.join(",")}` : `?rok=${year}`;
             return (
               <Link key={c} href={q} className={`chip ${on ? "chip-on" : ""}`}>{BEST_CATS[c]}</Link>
             );

@@ -4,7 +4,7 @@ process.env.MB_FIXTURES = "tests/fixtures/mb";
 // `||=`, nie `??=`: pusta zmienna z .env przeszłaby dalej i testy poszłyby na
 // prawdziwą bazę PGlite (czyli wolno, a przy zajętym katalogu — wcale).
 process.env.DATABASE_URL ||= "postgresql://invalid";
-import { getAlbum, getArtist, getDiscography, getPlayedOn, findAlbumMbid, searchAlbums, buildLinks, normalizeUserAgent } from "../src/lib/musicbrainz";
+import { getAlbum, getArtist, getDiscography, getPlayedOn, findAlbumMbid, searchAlbums, buildLinks, normalizeUserAgent, artistQuery } from "../src/lib/musicbrainz";
 import { ID } from "./make-fixtures";
 
 test("album: skład z relacji nagrań, najwcześniejsze wydanie, linki", async () => {
@@ -96,4 +96,11 @@ test("User-Agent: pusta zmienna nie kończy się pustym nagłówkiem", () => {
 test("User-Agent: własna wartość przechodzi, cudzysłowy z importu .env obcięte", () => {
   assert.equal(normalizeUserAgent('"MusicPortal/0.1 (a@b.pl)"'), "MusicPortal/0.1 (a@b.pl)");
   assert.equal(normalizeUserAgent("  MusicPortal/0.2 (a@b.pl)  "), "MusicPortal/0.2 (a@b.pl)");
+});
+
+test("szukanie artystów: zakres zawęża zapytanie do typu", () => {
+  assert.equal(artistQuery("cynic"), "cynic");
+  assert.equal(artistQuery("cynic", "group"), "cynic AND type:group");
+  assert.equal(artistQuery("scott burns", "person"), "scott burns AND type:person");
+  assert.equal(artistQuery("   ", "person"), "", "puste zapytanie nie idzie do MB");
 });
