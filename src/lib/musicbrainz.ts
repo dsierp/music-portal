@@ -152,6 +152,7 @@ interface MbRelease {
   id: string;
   title: string;
   date?: string;
+  "artist-credit"?: MbArtistCreditPart[];
   country?: string;
   status?: string;
   "label-info"?: { label?: { id: string; name: string } | null; "catalog-number"?: string | null }[];
@@ -828,4 +829,87 @@ export async function albumCrew(albums: AlbumSummary[], limit = 6): Promise<Crew
   }
   // Najpierw ci, którzy wracają na kolejnych płytach — to zwykle „ich" producent.
   return [...people.values()].sort((a, b) => b.albums.length - a.albums.length || a.name.localeCompare(b.name, "pl"));
+}
+
+// ---------- co wyprodukował ----------
+
+/**
+ * Płyty, przy których człowiek pracował przy PULPICIE: produkcja, realizacja,
+ * miks, mastering, okładka.
+ *
+ * Po co osobno, skoro strona artysty ma już „Produkcja, realizacja, okładki":
+ * tamta lista bierze relacje wiszące przy encji artysty i przy producentach
+ * bywa niemal pusta — Scott Burns wyprodukował pół kanonu death metalu, a widać
+ * było jedną pozycję. Producenckie kredyty MusicBrainz trzyma zwykle przy
+ * WYDANIU, więc trzeba przejrzeć wydania powiązane z tym człowiekiem. Browse po
+ * artyście łapie także powiązania relacyjne — to ta sama sztuczka, dzięki której
+ * działa „Grał(a) na płytach".
+ *
+ * Zwracamy grupy wydawnicze, żeby dziesięć reedycji nie zrobiło dziesięciu
+ * pozycji na liście.
+ */
+export interface ProducedAlbum {
+  album: AlbumSummary;
+  roles: string[];
+}
+
+export async function getProduced(mbid: string): Promise<ProducedAlbum[]> {
+  const releases = await cached(`mb:produced:v1:${mbid}`, TTL.lookup, async () => {
+    const out: (MbRelease & { relations?: MbArtistRel[] })[] = [];
+    for (let offset = 0; offset < 400; offset += 100) {
+      const page = await mbFetch<{ releases: (MbRelease & { relations?: MbArtistRel[] })[]; "release-count": number }>(
+        "/release/",
+        { artist: mbid, limit: 100, offset, inc: "artist-rels+release-groups+artist-credits" },
+      ).catch(() => null);
+      if (!page) break;
+      out.push(...page.releases);
+      if (out.length >= page["release-count"]) break;
+    }
+    return out;
+  });
+
+  const groups = new Map<string, ProducedAlbum>();
+  for (const rel of releases) {
+    const roles = (rel.relations ?? [])
+      .filter((r) => r.artist?.id === mbid)
+      .flatMap(rolesOf)
+      .filter(isCrewRole);
+    if (!roles.length) continue;
+    const rg = rel["release-group"];
+    if (!rg) continue;
+    const e = groups.get(rg.id) ?? { album: normReleaseGroup(rg, rel["artist-credit"]), roles: [] };
+    for (const role of roles) if (!e.roles.includes(role)) e.roles.push(role);
+    groups.set(rg.id, e);
+  }
+  return [...groups.values()].sort((x, y) =>
+    (y.album.firstReleaseDate ?? "").localeCompare(x.album.firstReleaseDate ?? ""),
+  );
+}
+
+// ---------- instrument, gdy skład go nie podaje ----------
+
+/**
+ * Czym ten człowiek zwykle gra — zgadywane z JEGO INNYCH zespołów.
+ *
+ * MusicBrainz trzyma instrument jako atrybut relacji „member of band", a
+ * redaktorzy nagminnie zostawiają go pustym: w składzie Venomous Concept jeden
+ * muzyk ma „guitar", a trzej nic. Skoro ten sam człowiek ma gdzie indziej
+ * wpisane „drums", to lepsze niż puste miejsce — ale to wciąż domysł, więc
+ * wołający ma go podpisać znakiem zapytania. Bębniarz może w tym akurat
+ * zespole grać na harfie.
+ */
+export async function guessRoles(mbids: string[], skipBandMbid?: string, limit = 10): Promise<Map<string, string[]>> {
+  const out = new Map<string, string[]>();
+  for (const id of mbids.slice(0, limit)) {
+    const person = await getArtist(id).catch(() => null);
+    if (!person) continue;
+    const licznik = new Map<string, number>();
+    for (const b of person.memberOf) {
+      if (b.mbid === skipBandMbid) continue;
+      for (const r of b.roles) licznik.set(r, (licznik.get(r) ?? 0) + 1);
+    }
+    const najczestsze = [...licznik.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([r]) => r);
+    if (najczestsze.length) out.set(id, najczestsze);
+  }
+  return out;
 }

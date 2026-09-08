@@ -8,6 +8,10 @@
 import type { Locale } from "@/lib/i18n";
 
 const pl = {
+  producedHeading: "Wyprodukował, zrealizował, zmasterował",
+  producedNote: "Płyty, przy których pracował przy pulpicie, a nie z instrumentem. Z relacji przy wydaniach w MusicBrainz — tam, gdzie zwykle wiszą kredyty producenckie.",
+  producedMore: "Pokazujemy 60 najnowszych z {n}.",
+  roleGuessNote: "instrument dobrany z innych zespołów tej osoby — MusicBrainz nie podaje go przy tym składzie",
   sortNewest: "od najnowszych",
   sortOldest: "chronologicznie",
   dislikeAdd: "Nie moja bajka",
@@ -90,6 +94,10 @@ const pl = {
 type T = typeof pl;
 
 const en: T = {
+  producedHeading: "Produced, engineered, mastered",
+  producedMore: "Showing the 60 most recent of {n}.",
+  producedNote: "Albums they worked on at the desk rather than with an instrument. From release relationships on MusicBrainz — where production credits usually live.",
+  roleGuessNote: "instrument taken from this person's other bands — MusicBrainz doesn't give one for this line-up",
   sortNewest: "newest first",
   sortOldest: "in order",
   dislikeAdd: "Not my thing",
@@ -171,6 +179,10 @@ const en: T = {
 };
 
 const es: T = {
+  producedHeading: "Produjo, grabó, masterizó",
+  producedMore: "Mostramos los 60 más recientes de {n}.",
+  producedNote: "Discos en los que trabajó desde la mesa, no con un instrumento. De las relaciones de las ediciones en MusicBrainz, donde suelen estar los créditos de producción.",
+  roleGuessNote: "instrumento tomado de sus otras bandas — MusicBrainz no da ninguno para esta formación",
   sortNewest: "más nuevos primero",
   sortOldest: "en orden",
   dislikeAdd: "No es lo mío",
@@ -252,6 +264,10 @@ const es: T = {
 };
 
 const de: T = {
+  producedHeading: "Produziert, aufgenommen, gemastert",
+  producedMore: "Wir zeigen die 60 neuesten von {n}.",
+  producedNote: "Alben, an denen er am Pult gearbeitet hat, nicht am Instrument. Aus den Beziehungen der Veröffentlichungen bei MusicBrainz — dort stehen Produktionscredits üblicherweise.",
+  roleGuessNote: "Instrument aus den anderen Bands dieser Person — MusicBrainz nennt für diese Besetzung keines",
   sortNewest: "neueste zuerst",
   sortOldest: "chronologisch",
   dislikeAdd: "Nicht mein Ding",

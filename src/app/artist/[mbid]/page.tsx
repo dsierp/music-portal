@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { ARTWORK_ROLES, albumCrew, getArtist, getDiscography, getPlayedOn, MbError } from "@/lib/musicbrainz";
+import { ARTWORK_ROLES, albumCrew, getArtist, getDiscography, getPlayedOn, getProduced, guessRoles, MbError } from "@/lib/musicbrainz";
 import { wikiFromLinks, wikiLogo } from "@/lib/wikipedia";
 import { MbUnavailable } from "@/components/mb-unavailable";
 import { currentUser } from "@/lib/auth";
@@ -54,12 +54,15 @@ function MemberList({
   playedByBand,
   ratings,
   t,
+  guessed,
 }: {
   title: string;
   items: Membership[];
   playedByBand?: Map<string, PlayedOn[]>;
   ratings?: Map<string, { avg: number; count: number }>;
   t: Dict;
+  /** instrumenty dobrane z innych zespołów — pokazujemy je ze znakiem zapytania */
+  guessed?: Map<string, string[]>;
 }) {
   if (!items.length) return null;
   return (
@@ -72,7 +75,15 @@ function MemberList({
             <li key={m.mbid + i} className="text-sm">
               <div className="flex flex-wrap items-baseline gap-x-2">
                 <Link href={`/artist/${m.mbid}`} className="font-medium hover:text-accent2 hover:underline">{m.name}</Link>
-                {m.roles.length > 0 && <span className="text-muted">{m.roles.join(", ")}</span>}
+                {m.roles.length > 0 ? (
+                  <span className="text-muted">{m.roles.join(", ")}</span>
+                ) : (
+                  guessed?.get(m.mbid) && (
+                    <span className="text-faint italic" title={t.artist.roleGuessNote}>
+                      {guessed.get(m.mbid)!.join(", ")}?
+                    </span>
+                  )
+                )}
                 {(m.begin || m.end) && <span className="font-mono text-[10px] text-faint">{m.begin?.slice(0, 4) ?? "?"}–{m.current ? "" : m.end?.slice(0, 4) ?? "?"}</span>}
               </div>
               {albums && albums.length > 0 && (
@@ -218,14 +229,21 @@ async function ArtistDeepContent({ artist: raw, mbid, locale, t, chrono }: { art
     memberOf: mergeDates(raw.memberOf, wdOf),
     members: mergeDates(raw.members, wdIn),
   };
-  const [disco, played] = await Promise.all([
+  const [disco, played, produced] = await Promise.all([
     getDiscography(mbid).catch(() => []),
     artist.isPerson ? getPlayedOn(mbid, artist.memberOf).catch(() => []) : Promise.resolve([]),
+    // Producent nie ma dyskografii jako wykonawca — Scott Burns wyprodukował
+    // pół kanonu death metalu, a jego strona świeciła „brak wydawnictw".
+    artist.isPerson ? getProduced(mbid).catch(() => []) : Promise.resolve([]),
   ]);
   const albums = disco.filter((a) => a.primaryType === "Album" && !a.secondaryTypes.length);
   const eps = disco.filter((a) => a.primaryType === "EP" && !a.secondaryTypes.length);
   const rest = disco.filter((a) => !albums.includes(a) && !eps.includes(a));
-  const ratings = await ratingAverages("ALBUM", [...disco.map((a) => a.mbid), ...played.map((p) => p.album.mbid)]);
+  const ratings = await ratingAverages("ALBUM", [
+    ...disco.map((a) => a.mbid),
+    ...played.map((p) => p.album.mbid),
+    ...produced.map((p) => p.album.mbid),
+  ]);
   const current = artist.members.filter((m) => m.current);
   const former = artist.members.filter((m) => !m.current);
   const playedByBand = artist.isPerson ? groupByBand(played) : undefined;
@@ -251,6 +269,13 @@ async function ArtistDeepContent({ artist: raw, mbid, locale, t, chrono }: { art
    * skład Ozzy'ego po prostu nie istniał.
    */
   const ownBand = artist.isPerson ? artist.members : [];
+  /**
+   * Instrument bywa w MusicBrainz pusty (to atrybut relacji, nie pole osoby).
+   * Dobieramy go wtedy z innych zespołów tego człowieka i podpisujemy „?" —
+   * bębniarz może akurat tutaj grać na harfie.
+   */
+  const bezInstrumentu = artist.members.filter((m) => !m.roles.length).map((m) => m.mbid);
+  const zgadywane = bezInstrumentu.length ? await guessRoles(bezInstrumentu, mbid).catch(() => new Map<string, string[]>()) : new Map<string, string[]>();
 
   return (
     <>
@@ -267,6 +292,7 @@ async function ArtistDeepContent({ artist: raw, mbid, locale, t, chrono }: { art
                 playedByBand={playedByBand}
                 ratings={ratings}
                 t={t}
+                guessed={zgadywane}
               />
               <MemberList
                 title={t.artist.formerly}
@@ -274,6 +300,7 @@ async function ArtistDeepContent({ artist: raw, mbid, locale, t, chrono }: { art
                 playedByBand={playedByBand}
                 ratings={ratings}
                 t={t}
+                guessed={zgadywane}
               />
             </>
           )}
@@ -300,6 +327,26 @@ async function ArtistDeepContent({ artist: raw, mbid, locale, t, chrono }: { art
             <MemberList title={t.artist.currently} items={ownBand.filter((m) => m.current)} ratings={ratings} t={t} />
             <MemberList title={t.artist.formerly} items={ownBand.filter((m) => !m.current)} ratings={ratings} t={t} />
           </div>
+        </section>
+      )}
+
+      {produced.length > 0 && (
+        <section className="mt-8">
+          <h2 className="mb-1 text-2xl">
+            {t.artist.producedHeading} <span className="font-mono text-sm text-muted">{produced.length}</span>
+          </h2>
+          <p className="mb-3 text-xs text-muted">{t.artist.producedNote}</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {produced.slice(0, 60).map((p) => (
+              <AlbumCard
+                key={p.album.mbid}
+                album={p.album}
+                rating={ratings.get(p.album.mbid)}
+                extra={<div className="text-xs text-accent2">{p.roles.join(", ")}</div>}
+              />
+            ))}
+          </div>
+          {produced.length > 60 && <p className="mt-2 text-xs text-faint">{fmt(t.artist.producedMore, { n: produced.length })}</p>}
         </section>
       )}
 
@@ -359,7 +406,7 @@ async function ArtistDeepContent({ artist: raw, mbid, locale, t, chrono }: { art
           </div>
         </details>
       )}
-      {!disco.length && !played.length && <p className="mt-8 text-sm text-muted">{t.artist.noReleases}</p>}
+      {!disco.length && !played.length && !produced.length && <p className="mt-8 text-sm text-muted">{t.artist.noReleases}</p>}
 
       {artist.workedOn.length > 0 && (
         <section className="mt-8">

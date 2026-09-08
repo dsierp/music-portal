@@ -11,13 +11,13 @@ export function SearchBox({
   label: string;
 }) {
   return (
-    <form action="/szukaj" className={big ? "flex gap-2" : "hidden md:block"}>
+    <form action="/szukaj" className={big ? "flex gap-2" : "w-full"}>
       <input
         name="q"
         defaultValue={defaultValue}
         placeholder={placeholder}
         aria-label={label}
-        className={big ? "input text-lg" : "input w-64 py-1 text-sm"}
+        className={big ? "input text-lg" : "input w-full py-1.5 text-sm"}
         autoComplete="off"
       />
       {big && <button className="btn btn-accent">{label}</button>}

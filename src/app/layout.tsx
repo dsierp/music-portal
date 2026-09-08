@@ -31,8 +31,8 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           <NavProgress />
         </Suspense>
         <Nav />
-        <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
-        <footer className="mx-auto max-w-6xl px-4 py-10 text-xs text-faint">{t.nav.footer}</footer>
+        <main className="mx-auto max-w-[min(96rem,95vw)] px-4 py-6">{children}</main>
+        <footer className="mx-auto max-w-[min(96rem,95vw)] px-4 py-10 text-xs text-faint">{t.nav.footer}</footer>
       </body>
     </html>
   );

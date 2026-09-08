@@ -15,7 +15,7 @@ export async function Nav() {
   const { locale, t } = await i18n(profileLocale);
   return (
     <header className="sticky top-0 z-20 border-b border-rule bg-bg/90 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
+      <div className="mx-auto flex max-w-[min(96rem,95vw)] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
         <Link href="/" className="display text-2xl font-bold tracking-wide text-text hover:text-accent2">
           PURE <span className="text-accent">NEW</span> SHIT
         </Link>
@@ -25,8 +25,8 @@ export async function Nav() {
           <Link href="/best-of">{t.nav.bestOf}</Link>
           <Link href="/listy">{t.nav.lists}</Link>
         </nav>
-        <div className="ml-auto flex items-center gap-3">
-          <SearchBox placeholder={t.nav.searchPlaceholder} label={t.nav.search} />
+        <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-3">
+          <div className="hidden min-w-0 max-w-md flex-1 md:block"><SearchBox placeholder={t.nav.searchPlaceholder} label={t.nav.search} /></div>
           <Suspense fallback={null}>
             <LanguagePicker locale={locale} label={t.nav.language} />
           </Suspense>
