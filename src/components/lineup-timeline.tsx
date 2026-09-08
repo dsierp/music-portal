@@ -150,23 +150,33 @@ function Chart({
                     </rect>
                   );
                 })}
-                {/* płyty tego wiersza — romby na pasku (widok muzyka) */}
-                {rowPoints[i].map((p, j) => (
-                  <a key={`rm-${j}`} href={`/album/${p.album.mbid}`} className="album-mark">
-                    <title>{`${p.album.artistText} – ${p.album.title}${p.album.year ? ` (${p.album.year})` : ""}`}</title>
-                    <rect
-                      x={x(p.year) - 3.5}
-                      y={y + ROW_H / 2 - 3.5}
-                      width={7}
-                      height={7}
-                      transform={`rotate(45 ${x(p.year)} ${y + ROW_H / 2})`}
-                      fill="var(--bg)"
-                      stroke="var(--text)"
-                      strokeWidth={1.4}
-                    />
-                    <rect x={x(p.year) - 7} y={y} width={14} height={ROW_H} fill="transparent" />
-                  </a>
-                ))}
+                {/* Płyty tego wiersza — romby na pasku (widok muzyka).
+                    Wypełniony = wyszła, gdy był w składzie; pusty i przygaszony
+                    = dorobek zespołu spoza jego kadencji. */}
+                {rowPoints[i].map((p, j) => {
+                  const inSpan = row.spans.some(
+                    (sp) => p.year >= toYear(sp.begin, -Infinity) && p.year <= (sp.current ? now : toYear(sp.end, now)),
+                  );
+                  return (
+                    <a key={`rm-${j}`} href={`/album/${p.album.mbid}`} className="album-mark">
+                      <title>
+                        {`${p.album.artistText} – ${p.album.title}${p.album.year ? ` (${p.album.year})` : ""}${inSpan ? "" : " — poza jego okresem w składzie"}`}
+                      </title>
+                      <rect
+                        x={x(p.year) - 4}
+                        y={y + ROW_H / 2 - 4}
+                        width={8}
+                        height={8}
+                        transform={`rotate(45 ${x(p.year)} ${y + ROW_H / 2})`}
+                        fill={inSpan ? "var(--text)" : "var(--bg)"}
+                        stroke="var(--text)"
+                        strokeWidth={1.4}
+                        opacity={inSpan ? 1 : 0.45}
+                      />
+                      <rect x={x(p.year) - 7} y={y} width={14} height={ROW_H} fill="transparent" />
+                    </a>
+                  );
+                })}
                 <a href={`/artist/${row.mbid}`}>
                   <title>{row.name}</title>
                   <text x={LABEL_W - 8} y={y + ROW_H / 2 + 4} textAnchor="end" fontSize="12" fill="var(--text2)" fontFamily="var(--font-sans)">
@@ -201,10 +211,16 @@ function Chart({
             </span>
           )}
           {rowPoints.some((p) => p.length > 0) && (
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block h-2 w-2 rotate-45 border border-text" />
-              płyta nagrana w tym składzie — kliknij po stronę płyty
-            </span>
+            <>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2 w-2 rotate-45 bg-text" />
+                płyta z jego okresu — kliknij po stronę płyty
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2 w-2 rotate-45 border border-text opacity-45" />
+                płyta zespołu spoza jego kadencji
+              </span>
+            </>
           )}
         </div>
         <p className="mt-1 text-[10px] text-faint">
@@ -248,7 +264,7 @@ export function CareerTimeline({
 }) {
   const rows = mergeSpans<Membership, Mark>(
     bands.filter((b) => b.begin || b.end),
-    (m) => (albumsByBand.get(m.name) ?? []).map(markOf),
+    (m) => (albumsByBand.get(m.mbid) ?? []).map(markOf),
   );
   if (rows.length < 2) return null;
   return (

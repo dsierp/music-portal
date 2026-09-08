@@ -144,9 +144,18 @@ async function ArtistDeepContent({ artist, mbid }: { artist: Artist; mbid: strin
   const current = artist.members.filter((m) => m.current);
   const former = artist.members.filter((m) => !m.current);
   const playedByBand = artist.isPerson ? groupByBand(played) : undefined;
-  // To samo, ale same płyty — pod oś czasu muzyka (romby na paskach zespołów).
-  const albumsByBand = new Map<string, typeof albums>();
-  for (const [band, items] of playedByBand ?? []) albumsByBand.set(band, items.map((p) => p.album));
+  // Płyty pod oś czasu muzyka. NIE z „Grał(a) na płytach": to relacje przy
+  // nagraniach, a MusicBrainz ma je tylko dla części zespołów (dla Atheist —
+  // wcale). Bierzemy więc dyskografie samych zespołów, dokładnie tak jak
+  // w widoku zespołu, i nanosimy je na pasek danego zespołu.
+  const bandAlbums = new Map<string, typeof albums>();
+  if (artist.isPerson) {
+    const bands = [...new Map(artist.memberOf.map((m) => [m.mbid, m])).values()].slice(0, 10);
+    const discos = await Promise.all(bands.map((b) => getDiscography(b.mbid).catch(() => [])));
+    bands.forEach((b, i) => {
+      bandAlbums.set(b.mbid, discos[i].filter((a) => a.primaryType === "Album" && !a.secondaryTypes.length));
+    });
+  }
   // Nie żywym czasie: skoro artysty już nie ma, nikt nie gra w zespole "obecnie".
   const deceased = artist.isPerson && artist.ended;
 
@@ -259,12 +268,7 @@ async function ArtistDeepContent({ artist, mbid }: { artist: Artist; mbid: strin
       {artist.isPerson ? (
         // Odwrotność osi zespołu: po lewej zespoły, na paskach płyty nagrane
         // w danym okresie. Sidemani też — u nich to często najważniejsze granie.
-        <CareerTimeline
-          name={artist.name}
-          bands={artist.memberOf}
-          albumsByBand={albumsByBand}
-          own={albums}
-        />
+        <CareerTimeline name={artist.name} bands={artist.memberOf} albumsByBand={bandAlbums} own={albums} />
       ) : (
         <LineupTimeline members={artist.members.filter((m) => !m.supporting)} albums={albums} />
       )}
