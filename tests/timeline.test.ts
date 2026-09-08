@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mergeSpans, rowRoles } from "../src/lib/timeline.ts";
+import { fillMissingSpans, mergeSpans, rowRoles } from "../src/lib/timeline.ts";
 
 /** Skrót do wpisu członkostwa — tyle, ile scalanie potrzebuje. */
 function m(mbid: string, name: string, begin: string | null, end: string | null, roles: string[] = []) {
@@ -47,4 +47,34 @@ test("znaczniki płyt liczone raz na wiersz, nie raz na członkostwo", () => {
   const rows = mergeSpans(ATHEIST, (x) => [{ id: `plyta-${x.mbid}` }]);
   const choy = rows.find((r) => r.mbid === "choy")!;
   assert.deepEqual(choy.marks, [{ id: "plyta-choy" }]);
+});
+
+// --- daty odczytane z płyt ---------------------------------------------------
+
+test("zespół bez dat członkostwa dostaje okres z własnych płyt", () => {
+  const rows = mergeSpans(
+    [m("behemoth", "Behemoth", null, null)],
+    () => [{ date: "1995-03-01" }, { date: "2018-10-05" }, { date: "2004-09-06" }],
+  );
+  const [row] = fillMissingSpans(rows);
+  assert.ok(row, "wiersz ma zostać — Inferno gra w Behemocie, choć MB nie ma dat");
+  assert.equal(row.spans.length, 1);
+  assert.equal(row.spans[0].begin, "1995-03-01");
+  assert.equal(row.spans[0].end, "2018-10-05");
+  assert.equal(row.spans[0].inferred, true, "trzeba oznaczyć, że to daty z płyt, nie z członkostwa");
+});
+
+test("bez dat i bez płyt nie ma czego rysować", () => {
+  const rows = mergeSpans([m("x", "Zespół widmo", null, null)]);
+  assert.deepEqual(fillMissingSpans(rows), []);
+});
+
+test("prawdziwe daty członkostwa mają pierwszeństwo przed płytami", () => {
+  const rows = mergeSpans(
+    [m("b", "Band", "1990-01", "1995-01")],
+    () => [{ date: "1980-01-01" }, { date: "2020-01-01" }],
+  );
+  const [row] = fillMissingSpans(rows);
+  assert.equal(row.spans[0].begin, "1990-01");
+  assert.ok(!row.spans[0].inferred);
 });

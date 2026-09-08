@@ -1,5 +1,5 @@
 import type { AlbumSummary, Membership } from "@/lib/musicbrainz";
-import { mergeSpans, rowRoles, type TimelineRow } from "@/lib/timeline";
+import { fillMissingSpans, mergeSpans, rowRoles, type TimelineRow } from "@/lib/timeline";
 import { fmt, plural, type Locale } from "@/lib/i18n";
 import type { Dict } from "@/lib/dict";
 
@@ -155,9 +155,18 @@ function Chart({
                   const x1 = x(toYear(sp.begin, from));
                   const x2 = x(sp.current ? now : toYear(sp.end, now));
                   return (
-                    <rect key={j} x={x1} y={y + 4} width={Math.max(2, x2 - x1)} height={ROW_H - 8} fill={s.color} rx={2}>
+                    <rect
+                      key={j}
+                      x={x1}
+                      y={y + 4}
+                      width={Math.max(2, x2 - x1)}
+                      height={ROW_H - 8}
+                      fill={s.color}
+                      rx={2}
+                      opacity={sp.inferred ? 0.45 : 1}
+                    >
                       <title>
-                        {`${row.name}: ${sp.begin?.slice(0, 4) ?? "?"}–${sp.current ? t.today : sp.end?.slice(0, 4) ?? "?"}${sp.roles.length ? ` (${sp.roles.join(", ")})` : ""}`}
+                        {`${row.name}: ${sp.begin?.slice(0, 4) ?? "?"}–${sp.current ? t.today : sp.end?.slice(0, 4) ?? "?"}${sp.roles.length ? ` (${sp.roles.join(", ")})` : ""}${sp.inferred ? ` — ${t.inferredNote}` : ""}`}
                       </title>
                     </rect>
                   );
@@ -235,6 +244,12 @@ function Chart({
             </>
           )}
         </div>
+        {rows.some((r) => r.spans.some((sp) => sp.inferred)) && (
+          <div className="mt-1 flex items-center gap-1.5 font-mono text-[10px] text-muted">
+            <span className="inline-block h-2.5 w-4 rounded-sm bg-muted opacity-45" />
+            {t.legendInferred}
+          </div>
+        )}
         <p className="mt-1 text-[10px] text-faint">{t.footnote}</p>
       </div>
     </>
@@ -244,7 +259,7 @@ function Chart({
 /** Widok zespołu: po lewej ludzie, pionowe kreski to dyskografia zespołu. */
 export function LineupTimeline({ members, albums, locale, t }: { members: Membership[]; albums: AlbumSummary[]; locale: Locale; t: TimelineLabels }) {
   const rows = mergeSpans<Membership, Mark>(members.filter((m) => m.begin || m.end));
-  if (rows.length < 2) return null; // przy jednym pasku wykres niczego nie pokazuje
+  if (!rows.length) return null;
   return (
     <details className="mt-6">
       <summary className="cursor-pointer text-muted hover:text-accent2">{plural(locale, rows.length, t.lineupSummary)}</summary>
@@ -275,11 +290,13 @@ export function CareerTimeline({
   locale: Locale;
   t: TimelineLabels;
 }) {
-  const rows = mergeSpans<Membership, Mark>(
-    bands.filter((b) => b.begin || b.end),
-    (m) => (albumsByBand.get(m.mbid) ?? []).map(markOf),
+  // Bierzemy WSZYSTKIE zespoły, nie tylko te z datami: przy Inferno z Behemotha
+  // MusicBrainz ma gołą relację bez dat i cała oś znikała. Czego nie da się
+  // umiejscowić nawet po płytach, odpada w fillMissingSpans.
+  const rows = fillMissingSpans(
+    mergeSpans<Membership, Mark>(bands, (m) => (albumsByBand.get(m.mbid) ?? []).map(markOf)),
   );
-  if (rows.length < 2) return null;
+  if (!rows.length) return null;
   return (
     <details className="mt-6" open>
       <summary className="cursor-pointer text-muted hover:text-accent2">

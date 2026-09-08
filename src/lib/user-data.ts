@@ -277,3 +277,11 @@ export async function getUserLocale(userId: string): Promise<string | null> {
 export async function setUserLocale(userId: string, locale: string) {
   await db.update(schema.users).set({ locale }).where(eq(schema.users.id, userId));
 }
+
+// ---------- statystyki ----------
+
+/** Ilu ludzi ma konto w portalu. */
+export async function usersCount(): Promise<number> {
+  const [row] = await db.select({ n: count() }).from(schema.users);
+  return Number(row?.n ?? 0);
+}

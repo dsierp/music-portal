@@ -161,6 +161,14 @@ async function ArtistDeepContent({ artist, mbid, locale, t }: { artist: Artist; 
   }
   // Nie żywym czasie: skoro artysty już nie ma, nikt nie gra w zespole "obecnie".
   const deceased = artist.isPerson && artist.ended;
+  /**
+   * Ludzie, którzy grali U NIEGO — czyli jego zespół, mimo że szyld jest
+   * nazwiskiem. Ozzy Osbourne to persona ORAZ zespół: pod własnym nazwiskiem
+   * wydał kilkanaście płyt z konkretnymi składami (Randy Rhoads, Zakk Wylde,
+   * Bordin na bębnach). Dotąd te relacje leżały na stronie osoby nieużyte i
+   * skład Ozzy'ego po prostu nie istniał.
+   */
+  const ownBand = artist.isPerson ? artist.members : [];
 
   return (
     <>
@@ -197,6 +205,19 @@ async function ArtistDeepContent({ artist, mbid, locale, t }: { artist: Artist; 
             ratings={ratings}
             t={t}
           />
+        </section>
+      )}
+
+      {/* Skład solisty. Osobna sekcja, nie dopisek do „Zespoły": to nie są
+          miejsca, w których grał on, tylko ludzie, którzy grali u niego. */}
+      {artist.isPerson && ownBand.length > 0 && (
+        <section className="mt-8">
+          <h2 className="mb-1 text-2xl">{t.artist.ownBandHeading}</h2>
+          <p className="mb-3 text-xs text-muted">{t.artist.ownBandNote}</p>
+          <div className="space-y-4">
+            <MemberList title={t.artist.currently} items={ownBand.filter((m) => m.current)} ratings={ratings} t={t} />
+            <MemberList title={t.artist.formerly} items={ownBand.filter((m) => !m.current)} ratings={ratings} t={t} />
+          </div>
         </section>
       )}
 
@@ -270,9 +291,18 @@ async function ArtistDeepContent({ artist, mbid, locale, t }: { artist: Artist; 
       )}
 
       {artist.isPerson ? (
-        // Odwrotność osi zespołu: po lewej zespoły, na paskach płyty nagrane
-        // w danym okresie. Sidemani też — u nich to często najważniejsze granie.
-        <CareerTimeline name={artist.name} bands={artist.memberOf} albumsByBand={bandAlbums} own={albums} locale={locale} t={t.artist.timeline} />
+        <>
+          {/* Odwrotność osi zespołu: po lewej zespoły, na paskach płyty nagrane
+              w danym okresie. Sidemani też — u nich to często najważniejsze granie. */}
+          <CareerTimeline name={artist.name} bands={artist.memberOf} albumsByBand={bandAlbums} own={albums} locale={locale} t={t.artist.timeline} />
+          {/* Solista to też zespół: Ozzy Osbourne wydaje pod własnym nazwiskiem,
+              ale te płyty ktoś z nim nagrał i te składy się zmieniały. Skoro
+              MusicBrainz wie kto i kiedy, rysujemy mu zwykłą oś składu — obok
+              osi „gdzie grał", bo to dwie różne historie tej samej osoby. */}
+          {ownBand.length > 0 && (
+            <LineupTimeline members={ownBand} albums={albums} locale={locale} t={t.artist.timeline} />
+          )}
+        </>
       ) : (
         <LineupTimeline members={artist.members.filter((m) => !m.supporting)} albums={albums} locale={locale} t={t.artist.timeline} />
       )}

@@ -2,6 +2,9 @@
 import type { Locale } from "@/lib/i18n";
 
 const pl = {
+  statsTitle: "Statystyki portalu",
+  statsExplain: "Widzisz to, bo Twoje konto jest na liście administratorów portalu.",
+  statsUsers: { one: "{n} zarejestrowana osoba", few: "{n} zarejestrowane osoby", many: "{n} zarejestrowanych osób" } as { one: string; few?: string; many: string },
   welcomeEyebrow: "Witaj w portalu",
   welcomeTitle: "Zacznijmy od tego, czego słuchasz",
   welcomeBody: "Wybierz poniżej kategorie, które lubisz — klikasz w kafelek, żeby dodać. Od nich zależy, czym portal Cię wita, w jakiej kolejności układa premiery i o czyich zmianach w składach Ci mówi. Zawsze możesz to zmienić na tej stronie.",
@@ -57,6 +60,9 @@ const pl = {
 type T = typeof pl;
 
 const en: T = {
+  statsTitle: "Portal statistics",
+  statsExplain: "You see this because your account is on the portal's admin list.",
+  statsUsers: { one: "{n} registered person", many: "{n} registered people" },
   welcomeEyebrow: "Welcome to the portal",
   welcomeTitle: "Let's start with what you listen to",
   welcomeBody: "Pick the categories you're into below — click a tile to add it. They decide how the portal greets you, in what order it orders new releases, and whose line-up changes it tells you about. You can always change this here.",
@@ -111,6 +117,9 @@ const en: T = {
 };
 
 const es: T = {
+  statsTitle: "Estadísticas del portal",
+  statsExplain: "Ves esto porque tu cuenta está en la lista de administradores del portal.",
+  statsUsers: { one: "{n} persona registrada", many: "{n} personas registradas" },
   welcomeEyebrow: "Bienvenido al portal",
   welcomeTitle: "Empecemos por lo que escuchas",
   welcomeBody: "Elige abajo las categorías que te gustan — haz clic en una para añadirla. De ellas depende cómo te recibe el portal, en qué orden ordena las novedades y de qué cambios de formación te habla. Siempre puedes cambiarlo en esta página.",
@@ -165,6 +174,9 @@ const es: T = {
 };
 
 const de: T = {
+  statsTitle: "Portal-Statistik",
+  statsExplain: "Du siehst das, weil dein Konto auf der Admin-Liste des Portals steht.",
+  statsUsers: { one: "{n} registrierte Person", many: "{n} registrierte Personen" },
   welcomeEyebrow: "Willkommen im Portal",
   welcomeTitle: "Fangen wir damit an, was du hörst",
   welcomeBody: "Wähle unten die Kategorien, die dir gefallen — klick auf eine Kachel, um sie hinzuzufügen. Danach richtet sich, wie das Portal dich begrüßt, in welcher Reihenfolge es Neuerscheinungen anordnet und über wessen Besetzungswechsel es dich informiert. Du kannst das hier jederzeit ändern.",

@@ -14,6 +14,14 @@ export interface TimelineSpan {
   end: string | null;
   current: boolean;
   roles: string[];
+  /**
+   * true = okres odczytany z płyt, nie z dat członkostwa. MusicBrainz nagminnie
+   * nie ma dat przy członkostwie (Inferno siedzi w Behemocie od 1997, a relacja
+   * jest goła) — wtedy zamiast chować wiersz albo rysować pasek przez całą
+   * szerokość, bierzemy pierwszą i ostatnią płytę tego zespołu i mówimy wprost,
+   * skąd te daty.
+   */
+  inferred?: boolean;
 }
 export interface TimelineRow<M> {
   mbid: string;
@@ -59,4 +67,32 @@ export function rowRoles(row: { spans: TimelineSpan[] }): string[] {
   const out: string[] = [];
   for (const s of row.spans) for (const r of s.roles) if (!out.includes(r)) out.push(r);
   return out;
+}
+
+/**
+ * Uzupełnia wiersze bez dat okresem odczytanym ze znaczników (płyt zespołu).
+ *
+ * Bez tego strona muzyka bywała pusta: MusicBrainz często nie ma dat przy
+ * członkostwie, a wiersz bez dat albo znikał, albo rysował się przez całą oś —
+ * obie odpowiedzi są nieprawdziwe. Wiersze, których nie da się umiejscowić
+ * (brak dat i brak płyt), odpadają: nie ma czego rysować.
+ */
+export function fillMissingSpans<M extends { date: string | null }>(rows: TimelineRow<M>[]): TimelineRow<M>[] {
+  const out: TimelineRow<M>[] = [];
+  for (const row of rows) {
+    const dated = row.spans.some((s) => s.begin || s.end);
+    if (dated) {
+      out.push(row);
+      continue;
+    }
+    const years = row.marks.map((m) => m.date).filter((d): d is string => !!d).sort();
+    if (!years.length) continue;
+    const roles = [...new Set(row.spans.flatMap((s) => s.roles))];
+    out.push({ ...row, spans: [{ begin: years[0], end: years[years.length - 1], current: false, roles, inferred: true }] });
+  }
+  return out.sort((a, b) => {
+    const ab = a.spans[0]?.begin ?? "9999";
+    const bb = b.spans[0]?.begin ?? "9999";
+    return ab.localeCompare(bb) || a.name.localeCompare(b.name, "pl");
+  });
 }

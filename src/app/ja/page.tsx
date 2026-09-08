@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { currentUser } from "@/lib/auth";
-import { getAreas, getFavoriteArtists, getGenres, getLikedAlbums, getUserLocale, myRatings } from "@/lib/user-data";
+import { getAreas, getFavoriteArtists, getGenres, getLikedAlbums, getUserLocale, myRatings, usersCount } from "@/lib/user-data";
+import { isAdmin } from "@/lib/admin";
 import { addAreaAction, removeAreaAction, setGenreAction, skipOnboarding, toggleFavorite, toggleLike } from "@/app/actions";
 import { MAIN_CATEGORIES } from "@/lib/genres";
 import { orderByPopularity } from "@/lib/popularity";
@@ -10,7 +11,7 @@ import { genreImage } from "@/lib/genre-art";
 import { Cover } from "@/components/cover";
 import { LanguagePicker } from "@/components/language-picker";
 import { i18n } from "@/lib/t";
-import { fmt } from "@/lib/i18n";
+import { fmt, plural } from "@/lib/i18n";
 import { genreLabel } from "@/lib/dict";
 
 /** Tytuł w zakładce też idzie w języku czytelnika. */
@@ -39,6 +40,10 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
     getGenres(user.id), getLikedAlbums(user.id), getFavoriteArtists(user.id), myRatings(user.id, "ALBUM"), myRatings(user.id, "ARTIST"), getAreas(user.id),
   ]);
   const weightOf = new Map(genres.map((g) => [g.genre, g.weight]));
+  // Statystyki tylko dla administratora — jedna liczba, więc pytamy o nią
+  // dopiero wtedy, gdy jest komu ją pokazać.
+  const admin = isAdmin(user.email);
+  const ludzi = admin ? await usersCount().catch(() => null) : null;
   // Kafelki: najpierw to, co już masz (od największej wagi), potem reszta
   // według popularności wśród użytkowników portalu.
   const bySlug = new Map(MAIN_CATEGORIES.map((c) => [c.slug, c]));
@@ -64,6 +69,14 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         <h1 className="text-4xl">{user.name || user.email}</h1>
         <p className="text-sm text-muted">{user.email}</p>
       </header>
+
+      {admin && ludzi !== null && (
+        <section id="statystyki" className="card">
+          <h2 className="text-2xl">{t.profile.statsTitle}</h2>
+          <p className="mt-2 font-mono text-3xl text-accent2">{plural(locale, ludzi, t.profile.statsUsers)}</p>
+          <p className="mt-1 text-xs text-faint">{t.profile.statsExplain}</p>
+        </section>
+      )}
 
       <section id="jezyk">
         <h2 className="text-2xl">{t.profile.languageTitle}</h2>

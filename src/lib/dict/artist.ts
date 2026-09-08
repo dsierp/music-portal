@@ -22,6 +22,8 @@ const pl = {
   formerly: "Dawniej",
   guestOf: "Grał u (koncertowo / sesyjnie)",
   supportMusicians: "Muzycy towarzyszący",
+  ownBandHeading: "Jego skład — kto z nim grał",
+  ownBandNote: "Artysta solowy to też zespół: pod własnym nazwiskiem nagrywa z konkretnymi ludźmi. Poniżej ci, których MusicBrainz przypisał do jego płyt i tras.",
   albumsWithMember: "płyty z {name} ({n})",
 
   playedOnHeading: "Grał(a) na płytach",
@@ -47,6 +49,8 @@ const pl = {
 
   timeline: {
     roleVocal: "wokal",
+    inferredNote: "daty z płyt — MusicBrainz nie ma dat członkostwa",
+    legendInferred: "okres odczytany z płyt, nie z dat członkostwa",
     roleGuitar: "gitara",
     roleBass: "bas",
     roleDrums: "perkusja",
@@ -81,6 +85,8 @@ const en: T = {
   formerly: "Formerly",
   guestOf: "Played with (live / session)",
   supportMusicians: "Touring musicians",
+  ownBandHeading: "Their band — who played with them",
+  ownBandNote: "A solo artist is a band too: records under their own name are made with particular people. Below are the ones MusicBrainz ties to their albums and tours.",
   albumsWithMember: "albums with {name} ({n})",
 
   playedOnHeading: "Played on",
@@ -106,6 +112,8 @@ const en: T = {
 
   timeline: {
     roleVocal: "vocals",
+    inferredNote: "dates taken from the albums — MusicBrainz has no membership dates",
+    legendInferred: "period read from the albums, not from membership dates",
     roleGuitar: "guitar",
     roleBass: "bass",
     roleDrums: "drums",
@@ -139,6 +147,8 @@ const es: T = {
   formerly: "Anteriormente",
   guestOf: "Tocó con (en directo / de sesión)",
   supportMusicians: "Músicos de gira",
+  ownBandHeading: "Su banda — quién tocó con él",
+  ownBandNote: "Un artista en solitario también es una banda: los discos a su nombre se graban con gente concreta. Abajo, quienes MusicBrainz asocia a sus discos y giras.",
   albumsWithMember: "discos con {name} ({n})",
 
   playedOnHeading: "Discos en los que tocó",
@@ -164,6 +174,8 @@ const es: T = {
 
   timeline: {
     roleVocal: "voz",
+    inferredNote: "fechas tomadas de los discos — MusicBrainz no tiene fechas de pertenencia",
+    legendInferred: "periodo deducido de los discos, no de las fechas de pertenencia",
     roleGuitar: "guitarra",
     roleBass: "bajo",
     roleDrums: "batería",
@@ -197,6 +209,8 @@ const de: T = {
   formerly: "Früher",
   guestOf: "Spielte bei (live / als Session-Musiker)",
   supportMusicians: "Begleitmusiker",
+  ownBandHeading: "Seine Band — wer mit ihm spielte",
+  ownBandNote: "Ein Soloartist ist auch eine Band: Platten unter eigenem Namen entstehen mit konkreten Leuten. Unten die, die MusicBrainz seinen Alben und Touren zuordnet.",
   albumsWithMember: "Alben mit {name} ({n})",
 
   playedOnHeading: "Mitgewirkt auf",
@@ -222,6 +236,8 @@ const de: T = {
 
   timeline: {
     roleVocal: "Gesang",
+    inferredNote: "Daten aus den Alben — MusicBrainz hat keine Mitgliedsdaten",
+    legendInferred: "Zeitraum aus den Alben abgelesen, nicht aus Mitgliedsdaten",
     roleGuitar: "Gitarre",
     roleBass: "Bass",
     roleDrums: "Schlagzeug",
