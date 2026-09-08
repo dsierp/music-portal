@@ -247,6 +247,13 @@ export interface Membership {
   begin: string | null;
   end: string | null;
   current: boolean;
+  /**
+   * true = współpraca, nie członkostwo („instrumental/vocal supporting
+   * musician"). Tak MusicBrainz opisuje granie u kogoś na etacie sidemana:
+   * Mike Bordin bębnił u Ozzy'ego Osbourne'a 1996–2010, ale członkiem żadnego
+   * „zespołu Ozzy'ego" nie był. Bez tego pola takie granie w ogóle nam znikało.
+   */
+  supporting?: boolean;
 }
 export interface Artist {
   mbid: string;
@@ -551,9 +558,22 @@ export async function getAlbum(mbid: string): Promise<Album> {
 
 // ---------- artysta ----------
 
+/**
+ * Typy relacji artysta–artysta, które traktujemy jak „grał z".
+ *
+ * Samo „member of band" gubi sidemanów, a to bywa najważniejsze granie
+ * w życiorysie — Mike Bordin bębnił u Ozzy'ego Osbourne'a w latach 1996–2010
+ * i w MusicBrainz jest to „instrumental supporting musician", nie członkostwo.
+ */
+const MEMBER_RELS = new Set(["member of band", "instrumental supporting musician", "vocal supporting musician"]);
+export function isMembershipRelation(type: string): boolean {
+  return MEMBER_RELS.has(type);
+}
+
 function normMembership(r: MbArtistRel): Membership | null {
   if (!r.artist) return null;
   return {
+    supporting: r.type !== "member of band",
     mbid: r.artist.id,
     name: r.artist.name,
     type: r.artist.type ?? null,
@@ -571,11 +591,11 @@ export async function getArtist(mbid: string): Promise<Artist> {
   const members: Membership[] = [];
   const memberOf: Membership[] = [];
   for (const r of a.relations ?? []) {
-    if (r["target-type"] !== "artist" || r.type !== "member of band") continue;
+    if (r["target-type"] !== "artist" || !MEMBER_RELS.has(r.type)) continue;
     const m = normMembership(r);
     if (!m) continue;
-    // Dla zespołu: relacja "member of band" wskazuje na członka (direction backward).
-    // Dla osoby: relacja wskazuje na zespół (direction forward).
+    // Dla zespołu: relacja wskazuje na członka (direction backward).
+    // Dla osoby: relacja wskazuje na zespół albo artystę, u którego grała (forward).
     if (r.direction === "backward") members.push(m);
     else memberOf.push(m);
   }

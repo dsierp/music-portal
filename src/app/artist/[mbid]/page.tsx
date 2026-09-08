@@ -153,23 +153,32 @@ async function ArtistDeepContent({ artist, mbid }: { artist: Artist; mbid: strin
         <section className="mt-8 space-y-4">
           <h2 className="text-2xl">{artist.isPerson ? "Zespoły" : "Skład"}</h2>
           {artist.isPerson && deceased ? (
-            <MemberList title="Grał w zespołach" items={artist.memberOf} playedByBand={playedByBand} ratings={ratings} />
+            <MemberList title="Grał w zespołach" items={artist.memberOf.filter((m) => !m.supporting)} playedByBand={playedByBand} ratings={ratings} />
           ) : (
             <>
               <MemberList
                 title="Obecnie"
-                items={artist.isPerson ? artist.memberOf.filter((m) => m.current) : current}
+                items={(artist.isPerson ? artist.memberOf.filter((m) => m.current) : current).filter((m) => !m.supporting)}
                 playedByBand={playedByBand}
                 ratings={ratings}
               />
               <MemberList
                 title="Dawniej"
-                items={artist.isPerson ? artist.memberOf.filter((m) => !m.current) : former}
+                items={(artist.isPerson ? artist.memberOf.filter((m) => !m.current) : former).filter((m) => !m.supporting)}
                 playedByBand={playedByBand}
                 ratings={ratings}
               />
             </>
           )}
+          {/* Sideman to nie członek zespołu, ale to często najważniejsze granie
+              w życiorysie (Bordin u Ozzy'ego 1996–2010). MusicBrainz opisuje to
+              osobną relacją, więc i my dajemy osobną listę zamiast mieszać. */}
+          <MemberList
+            title={artist.isPerson ? "Grał u (koncertowo / sesyjnie)" : "Muzycy towarzyszący"}
+            items={(artist.isPerson ? artist.memberOf : artist.members).filter((m) => m.supporting)}
+            playedByBand={playedByBand}
+            ratings={ratings}
+          />
         </section>
       )}
 
@@ -244,7 +253,7 @@ async function ArtistDeepContent({ artist, mbid }: { artist: Artist; mbid: strin
         </section>
       )}
 
-      {!artist.isPerson && <LineupTimeline members={artist.members} albums={albums} />}
+      {!artist.isPerson && <LineupTimeline members={artist.members.filter((m) => !m.supporting)} albums={albums} />}
 
       <Suspense fallback={<p className="mt-10 font-mono text-xs text-muted">Szukam powiązanych zespołów…</p>}>
         <RelatedSection artist={artist} />

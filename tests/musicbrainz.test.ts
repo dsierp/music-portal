@@ -4,7 +4,7 @@ process.env.MB_FIXTURES = "tests/fixtures/mb";
 // `||=`, nie `??=`: pusta zmienna z .env przeszłaby dalej i testy poszłyby na
 // prawdziwą bazę PGlite (czyli wolno, a przy zajętym katalogu — wcale).
 process.env.DATABASE_URL ||= "postgresql://invalid";
-import { getAlbum, getArtist, getDiscography, getPlayedOn, findAlbumMbid, searchAlbums, buildLinks, normalizeUserAgent, artistQuery } from "../src/lib/musicbrainz";
+import { getAlbum, getArtist, getDiscography, getPlayedOn, findAlbumMbid, searchAlbums, buildLinks, normalizeUserAgent, artistQuery, isMembershipRelation } from "../src/lib/musicbrainz";
 import { ID } from "./make-fixtures";
 
 test("album: skład z relacji nagrań, najwcześniejsze wydanie, linki", async () => {
@@ -103,4 +103,14 @@ test("szukanie artystów: zakres zawęża zapytanie do typu", () => {
   assert.equal(artistQuery("cynic", "group"), "cynic AND type:group");
   assert.equal(artistQuery("scott burns", "person"), "scott burns AND type:person");
   assert.equal(artistQuery("   ", "person"), "", "puste zapytanie nie idzie do MB");
+});
+
+test("relacje 'grał z': sideman liczy się tak samo jak członek zespołu", () => {
+  // Bez tych dwóch typów znikało granie Bordina u Ozzy'ego (1996–2010) i u Korn.
+  assert.equal(isMembershipRelation("member of band"), true);
+  assert.equal(isMembershipRelation("instrumental supporting musician"), true);
+  assert.equal(isMembershipRelation("vocal supporting musician"), true);
+  // …ale nie wszystko: produkcja to osobna sekcja strony.
+  assert.equal(isMembershipRelation("producer"), false);
+  assert.equal(isMembershipRelation("teacher"), false);
 });
