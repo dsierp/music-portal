@@ -111,3 +111,14 @@ export async function addLikedFromSearch(formData: FormData) {
   revalidatePath("/ja");
   redirect("/ja#plyty");
 }
+
+/**
+ * „Wybiorę później" na ekranie powitalnym: zapamiętujemy decyzję w ciasteczku
+ * (rok), żeby portal nie wracał z tym pytaniem przy każdym wejściu.
+ */
+export async function skipOnboarding() {
+  const { cookies } = await import("next/headers");
+  const { SKIP_ONBOARDING } = await import("@/lib/onboarding");
+  (await cookies()).set(SKIP_ONBOARDING, "1", { maxAge: 60 * 60 * 24 * 365, httpOnly: true, sameSite: "lax", path: "/" });
+  redirect("/");
+}

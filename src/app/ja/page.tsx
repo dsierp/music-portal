@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { currentUser } from "@/lib/auth";
 import { getFavoriteArtists, getGenres, getLikedAlbums, myRatings } from "@/lib/user-data";
-import { setGenreAction, toggleFavorite, toggleLike } from "@/app/actions";
+import { setGenreAction, skipOnboarding, toggleFavorite, toggleLike } from "@/app/actions";
 import { MAIN_CATEGORIES, WEIGHT_LABELS } from "@/lib/genres";
 import { genreImage } from "@/lib/genre-art";
 import { Cover } from "@/components/cover";
@@ -11,7 +11,8 @@ import { Cover } from "@/components/cover";
 export const metadata: Metadata = { title: "Mój profil" };
 export const dynamic = "force-dynamic";
 
-export default async function MePage() {
+export default async function MePage({ searchParams }: { searchParams: Promise<{ witaj?: string }> }) {
+  const witaj = (await searchParams).witaj === "1";
   const user = await currentUser();
   if (!user) redirect("/login?callbackUrl=/ja");
   const [genres, liked, favs, albumRatings, artistRatings] = await Promise.all([
@@ -22,6 +23,20 @@ export default async function MePage() {
 
   return (
     <div className="space-y-10">
+      {witaj && (
+        <section className="card border-accent/60">
+          <div className="label mb-1">Witaj w portalu</div>
+          <h2 className="text-2xl">Zacznijmy od tego, czego słuchasz</h2>
+          <p className="mt-2 max-w-2xl text-sm text-text2">
+            Wybierz poniżej kategorie, które lubisz — klikasz w kafelek, żeby dodać. Od nich zależy,
+            czym portal Cię wita, w jakiej kolejności układa premiery i o czyich zmianach w składach
+            Ci mówi. Zawsze możesz to zmienić na tej stronie.
+          </p>
+          <form action={skipOnboarding} className="mt-3">
+            <button className="text-xs text-muted underline hover:text-accent2">wybiorę później</button>
+          </form>
+        </section>
+      )}
       <header>
         <div className="label">Profil</div>
         <h1 className="text-4xl">{user.name || user.email}</h1>

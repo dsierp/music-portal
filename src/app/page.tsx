@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import { latestSections, releasesFor, bestOfYears, bestOf, BEST_CATS } from "@/lib/lists";
 import { ReleaseRow } from "@/components/release-list";
@@ -8,6 +10,7 @@ import { Suspense } from "react";
 import { lineupNews } from "@/lib/lineup-news";
 import { getFavoriteArtists, getGenres, getLikedAlbums, recentComments } from "@/lib/user-data";
 import { genreToSection } from "@/lib/genres";
+import { SKIP_ONBOARDING } from "@/lib/onboarding";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +48,14 @@ async function LineupNews({ bands, favorites }: { bands: { mbid: string; name: s
 
 export default async function Home() {
   const user = await currentUser();
+  // Pierwsze wejście po zalogowaniu: nikt nie ma jeszcze stylów, a bez nich
+  // portal nie wie, co komu pokazywać — więc zamiast wpuszczać na stronę
+  // główną z domyślną oprawą, prowadzimy prosto do wyboru gatunków.
+  // „Później" ustawia ciasteczko i drugi raz już nie zaczepiamy.
+  if (user && !(await cookies()).get(SKIP_ONBOARDING)?.value) {
+    const genres = await getGenres(user.id).catch(() => [] as { genre: string; weight: number }[]);
+    if (!genres.length) redirect("/ja?witaj=1");
+  }
   const sections = await latestSections(2);
   const rel = await releasesFor(sections.map((s) => s.id));
   const years = await bestOfYears();

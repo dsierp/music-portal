@@ -1,7 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 process.env.MB_FIXTURES = "tests/fixtures/mb";
-process.env.DATABASE_URL ??= "postgresql://invalid";
+// `||=`, nie `??=`: pusta zmienna z .env przeszłaby dalej i testy poszłyby na
+// prawdziwą bazę PGlite (czyli wolno, a przy zajętym katalogu — wcale).
+process.env.DATABASE_URL ||= "postgresql://invalid";
 import { getAlbum, getArtist, getDiscography, getPlayedOn, findAlbumMbid, searchAlbums, buildLinks, normalizeUserAgent } from "../src/lib/musicbrainz";
 import { ID } from "./make-fixtures";
 

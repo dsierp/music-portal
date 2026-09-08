@@ -394,6 +394,24 @@ export async function searchAlbums(query: string, limit = 20): Promise<AlbumSumm
 }
 
 /**
+ * Szukanie z zawężeniem: osobno artysta, osobno tytuł płyty.
+ *
+ * Po co, skoro jest jedno pole: „Sigh" w jednym polu zwraca wszystko, w czym
+ * to słowo się pojawia — tytuły, wytwórnie, przypadkowe zbitki. Rozbicie na
+ * `artist:` i `releasegroup:` pyta MusicBrainz dokładnie o to, o co chodzi,
+ * i wystarczy wypełnić jedno z pól.
+ */
+export async function searchAlbumsBy(opts: { artist?: string; title?: string }, limit = 20): Promise<AlbumSummary[]> {
+  const a = lucene(opts.artist ?? "");
+  const t = lucene(opts.title ?? "");
+  const parts: string[] = [];
+  if (t) parts.push(`releasegroup:"${t}"`);
+  if (a) parts.push(`artist:"${a}"`);
+  if (!parts.length) return [];
+  return mbSearchReleaseGroups(parts.join(" AND "), limit);
+}
+
+/**
  * Surowe wyszukiwanie release-group składnią Lucene MB (bez czyszczenia zapytania —
  * używamy go tam, gdzie sami budujemy query z operatorami, np. premiery tygodnia).
  */

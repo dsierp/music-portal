@@ -11,7 +11,7 @@
  * drodze.
  */
 import { db, schema } from "@/db";
-import { ilike, or, sql } from "drizzle-orm";
+import { and, ilike, or, sql } from "drizzle-orm";
 
 export interface LocalHit {
   href: string;
@@ -19,6 +19,60 @@ export interface LocalHit {
   album: string;
   sub: string;
   mbid: string | null;
+}
+
+const like = (s: string) => `%${s.trim().replace(/[%_]/g, (m) => `\\${m}`)}%`;
+
+/**
+ * Zawężone szukanie w bazie portalu: osobno artysta, osobno tytuł.
+ * Wypełnione pola łączy „i" — puste są pomijane.
+ */
+export async function localAlbumsBy(opts: { artist?: string; title?: string }, limit = 12): Promise<LocalHit[]> {
+  const a = (opts.artist ?? "").trim();
+  const t = (opts.title ?? "").trim();
+  if (a.length < 2 && t.length < 2) return [];
+
+  const relWhere = and(
+    a.length >= 2 ? ilike(schema.releases.artist, like(a)) : undefined,
+    t.length >= 2 ? ilike(schema.releases.album, like(t)) : undefined,
+  );
+  const bestWhere = and(
+    a.length >= 2 ? ilike(schema.bestOfEntries.artist, like(a)) : undefined,
+    t.length >= 2 ? ilike(schema.bestOfEntries.album, like(t)) : undefined,
+  );
+
+  const [rel, best] = await Promise.all([
+    db
+      .select({ id: schema.releases.id, artist: schema.releases.artist, album: schema.releases.album, label: schema.releases.label, mbid: schema.releases.mbid })
+      .from(schema.releases)
+      .where(relWhere)
+      .limit(limit),
+    db
+      .select({ id: schema.bestOfEntries.id, artist: schema.bestOfEntries.artist, album: schema.bestOfEntries.album, year: schema.bestOfEntries.year, genre: schema.bestOfEntries.genre, mbid: schema.bestOfEntries.mbid })
+      .from(schema.bestOfEntries)
+      .where(bestWhere)
+      .limit(limit),
+  ]);
+  return dedupe(
+    [
+      ...rel.map((r) => ({ href: `/go/release/${r.id}`, artist: r.artist ?? "", album: r.album ?? "", sub: ["premiery", r.label].filter(Boolean).join(" · "), mbid: r.mbid })),
+      ...best.map((b) => ({ href: `/go/best/${b.id}`, artist: b.artist, album: b.album, sub: [`best of ${b.year}`, b.genre].filter(Boolean).join(" · "), mbid: b.mbid })),
+    ],
+    limit,
+  );
+}
+
+/** Ta sama płyta bywa i w premierach, i w best of — pokazujemy raz. */
+function dedupe(hits: LocalHit[], limit: number): LocalHit[] {
+  const seen = new Set<string>();
+  return hits
+    .filter((h) => {
+      const key = `${h.artist.toLowerCase()}|${h.album.toLowerCase()}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, limit);
 }
 
 /** Dopasowanie „zawiera" — bez rozróżniania wielkości liter i polskich ogonków. */
@@ -70,14 +124,5 @@ export async function localAlbums(q: string, limit = 12): Promise<LocalHit[]> {
     })),
   ];
 
-  // Ta sama płyta bywa i w premierach, i w best of — pokazujemy raz.
-  const seen = new Set<string>();
-  return hits
-    .filter((h) => {
-      const key = `${h.artist.toLowerCase()}|${h.album.toLowerCase()}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .slice(0, limit);
+  return dedupe(hits, limit);
 }

@@ -19,7 +19,7 @@
     "resolve:mbids": "tsx scripts/resolve-mbids.ts",
     "neon:setup": "tsx scripts/neon-setup.ts",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "DATABASE_URL=${DATABASE_URL:-postgresql://testy-nie-dotykaja-bazy} tsx --test tests/*.test.ts",
     "setup": "npm run db:migrate && npm run import:pns -- data/purenewshit.html"
   },
   "dependencies": {
