@@ -15,6 +15,7 @@ import { Comments } from "@/components/comments";
 import { AlbumCard } from "@/components/cards";
 import { YoutubeVideos } from "@/components/youtube";
 import { relatedBands } from "@/lib/related";
+import { INSTRUMENT_GROUPS, groupsOf, playsInstrument, type InstrumentKey } from "@/lib/instruments";
 import { concertsForArtist } from "@/lib/concerts";
 import { mergeDates, wdGenres, wdMembers, wdMemberships } from "@/lib/wikidata";
 import { CareerTimeline, LineupTimeline } from "@/components/lineup-timeline";
@@ -125,6 +126,53 @@ function MemberList({
  * Powiązane zespoły — w osobnym strumieniu, bo to kilkanaście zapytań do
  * MusicBrainz (limit 1/s). Reszta strony nie ma na nie czekać.
  */
+
+/**
+ * Filtr instrumentów nad składem.
+ *
+ * Przy Ozzym „Jego skład" to trzydzieści pozycji i trzy strony przewijania —
+ * a zwykle szuka się jednego: kto grał na gitarze. Chipsy liczymy z tego, co
+ * faktycznie jest w składzie, więc przy duecie nie zaśmiecą ekranu.
+ */
+function InstrumentFilter({
+  members,
+  wybrany,
+  mbid,
+  t,
+}: {
+  members: Membership[];
+  wybrany: string;
+  mbid: string;
+  t: Dict;
+}) {
+  const licznik = new Map<string, number>();
+  for (const m of members) for (const g of groupsOf(m.roles)) licznik.set(g, (licznik.get(g) ?? 0) + 1);
+  if (licznik.size < 2) return null;
+  const nazwa: Record<string, string> = {
+    vocals: t.artist.timeline.roleVocal,
+    guitar: t.artist.timeline.roleGuitar,
+    bass: t.artist.timeline.roleBass,
+    drums: t.artist.timeline.roleDrums,
+    keys: t.artist.timeline.roleKeys,
+    other: t.artist.timeline.roleOther,
+  };
+  const kolejnosc: InstrumentKey[] = [...INSTRUMENT_GROUPS.map((g) => g.key), "other"];
+  return (
+    <div className="mb-2 flex flex-wrap gap-1.5">
+      <Link href={`/artist/${mbid}`} className={`chip text-[11px] ${wybrany ? "" : "chip-on"}`}>
+        {t.common.all} <span className="ml-1 font-mono text-[10px] text-muted">{members.length}</span>
+      </Link>
+      {kolejnosc
+        .filter((k) => licznik.has(k))
+        .map((k) => (
+          <Link key={k} href={`/artist/${mbid}?i=${k}`} className={`chip text-[11px] ${wybrany === k ? "chip-on" : ""}`}>
+            {nazwa[k]} <span className="ml-1 font-mono text-[10px] text-muted">{licznik.get(k)}</span>
+          </Link>
+        ))}
+    </div>
+  );
+}
+
 /**
  * Osłona sekcji: awaria jednego kawałka strony ma zostać w tym kawałku.
  *
@@ -288,7 +336,7 @@ async function ConcertsSectionWewn({ mbid, name, locale, t }: { mbid: string; na
   );
 }
 
-async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, odNajnowszych }: { artist: Artist; mbid: string; locale: Locale; t: Dict; odNajnowszych: boolean }) {
+async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, odNajnowszych, instrument }: { artist: Artist; mbid: string; locale: Locale; t: Dict; odNajnowszych: boolean; instrument: string }) {
   // MusicBrainz nagminnie gubi daty przy członkostwie (Inferno w Behemocie od
   // 1997 — relacja jest, dat nie ma). Wikidane trzymają to samo strukturalnie,
   // więc zanim cokolwiek narysujemy, łatamy dziury stamtąd. Pytamy tylko wtedy,
@@ -319,8 +367,10 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, odNajnowszy
     ...produced.map((p) => p.album.mbid),
   ]), new Map<string, { avg: number; count: number }>());
   const ratings = ratingsS.value;
-  const current = artist.members.filter((m) => m.current);
-  const former = artist.members.filter((m) => !m.current);
+  // Filtr instrumentu dotyczy SKŁADU (kto z kim grał), nie listy zespołów.
+  const graNa = (m: Membership) => playsInstrument(m.roles, instrument);
+  const current = artist.members.filter((m) => m.current && graNa(m));
+  const former = artist.members.filter((m) => !m.current && graNa(m));
   const playedByBand = artist.isPerson ? groupByBand(played) : undefined;
   // Płyty pod oś czasu muzyka. NIE z „Grał(a) na płytach": to relacje przy
   // nagraniach, a MusicBrainz ma je tylko dla części zespołów (dla Atheist —
@@ -361,6 +411,7 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, odNajnowszy
       {(artist.members.length > 0 || artist.memberOf.length > 0) && (
         <section className="mt-8 space-y-4">
           <h2 className="text-2xl">{artist.isPerson ? t.artist.bandsHeading : t.artist.lineupHeading}</h2>
+          {!artist.isPerson && <InstrumentFilter members={artist.members} wybrany={instrument} mbid={mbid} t={t} />}
           {artist.isPerson && deceased ? (
             <MemberList title={t.artist.playedInBands} items={artist.memberOf.filter((m) => !m.supporting)} playedByBand={playedByBand} ratings={ratings} t={t} />
           ) : (
@@ -401,10 +452,11 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, odNajnowszy
       {artist.isPerson && ownBand.length > 0 && (
         <section className="mt-8">
           <h2 className="mb-1 text-2xl">{t.artist.ownBandHeading}</h2>
-          <p className="mb-3 text-xs text-muted">{t.artist.ownBandNote}</p>
+          <p className="mb-2 text-xs text-muted">{t.artist.ownBandNote}</p>
+          <InstrumentFilter members={ownBand} wybrany={instrument} mbid={mbid} t={t} />
           <div className="space-y-4">
-            <MemberList title={t.artist.currently} items={ownBand.filter((m) => m.current)} ratings={ratings} t={t} />
-            <MemberList title={t.artist.formerly} items={ownBand.filter((m) => !m.current)} ratings={ratings} t={t} />
+            <MemberList title={t.artist.currently} items={ownBand.filter((m) => m.current && graNa(m))} ratings={ratings} t={t} />
+            <MemberList title={t.artist.formerly} items={ownBand.filter((m) => !m.current && graNa(m))} ratings={ratings} t={t} />
           </div>
         </section>
       )}
@@ -530,7 +582,7 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, odNajnowszy
         <>
           {/* Odwrotność osi zespołu: po lewej zespoły, na paskach płyty nagrane
               w danym okresie. Sidemani też — u nich to często najważniejsze granie. */}
-          <CareerTimeline name={artist.name} bands={artist.memberOf} albumsByBand={bandAlbums} own={albums} locale={locale} t={t.artist.timeline} />
+          <CareerTimeline name={artist.name} mbid={mbid} bands={artist.memberOf} albumsByBand={bandAlbums} own={albums} locale={locale} t={t.artist.timeline} />
           {/* Solista to też zespół: Ozzy Osbourne wydaje pod własnym nazwiskiem,
               ale te płyty ktoś z nim nagrał i te składy się zmieniały. Skoro
               MusicBrainz wie kto i kiedy, rysujemy mu zwykłą oś składu — obok
@@ -574,10 +626,12 @@ export default async function ArtistPage({
   searchParams,
 }: {
   params: Promise<{ mbid: string }>;
-  searchParams: Promise<{ plyty?: string }>;
+  searchParams: Promise<{ plyty?: string; i?: string }>;
 }) {
   const { mbid } = await params;
-  const odNajnowszych = (await searchParams).plyty === "nowe";
+  const sp = await searchParams;
+  const odNajnowszych = sp.plyty === "nowe";
+  const instrument = sp.i ?? "";
   if (!UUID.test(mbid)) notFound();
   const { locale, t } = await i18n();
   let artist;
@@ -717,7 +771,7 @@ export default async function ArtistPage({
         )}
 
         <Suspense fallback={<DeepContentLoading t={t} />}>
-          <ArtistDeepContent artist={artist} mbid={mbid} locale={locale} t={t} odNajnowszych={odNajnowszych} />
+          <ArtistDeepContent artist={artist} mbid={mbid} locale={locale} t={t} odNajnowszych={odNajnowszych} instrument={instrument} />
         </Suspense>
       </div>
 
@@ -743,6 +797,6 @@ function CrewSection(p: { albums: AlbumSummary[]; t: Dict }) {
 function ConcertsSection(p: { mbid: string; name: string; locale: Locale; t: Dict }) {
   return osłona("Koncerty", () => ConcertsSectionWewn(p), p.t);
 }
-function ArtistDeepContent(p: { artist: Artist; mbid: string; locale: Locale; t: Dict; odNajnowszych: boolean }) {
+function ArtistDeepContent(p: { artist: Artist; mbid: string; locale: Locale; t: Dict; odNajnowszych: boolean; instrument: string }) {
   return osłona("Dyskografia i skład", () => ArtistDeepContentWewn(p), p.t);
 }

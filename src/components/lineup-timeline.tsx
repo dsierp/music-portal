@@ -303,6 +303,7 @@ export function LineupTimeline({ members, albums, locale, t }: { members: Member
  */
 export function CareerTimeline({
   name,
+  mbid,
   bands,
   albumsByBand,
   own,
@@ -310,6 +311,8 @@ export function CareerTimeline({
   t,
 }: {
   name: string;
+  /** MBID oglądanego artysty — jego własny „zespół" dostaje wiersz jak każdy inny */
+  mbid: string;
   bands: Membership[];
   albumsByBand: Map<string, AlbumSummary[]>;
   own: AlbumSummary[];
@@ -322,13 +325,43 @@ export function CareerTimeline({
   const rows = fillMissingSpans(
     mergeSpans<Membership, Mark>(bands, (m) => (albumsByBand.get(m.mbid) ?? []).map(markOf)),
   );
-  if (!rows.length) return null;
+
+  /**
+   * Własny szyld na pierwszym miejscu.
+   *
+   * Ozzy Osbourne grał w Black Sabbath — i był Ozzym Osbournem: kilkanaście płyt
+   * pod własnym nazwiskiem, z własnymi składami. MusicBrainz nie ma na to relacji
+   * „member of band" (bo i po co: to ta sama encja), więc na osi nie było go
+   * wcale, choć jego płyty leciały tam pionowymi kreskami bez przypisania.
+   * Robimy mu wiersz z jego dyskografii — daty z płyt, stąd przerywany styl.
+   */
+  const wlasneZnaczniki = own.map(markOf);
+  const lata = wlasneZnaczniki.map((m) => m.date).filter((d): d is string => !!d).sort();
+  const wlasnyWiersz: Row | null = lata.length
+    ? {
+        mbid,
+        name,
+        marks: wlasneZnaczniki,
+        spans: [{ begin: lata[0], end: lata[lata.length - 1], current: false, roles: [], inferred: true }],
+      }
+    : null;
+
+  const wszystkie = wlasnyWiersz ? [wlasnyWiersz, ...rows] : rows;
+  if (!wszystkie.length) return null;
   return (
     <details className="mt-6" open>
       <summary className="cursor-pointer text-muted hover:text-accent2">
-        {fmt(plural(locale, rows.length, t.careerSummary), { name })}
+        {fmt(plural(locale, wszystkie.length, t.careerSummary), { name })}
       </summary>
-      <Chart rows={rows} albums={own.map(markOf)} labelWidth={180} markLabel={t.markOwnLabel} t={t} />
+      {/* Gdy własny szyld ma swój wiersz, pionowe kreski przez cały wykres byłyby
+          tymi samymi płytami drugi raz — więc ich nie rysujemy. */}
+      <Chart
+        rows={wszystkie}
+        albums={wlasnyWiersz ? [] : wlasneZnaczniki}
+        labelWidth={180}
+        markLabel={t.markOwnLabel}
+        t={t}
+      />
     </details>
   );
 }
