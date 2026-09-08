@@ -56,16 +56,44 @@ function ConcertList({ items }: { items: Concert[] }) {
   );
 }
 
+/**
+ * Chipsy gatunków dla listy koncertów.
+ *
+ * Świadomie liczone z TEGO, CO PRZYSZŁO, a nie ze sztywnej listy: Ticketmaster
+ * ma własny słownik („Death Metal/Black Metal", „A Cappella") i lepiej pokazać
+ * etykiety, które faktycznie są w wynikach, razem z liczbą koncertów. Wybór
+ * siedzi w adresie (?g=), więc zawężoną listę da się wysłać linkiem.
+ */
+function GenreChips({ items, wybrany }: { items: Concert[]; wybrany: string }) {
+  const licznik = new Map<string, number>();
+  for (const c of items) for (const g of c.genres) licznik.set(g, (licznik.get(g) ?? 0) + 1);
+  if (licznik.size < 2) return null;
+  const lista = [...licznik.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "pl"));
+  return (
+    <div className="mb-3 flex flex-wrap gap-1.5">
+      <Link href="/koncerty" className={`chip ${wybrany ? "" : "chip-on"}`}>Wszystko <span className="ml-1 font-mono text-[10px] text-muted">{items.length}</span></Link>
+      {lista.map(([g, n]) => (
+        <Link key={g} href={`/koncerty?g=${encodeURIComponent(g)}`} className={`chip ${wybrany === g ? "chip-on" : ""}`}>
+          {g} <span className="ml-1 font-mono text-[10px] text-muted">{n}</span>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 /** Koncerty w moich obszarach — osobny strumień, bo to kilka zapytań do TM. */
-async function ByArea({ areas, categories }: { areas: { country: string; city: string | null }[]; categories: string[] }) {
+async function ByArea({ areas, categories, wybrany }: { areas: { country: string; city: string | null }[]; categories: string[]; wybrany: string }) {
   // MusicBrainz zawsze (za darmo), Ticketmaster gdy jest klucz — i scalamy,
   // bo dla czytelnika to jedna lista koncertów w jego mieście.
   const [mb, tm] = await Promise.all([
     concertsByAreaMb(areas).catch(() => []),
     concertsByArea(areas, categories).catch(() => []),
   ]);
-  const items = dedupe([...tm, ...mb]);
-  if (!items.length) {
+  const wszystkie = dedupe([...tm, ...mb]);
+  // Filtrujemy dopiero na wyświetlaniu, żeby chipsy zawsze pokazywały pełny
+  // obraz tygodnia — inaczej po zawężeniu zniknęłyby pozostałe gatunki.
+  const items = wybrany ? wszystkie.filter((c) => c.genres.includes(wybrany)) : wszystkie;
+  if (!wszystkie.length) {
     return (
       <p className="text-sm text-muted">
         Nic nie znalazłam w Twoich obszarach na najbliższe trzy miesiące.
@@ -73,7 +101,16 @@ async function ByArea({ areas, categories }: { areas: { country: string; city: s
       </p>
     );
   }
-  return <ConcertList items={items} />;
+  return (
+    <>
+      <GenreChips items={wszystkie} wybrany={wybrany} />
+      {items.length ? (
+        <ConcertList items={items} />
+      ) : (
+        <p className="text-sm text-muted">Nic w tym gatunku w Twoich obszarach. <Link href="/koncerty" className="underline">Pokaż wszystko</Link></p>
+      )}
+    </>
+  );
 }
 
 /** Koncerty ulubionych zespołów — MusicBrainz, jedno zapytanie na zespół (1/s). */
@@ -85,7 +122,8 @@ async function ByFavorites({ artists, areas }: { artists: { mbid: string; name: 
   return <ConcertList items={items} />;
 }
 
-export default async function ConcertsPage() {
+export default async function ConcertsPage({ searchParams }: { searchParams: Promise<{ g?: string }> }) {
+  const wybrany = (await searchParams).g ?? "";
   const user = await currentUser();
   const { from, to } = concertWindow();
 
@@ -149,7 +187,7 @@ export default async function ConcertsPage() {
             </p>
           ) : (
             <Suspense fallback={<p className="font-mono text-xs text-muted">Sprawdzam, co gra w Twoich miastach…</p>}>
-              <ByArea areas={genreAreas} categories={categories} />
+              <ByArea areas={genreAreas} categories={categories} wybrany={wybrany} />
             </Suspense>
           )}
         </section>
