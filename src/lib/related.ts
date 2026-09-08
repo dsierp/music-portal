@@ -26,6 +26,18 @@ export interface RelatedBand {
   people: { name: string; roles: string[] }[];
   /** wspólne gatunki */
   genres: string[];
+  /**
+   * Wizytówka zespołu: własne gatunki, skąd jest, kiedy grał, czym się różni od
+   * imiennika. Bez tego karta mówiła tylko „gra tu ten sam basista", a to za
+   * mało, żeby zdecydować, w co kliknąć — a po to ta sekcja jest.
+   */
+  ownGenres: string[];
+  country: string | null;
+  area: string | null;
+  begin: string | null;
+  end: string | null;
+  ended: boolean;
+  disambiguation: string | null;
   score: number;
 }
 
@@ -52,7 +64,10 @@ export async function relatedBands(artist: Artist): Promise<RelatedBand[]> {
       if (prev) {
         if (!prev.people.some((p) => p.name === via.name)) prev.people.push(via);
       } else {
-        acc.set(mbid, { mbid, name, people: [via], genres: [], score: 0 });
+        acc.set(mbid, {
+          mbid, name, people: [via], genres: [], score: 0,
+          ownGenres: [], country: null, area: null, begin: null, end: null, ended: false, disambiguation: null,
+        });
       }
     };
 
@@ -97,6 +112,14 @@ export async function relatedBands(artist: Artist): Promise<RelatedBand[]> {
       // Ostatnie sito: gdyby po drodze wpadł człowiek, tutaj wypada.
       if (info?.isPerson) continue;
       cand.genres = (info?.genres ?? []).filter((g) => mine.has(g.toLowerCase())).slice(0, 4);
+      // Te same dane, które i tak przyszły w lookupie — grzech ich nie pokazać.
+      cand.ownGenres = (info?.genres?.length ? info.genres : (info?.tags ?? [])).slice(0, 4);
+      cand.country = info?.country ?? null;
+      cand.area = info?.area ?? null;
+      cand.begin = info?.begin ?? null;
+      cand.end = info?.end ?? null;
+      cand.ended = !!info?.ended;
+      cand.disambiguation = info?.disambiguation ?? null;
       cand.score = cand.people.length * 10 + cand.genres.length;
       out.push(cand);
     }

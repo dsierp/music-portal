@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getArtist, getDiscography, getPlayedOn, MbError } from "@/lib/musicbrainz";
+import { ARTWORK_ROLES, albumCrew, getArtist, getDiscography, getPlayedOn, MbError } from "@/lib/musicbrainz";
 import { wikiFromLinks, wikiLogo } from "@/lib/wikipedia";
 import { MbUnavailable } from "@/components/mb-unavailable";
 import { currentUser } from "@/lib/auth";
@@ -14,14 +14,14 @@ import { Comments } from "@/components/comments";
 import { AlbumCard } from "@/components/cards";
 import { YoutubeVideos } from "@/components/youtube";
 import { relatedBands } from "@/lib/related";
-import { mergeDates, wdMembers, wdMemberships } from "@/lib/wikidata";
+import { mergeDates, wdGenres, wdMembers, wdMemberships } from "@/lib/wikidata";
 import { CareerTimeline, LineupTimeline } from "@/components/lineup-timeline";
 import { dbSafe } from "@/lib/db-safe";
 import { DbWarning } from "@/components/db-warning";
 import { i18n } from "@/lib/t";
 import { fmt, wikiLangs, type Locale } from "@/lib/i18n";
 import type { Dict } from "@/lib/dict";
-import type { Artist, Membership, PlayedOn } from "@/lib/musicbrainz";
+import type { AlbumSummary, Artist, Membership, PlayedOn } from "@/lib/musicbrainz";
 
 /** Grupuje "Grał(a) na płytach" wg zespołu (do rozwijania przy pozycji w Zespoły). */
 function groupByBand(played: PlayedOn[]) {
@@ -122,8 +122,26 @@ async function RelatedSection({ artist, t }: { artist: Artist; t: Dict }) {
       <ul className="grid gap-2 sm:grid-cols-2">
         {related.map((b) => (
           <li key={b.mbid} className="rounded-lg border border-rule bg-surface p-3">
-            <Link href={`/artist/${b.mbid}`} className="display text-lg hover:text-accent2">{b.name}</Link>
-            <p className="mt-0.5 text-xs text-text2">
+            <div className="flex flex-wrap items-baseline gap-x-2">
+              <Link href={`/artist/${b.mbid}`} className="display text-lg hover:text-accent2">{b.name}</Link>
+              {/* Wizytówka: skąd i kiedy. Bez tego karta mówiła tylko „ten sam
+                  basista", a to za mało, żeby wiedzieć, w co kliknąć. */}
+              {(b.begin || b.end) && (
+                <span className="font-mono text-[10px] text-faint">
+                  {b.begin?.slice(0, 4) ?? "?"}–{b.ended ? (b.end?.slice(0, 4) ?? "?") : ""}
+                </span>
+              )}
+              {(b.country || b.area) && <span className="font-mono text-[10px] text-faint">{b.country ?? b.area}</span>}
+            </div>
+            {b.disambiguation && <p className="text-[11px] text-muted">{b.disambiguation}</p>}
+            {b.ownGenres.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {b.ownGenres.map((g) => (
+                  <span key={g} className={`chip text-[10px] ${b.genres.includes(g) ? "chip-on" : ""}`}>{g}</span>
+                ))}
+              </div>
+            )}
+            <p className="mt-1 text-xs text-text2">
               {b.people.map((p) => `${p.name}${p.roles.length ? ` (${p.roles.join(", ")})` : ""}`).join(" · ")}
             </p>
             {b.genres.length > 0 && (
@@ -132,6 +150,55 @@ async function RelatedSection({ artist, t }: { artist: Artist; t: Dict }) {
           </li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+/**
+ * Kto to nagrywał — producenci, realizatorzy, mastering, okładki.
+ *
+ * Osobny strumień, bo to jedno zapytanie do MusicBrainz na płytę (limit 1/s).
+ * Świadomie ograniczone do kilku albumów: chodzi o rozpoznanie „ich" ekipy,
+ * a nie o kompletny spis techniczny.
+ */
+async function CrewSection({ albums, t }: { albums: AlbumSummary[]; t: Dict }) {
+  if (!albums.length) return null;
+  const crew = await albumCrew(albums).catch(() => []);
+  if (!crew.length) {
+    return (
+      <section className="mt-10">
+        <h2 className="mb-1 text-2xl">{t.artist.crewHeading}</h2>
+        <p className="text-xs text-muted">{t.artist.crewEmpty}</p>
+      </section>
+    );
+  }
+  const okladki = crew.filter((c) => c.roles.some((r) => ARTWORK_ROLES.test(r)));
+  const studio = crew.filter((c) => !okladki.includes(c));
+  const Lista = ({ title, items }: { title: string; items: typeof crew }) =>
+    items.length ? (
+      <div>
+        <h3 className="label mb-1">{title}</h3>
+        <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
+          {items.map((c) => (
+            <li key={c.mbid} className="text-sm">
+              <Link href={`/artist/${c.mbid}`} className="font-medium hover:text-accent2 hover:underline">{c.name}</Link>{" "}
+              <span className="text-muted">{c.roles.join(", ")}</span>{" "}
+              <span className="font-mono text-[10px] text-faint" title={c.albums.map((a) => a.title).join(" · ")}>
+                {fmt(t.artist.crewOnAlbums, { n: c.albums.length })}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ) : null;
+  return (
+    <section className="mt-10 space-y-4">
+      <div>
+        <h2 className="mb-1 text-2xl">{t.artist.crewHeading}</h2>
+        <p className="text-xs text-muted">{t.artist.crewNote}</p>
+      </div>
+      <Lista title={t.artist.crewStudio} items={studio} />
+      <Lista title={t.artist.crewArtwork} items={okladki} />
     </section>
   );
 }
@@ -322,6 +389,10 @@ async function ArtistDeepContent({ artist: raw, mbid, locale, t }: { artist: Art
         <LineupTimeline members={artist.members.filter((m) => !m.supporting)} albums={albums} locale={locale} t={t.artist.timeline} />
       )}
 
+      <Suspense fallback={<p className="mt-10 font-mono text-xs text-muted">{t.artist.crewLoading}</p>}>
+        <CrewSection albums={albums.length ? albums : disco.slice(0, 6)} t={t} />
+      </Suspense>
+
       <Suspense fallback={<p className="mt-10 font-mono text-xs text-muted">{t.artist.relatedLoading}</p>}>
         <RelatedSection artist={artist} t={t} />
       </Suspense>
@@ -355,13 +426,17 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
   }
   const user = await currentUser();
   // Przez dbSafe: padnięta baza ma nie zabierać treści z MusicBrainz/Wikipedii.
-  const [summaryS, treeS, favS, favsS, wiki, logo] = await Promise.all([
+  // Gatunków szukamy dalej niż w MusicBrainz: przy mniejszych zespołach MB nie ma
+  // ani jednego tagu i strona wygląda na pustą. Pytamy tylko wtedy, gdy naprawdę
+  // nie ma czego pokazać — i piszemy potem, skąd to wzięliśmy.
+  const [summaryS, treeS, favS, favsS, wiki, logo, wdStyles] = await Promise.all([
     dbSafe(ratingSummary("ARTIST", mbid, user?.id), EMPTY_SUMMARY),
     dbSafe(commentTree("ARTIST", mbid), []),
     dbSafe(user ? isFavorite(user.id, mbid) : Promise.resolve(false), false),
     dbSafe(favoriteCount(mbid), 0),
     wikiFromLinks(artist.links, wikiLangs(locale)).catch(() => null),
     wikiLogo(artist.links).catch(() => null),
+    artist.genres.length ? Promise.resolve([] as string[]) : wdGenres(artist.links, locale).catch(() => []),
   ]);
   const [summary, tree, fav, favs] = [summaryS.value, treeS.value, favS.value, favsS.value];
   const dbDown = summaryS.failed || treeS.failed || favS.failed || favsS.failed;
@@ -391,10 +466,20 @@ export default async function ArtistPage({ params }: { params: Promise<{ mbid: s
             )}
             {artist.disambiguation && <div className="text-sm text-muted">{artist.disambiguation}</div>}
             {artist.aliases.length > 0 && <div className="text-xs text-faint">{t.artist.aka} {artist.aliases.join(", ")}</div>}
-            {artist.genres.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1">
-                {artist.genres.map((g) => <Link key={g} href={`/szukaj?q=${encodeURIComponent(g)}`} className="chip">{g}</Link>)}
-              </div>
+            {(artist.genres.length > 0 || wdStyles.length > 0) && (
+              <>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {(artist.genres.length ? artist.genres : wdStyles).map((g) => (
+                    <Link key={g} href={`/szukaj?q=${encodeURIComponent(g)}`} className="chip">{g}</Link>
+                  ))}
+                </div>
+                {/* Uczciwie mówimy, skąd to jest — Wikidane bywają jedynym miejscem,
+                    które w ogóle wie, co ten zespół gra. */}
+                {!artist.genres.length && <p className="mt-1 font-mono text-[10px] text-faint">{t.artist.genresFromWikidata}</p>}
+              </>
+            )}
+            {!artist.genres.length && !wdStyles.length && artist.tags.length === 0 && (
+              <p className="mt-2 text-xs text-faint">{t.artist.noGenres}</p>
             )}
             <div className="mt-3"><LinksRow links={artist.links} wikiUrl={wiki?.url} /></div>
             <div className="mt-3 flex items-center gap-3">

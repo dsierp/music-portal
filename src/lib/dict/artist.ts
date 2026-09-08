@@ -8,6 +8,16 @@
 import type { Locale } from "@/lib/i18n";
 
 const pl = {
+  crewHeading: "Kto to nagrywał",
+  crewNote: "Producenci, realizatorzy, mastering i autorzy okładek — z wydań w MusicBrainz. Każde nazwisko to kolejny przystanek: z jego strony widać wszystko, przy czym pracował.",
+  crewLoading: "Sprawdzam, kto produkował i kto malował…",
+  crewEmpty: "MusicBrainz nie ma przy tych wydaniach nikogo od produkcji ani okładek. To częsta dziura w tej bazie — nie znaczy, że tych ludzi nie było.",
+  crewArtwork: "Okładki i zdjęcia",
+  crewStudio: "Produkcja i realizacja",
+  crewOnAlbums: "przy {n}",
+  genresFromWikidata: "gatunki z Wikidanych — MusicBrainz nie ma tu żadnego tagu",
+  noGenres: "Ani MusicBrainz, ani Wikidane nie mają gatunku dla tego zespołu. Tyle udało się zebrać.",
+  relatedYears: "{years}",
   mbUnavailableWhat: "artysty",
   personType: "muzyk",
   aka: "aka",
@@ -75,6 +85,16 @@ const pl = {
 type T = typeof pl;
 
 const en: T = {
+  crewHeading: "Who recorded it",
+  crewNote: "Producers, engineers, mastering and cover artists — from the releases on MusicBrainz. Every name is another stop: their page shows everything they worked on.",
+  crewLoading: "Checking who produced and who painted…",
+  crewEmpty: "MusicBrainz lists nobody for production or artwork on these releases. That's a common gap in this database — it doesn't mean those people didn't exist.",
+  crewArtwork: "Artwork and photography",
+  crewStudio: "Production and engineering",
+  crewOnAlbums: "on {n}",
+  genresFromWikidata: "genres from Wikidata — MusicBrainz has no tag here",
+  noGenres: "Neither MusicBrainz nor Wikidata has a genre for this band. This is all we could gather.",
+  relatedYears: "{years}",
   mbUnavailableWhat: "an artist",
   personType: "musician",
   aka: "aka",
@@ -141,6 +161,16 @@ const en: T = {
 };
 
 const es: T = {
+  crewHeading: "Quién lo grabó",
+  crewNote: "Productores, técnicos, masterización y autores de portada — de las ediciones en MusicBrainz. Cada nombre es otra parada: en su página está todo en lo que trabajó.",
+  crewLoading: "Mirando quién produjo y quién pintó…",
+  crewEmpty: "MusicBrainz no tiene a nadie de producción ni de portada en estas ediciones. Es un hueco habitual de esta base — no significa que esa gente no existiera.",
+  crewArtwork: "Portadas y fotografía",
+  crewStudio: "Producción y grabación",
+  crewOnAlbums: "en {n}",
+  genresFromWikidata: "géneros de Wikidata — MusicBrainz no tiene ninguna etiqueta aquí",
+  noGenres: "Ni MusicBrainz ni Wikidata tienen género para esta banda. Esto es todo lo que hemos podido reunir.",
+  relatedYears: "{years}",
   mbUnavailableWhat: "un artista",
   personType: "músico",
   aka: "alias",
@@ -207,6 +237,16 @@ const es: T = {
 };
 
 const de: T = {
+  crewHeading: "Wer es aufgenommen hat",
+  crewNote: "Produzenten, Toningenieure, Mastering und Cover-Künstler — aus den Veröffentlichungen bei MusicBrainz. Jeder Name ist die nächste Station: auf seiner Seite steht alles, woran er gearbeitet hat.",
+  crewLoading: "Schaue nach, wer produziert und wer gemalt hat…",
+  crewEmpty: "MusicBrainz führt bei diesen Veröffentlichungen niemanden für Produktion oder Artwork. Eine übliche Lücke dieser Datenbank — es heißt nicht, dass es diese Leute nicht gab.",
+  crewArtwork: "Artwork und Fotografie",
+  crewStudio: "Produktion und Aufnahme",
+  crewOnAlbums: "bei {n}",
+  genresFromWikidata: "Genres aus Wikidata — MusicBrainz hat hier kein Tag",
+  noGenres: "Weder MusicBrainz noch Wikidata kennt ein Genre für diese Band. Mehr war nicht zu holen.",
+  relatedYears: "{years}",
   mbUnavailableWhat: "eines Künstlers",
   personType: "Musiker",
   aka: "auch bekannt als",

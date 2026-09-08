@@ -190,3 +190,32 @@ export function mergeDates<T extends Datable>(items: T[], spans: WdSpan[]): T[] 
     return { ...it, begin, end, current: end ? false : it.current, datesFrom: "wikidata" as const };
   });
 }
+
+/**
+ * Gatunki z Wikidanych (P136) — gdy MusicBrainz nie ma żadnego tagu.
+ *
+ * Zdarza się to nagminnie przy mniejszych zespołach: strona zespołu wygląda
+ * wtedy na pustą i nie wiadomo, w co kliknąć. Wikidane mają gatunek jako
+ * osobną encję, więc dostajemy nazwę w języku czytelnika, a nie surowy tag.
+ */
+export async function wdGenres(links: Links, lang = "en"): Promise<string[]> {
+  const qid = qidFromLinks(links);
+  if (!qid) return [];
+  return cached(`wd:genres:v1:${lang}:${qid}`, TTL.wiki, async () => {
+    const data = await getJson<{ entities?: Record<string, WdEntity> }>(
+      `https://www.wikidata.org/wiki/Special:EntityData/${qid}.json`,
+    );
+    const qids = (data?.entities?.[qid]?.claims?.P136 ?? [])
+      .map((c) => qidOf(c.mainsnak))
+      .filter((q): q is string => !!q);
+    if (!qids.length) return [];
+    const info = await entities([...new Set(qids)]);
+    return qids
+      .map((q) => {
+        const e = info[q];
+        return e?.labels?.[lang]?.value ?? labelOf(e, "");
+      })
+      .filter(Boolean)
+      .slice(0, 8);
+  }).catch(() => []);
+}

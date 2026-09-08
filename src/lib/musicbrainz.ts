@@ -764,3 +764,68 @@ export function fmtLength(ms: number | null) {
   const s = Math.round(ms / 1000);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
+
+// ---------- kto to nagrywał ----------
+
+/**
+ * Ludzie od strony technicznej płyt: producent, realizator, miks, mastering,
+ * okładka, zdjęcia.
+ *
+ * Do tej pory portal umiał tylko odwrotną stronę tej relacji („przy czyich
+ * płytach pracował ten człowiek"), a przy zespole nie było widać, KTO im to
+ * nagrał i KTO namalował okładkę — czyli tego, po czym często wybiera się
+ * płytę i od czego zaczyna się kolejna podróż.
+ *
+ * MusicBrainz trzyma to przy WYDANIU, nie przy grupie wydawniczej, więc pytamy
+ * o wydania każdej płyty osobno. Stąd twardy limit: to jedno zapytanie na
+ * album (1/s), a strona i tak ładuje tę sekcję osobnym strumieniem.
+ */
+export interface CrewMember {
+  mbid: string;
+  name: string;
+  roles: string[];
+  albums: { mbid: string; title: string; year: string | null }[];
+}
+
+/** Role „okładkowe" — wydzielamy je, bo autor okładki to inny powód do kliknięcia. */
+export const ARTWORK_ROLES = /design|illustration|art direction|graphic|photograph|artwork/i;
+
+/**
+ * Papierologia: prawa, wydawnictwo, booking, prawnicy. Formalnie to też „nie
+ * granie", ale nikt nie sięga po płytę przez firmę, która trzyma copyright —
+ * a wypełniało to listę tak, że producent ginął w tłumie.
+ */
+const PAPERWORK = /copyright|publishing|booking|legal|distribut|licens|manufact/i;
+
+export function isCrewRole(role: string): boolean {
+  return !isMusicianRole(role) && !PAPERWORK.test(role);
+}
+
+export async function albumCrew(albums: AlbumSummary[], limit = 6): Promise<CrewMember[]> {
+  const wanted = albums.slice(0, limit);
+  const people = new Map<string, CrewMember>();
+  for (const album of wanted) {
+    const data = await cached(`mb:crew:v1:${album.mbid}`, TTL.lookup, () =>
+      mbFetch<{ releases: (MbRelease & { relations?: MbArtistRel[] })[] }>("/release/", {
+        "release-group": album.mbid,
+        inc: "artist-rels",
+        limit: 1,
+      }).catch(() => ({ releases: [] })),
+    );
+    for (const rel of data.releases ?? []) {
+      for (const r of rel.relations ?? []) {
+        if (!r.artist || r["target-type"] !== "artist") continue;
+        const roles = rolesOf(r).filter(isCrewRole);
+        if (!roles.length) continue;
+        const e = people.get(r.artist.id) ?? { mbid: r.artist.id, name: r.artist.name, roles: [], albums: [] };
+        for (const role of roles) if (!e.roles.includes(role)) e.roles.push(role);
+        if (!e.albums.some((a) => a.mbid === album.mbid)) {
+          e.albums.push({ mbid: album.mbid, title: album.title, year: album.year });
+        }
+        people.set(r.artist.id, e);
+      }
+    }
+  }
+  // Najpierw ci, którzy wracają na kolejnych płytach — to zwykle „ich" producent.
+  return [...people.values()].sort((a, b) => b.albums.length - a.albums.length || a.name.localeCompare(b.name, "pl"));
+}
