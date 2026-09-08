@@ -314,14 +314,73 @@ export async function concertsByArtist(artist: { mbid: string; name: string }): 
  * `areas` (lista „ulubieni") zawęża wynik do wskazanych miast/krajów; pusta
  * lista = pokazujemy wszystko, gdziekolwiek grają.
  */
+/**
+ * Koncerty konkretnego zespołu z Ticketmastera — po nazwie.
+ *
+ * MusicBrainz zna zapowiedzi wyjątkowo rzadko (to katalog nagrań, nie afisz),
+ * więc „Twoje ulubione zespoły" świeciło pustką, choć Napalm Death gra w Polsce
+ * i ma to na TM. Pytamy `keyword`, bo szukanie po `attractionId` wymagałoby
+ * osobnego kroku mapowania MBID→TM.
+ *
+ * Keyword w TM jest luźny („Napalm" wraca z festiwalami, na których gra ktoś
+ * inny), więc odsiewamy po nazwie: musi wystąpić w tytule wydarzenia.
+ */
+async function tmByArtist(name: string, country?: string, size = 20): Promise<Concert[]> {
+  const key = (process.env.TICKETMASTER_API_KEY ?? "").trim();
+  if (!key || !name.trim()) return [];
+  const { from, to } = concertWindow();
+  const url = new URL(TM_BASE);
+  url.searchParams.set("apikey", key);
+  url.searchParams.set("keyword", name);
+  if (country) url.searchParams.set("countryCode", country);
+  url.searchParams.set("startDateTime", `${from}T00:00:00Z`);
+  url.searchParams.set("endDateTime", `${to}T23:59:59Z`);
+  url.searchParams.set("sort", "date,asc");
+  url.searchParams.set("size", String(size));
+
+  const cacheKey = `tm:artist:v1:${name.toLowerCase()}:${country ?? "*"}:${from}`;
+  const data = await cached<{ _embedded?: { events?: TmEvent[] } }>(cacheKey, TTL.search, async () => {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new MbError(`Ticketmaster ${res.status}`, res.status);
+    return (await res.json()) as { _embedded?: { events?: TmEvent[] } };
+  });
+
+  const szukane = name.toLowerCase();
+  return (data._embedded?.events ?? [])
+    .map((e) => {
+      const v = e._embedded?.venues?.[0];
+      return {
+        id: `tm:${e.id}`,
+        name: e.name,
+        date: e.dates?.start?.localDate ?? "",
+        time: e.dates?.start?.localTime ?? null,
+        city: v?.city?.name ?? null,
+        country: v?.country?.countryCode ?? v?.country?.name ?? null,
+        venue: v?.name ?? null,
+        url: e.url ?? null,
+        source: "ticketmaster" as const,
+        genres: [...new Set((e.classifications ?? []).flatMap((c) => [c.genre?.name, c.subGenre?.name]).filter((x): x is string => Boolean(x) && x !== "Undefined"))],
+      };
+    })
+    .filter((c) => c.date && c.name.toLowerCase().includes(szukane));
+}
+
 export async function concertsForFavorites(
   artists: { mbid: string; name: string }[],
   areas: Area[] = [],
   max = 8,
 ): Promise<Concert[]> {
   const out: Concert[] = [];
+  // Kraje z listy „dla ulubionych" — po nich pytamy Ticketmastera. Bez obszarów
+  // pytamy raz, bez kraju: lepiej pokazać trasę po Europie niż nic.
+  const kraje = [...new Set(areas.map((a) => a.country))].slice(0, 3);
   for (const a of artists.slice(0, max)) {
+    // MusicBrainz zna zapowiedzi rzadko, ale gdy zna — bywają to małe kluby,
+    // których nie ma na Ticketmasterze. Dlatego oba źródła, nie „albo".
     out.push(...(await concertsByArtist(a).catch(() => [])));
+    for (const kraj of kraje.length ? kraje : [undefined]) {
+      out.push(...(await tmByArtist(a.name, kraj).catch(() => [])));
+    }
   }
   return dedupe(areas.length ? out.filter((c) => inAnyArea(c, areas)) : out);
 }
@@ -334,10 +393,18 @@ export async function concertsForFavorites(
  * kraju dopuszczamy też jego kod. To celowo luźne: lepiej pokazać koncert
  * z sąsiedniej dzielnicy niż zgubić właściwy.
  */
+/**
+ * Bez ogonków i wielkości liter: użytkownik wpisuje „Kraków", a Ticketmaster
+ * zwraca „Krakow" — i przez to jego własne miasto mu nie pasowało.
+ */
+function bezOgonkow(s: string): string {
+  return s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+}
+
 export function inAnyArea(c: Concert, areas: Area[]): boolean {
-  const hay = [c.city, c.country, c.venue].filter(Boolean).join(" ").toLowerCase();
+  const hay = bezOgonkow([c.city, c.country, c.venue].filter(Boolean).join(" "));
   return areas.some((a) => {
-    const needle = (a.city ?? a.country).toLowerCase();
+    const needle = bezOgonkow(a.city ?? a.country);
     return hay.includes(needle) || (!a.city && c.country?.toLowerCase() === a.country.toLowerCase());
   });
 }

@@ -74,3 +74,16 @@ test("bez wybranych kategorii nie filtrujemy niczego", () => {
   const c = { id: "1", name: "X", date: "2026-09-17", time: null, city: null, country: "PL", venue: null, url: null, source: "ticketmaster" as const, genres: ["Pop"] };
   assert.equal(matchesGenres(c, acceptedLabels([])), true);
 });
+
+test("koncert z Ticketmastera dla ulubionego zespołu ma być w obszarze", () => {
+  // Napalm Death, Kraków — TM ma to w bazie, MusicBrainz nie. Sekcja ulubionych
+  // pytała dotąd tylko MB i dlatego świeciła pustką.
+  const nd = {
+    id: "tm:1", name: "Napalm Death | Support: Master, Brat, Goatburner", date: "2026-11-20",
+    time: "18:30", city: "Krakow", country: "PL", venue: "Hype Park", url: null,
+    source: "ticketmaster" as const, genres: ["Rock", "Pop", "Metal"],
+  };
+  assert.equal(inAnyArea(nd, [{ country: "PL", city: null }]), true, "cały kraj obejmuje Kraków");
+  assert.equal(inAnyArea(nd, [{ country: "PL", city: "Kraków" }]), true, "miasto po polsku też ma się łapać");
+  assert.equal(inAnyArea(nd, [{ country: "DE", city: null }]), false);
+});
