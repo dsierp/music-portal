@@ -111,6 +111,50 @@ export function qidFromLinks(links: Links): string | null {
 }
 
 /**
+ * Q-id, gdy MusicBrainz nie podaje linku do Wikidanych.
+ *
+ * A nie podaje nagminnie — i wtedy cała nasza furtka awaryjna nie ma dokąd
+ * pójść, choć encja w Wikidanych istnieje. Dwie drogi obejścia:
+ * 1. przez Wikipedię: każdy artykuł trzyma przy sobie swoje Q-id,
+ * 2. przez sam MBID: Wikidane pozwalają szukać po wartości P434.
+ * Kolejność nieprzypadkowa — link do Wikipedii mamy częściej i jest pewniejszy
+ * niż wyszukiwanie.
+ */
+export async function resolveQid(links: Links, mbid?: string): Promise<string | null> {
+  const wprost = qidFromLinks(links);
+  if (wprost) return wprost;
+
+  const wiki = links.wikipedia;
+  if (wiki) {
+    const m = wiki.match(/^https?:\/\/([a-z-]+)\.wikipedia\.org\/wiki\/(.+)$/);
+    if (m) {
+      const [, lang, tytul] = m;
+      const qid = await cached(`wd:qid-from-wiki:v1:${lang}:${tytul}`, TTL.wiki, async () => {
+        const data = await getJson<{ query?: { pages?: Record<string, { pageprops?: { wikibase_item?: string } }> } }>(
+          `https://${lang}.wikipedia.org/w/api.php?action=query&prop=pageprops&ppprop=wikibase_item` +
+            `&redirects=1&format=json&origin=*&titles=${tytul}`,
+        );
+        const strony = Object.values(data?.query?.pages ?? {});
+        return strony[0]?.pageprops?.wikibase_item ?? null;
+      });
+      if (qid) return qid;
+    }
+  }
+
+  if (mbid) {
+    return cached(`wd:qid-from-mbid:v1:${mbid}`, TTL.wiki, async () => {
+      const data = await getJson<{ query?: { search?: { title: string }[] } }>(
+        `https://www.wikidata.org/w/api.php?action=query&list=search&format=json&origin=*&srlimit=1` +
+          `&srsearch=${encodeURIComponent(`haswbstatement:P434=${mbid}`)}`,
+      );
+      const t = data?.query?.search?.[0]?.title;
+      return t && /^Q\d+$/.test(t) ? t : null;
+    });
+  }
+  return null;
+}
+
+/**
  * Okresy z Wikidanych dla jednego artysty.
  *
  * `prop` decyduje o kierunku: P463 to „w jakich zespołach grał", P527 to „kto
@@ -143,17 +187,54 @@ async function spansFor(qid: string, prop: "P463" | "P527"): Promise<WdSpan[]> {
 }
 
 /** Zespoły, w których grał — od strony człowieka (P463). */
-export async function wdMemberships(links: Links): Promise<WdSpan[]> {
-  const qid = qidFromLinks(links);
+export async function wdMemberships(links: Links, mbid?: string): Promise<WdSpan[]> {
+  const qid = await resolveQid(links, mbid).catch(() => null);
   if (!qid) return [];
   return spansFor(qid, "P463").catch(() => []);
 }
 
-/** Ludzie, którzy grali w zespole (albo u solisty) — od strony zespołu (P527). */
-export async function wdMembers(links: Links): Promise<WdSpan[]> {
-  const qid = qidFromLinks(links);
+/**
+ * Ludzie, którzy grali w zespole (albo u solisty).
+ *
+ * Wikidane opisują to z dwóch stron i redaktorzy wypełniają raz jedną, raz
+ * drugą: P527 przy zespole („składa się z") albo P463 przy człowieku („członek
+ * zespołu"). Pytamy więc o obie — przy zespołach spoza pierwszej ligi bardzo
+ * często wypełniona jest tylko ta od strony ludzi, a wtedy sam P527 daje pustkę.
+ */
+export async function wdMembers(links: Links, mbid?: string): Promise<WdSpan[]> {
+  const qid = await resolveQid(links, mbid).catch(() => null);
   if (!qid) return [];
-  return spansFor(qid, "P527").catch(() => []);
+  const wprost = await spansFor(qid, "P527").catch(() => []);
+  if (wprost.length) return wprost;
+  return membersByReverse(qid).catch(() => []);
+}
+
+/**
+ * Skład wyszukany „od drugiej strony": kto ma P463 wskazujące na ten zespół.
+ *
+ * Idzie przez punkt zapytań Wikidanych (SPARQL), bo pliku encji zespołu nie da
+ * się o to zapytać — relacja jest zapisana u ludzi, nie u niego.
+ */
+async function membersByReverse(qid: string): Promise<WdSpan[]> {
+  return cached(`wd:members-rev:v1:${qid}`, TTL.wiki, async () => {
+    const sparql = `SELECT ?p ?pLabel ?begin ?end WHERE {
+      ?p wdt:P31 wd:Q5 . ?p p:P463 ?st . ?st ps:P463 wd:${qid} .
+      OPTIONAL { ?st pq:P580 ?begin } OPTIONAL { ?st pq:P582 ?end }
+      OPTIONAL { ?p wdt:P434 ?mb }
+      SERVICE wikibase:label { bd:serviceParam wikibase:language "en,pl" }
+    } LIMIT 50`;
+    const data = await getJson<{
+      results?: { bindings?: Record<string, { value: string }>[] };
+    }>(`https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(sparql)}`);
+    const rok = (v?: string) => (v && /^[+-]?\d{4}/.test(v) ? v.replace(/^\+/, "").slice(0, 10) : null);
+    return (data?.results?.bindings ?? []).map((b) => ({
+      qid: b.p?.value.split("/").pop() ?? "",
+      mbid: b.mb?.value ?? null,
+      label: b.pLabel?.value ?? "",
+      begin: rok(b.begin?.value),
+      end: rok(b.end?.value),
+    })).filter((r) => r.label && !/^Q\d+$/.test(r.label));
+  });
 }
 
 interface Datable {

@@ -346,8 +346,8 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
   // Wikidanych i świecił brakiem składu, choć skład jest powszechnie znany.
   const braki = (m: Membership[]) => !m.length || m.some((x) => !x.begin || (!x.end && !x.current));
   const [wdOf, wdIn] = await Promise.all([
-    braki(raw.memberOf) ? wdMemberships(raw.links).catch(() => []) : Promise.resolve([]),
-    braki(raw.members) ? wdMembers(raw.links).catch(() => []) : Promise.resolve([]),
+    braki(raw.memberOf) ? wdMemberships(raw.links, mbid).catch(() => []) : Promise.resolve([]),
+    braki(raw.members) ? wdMembers(raw.links, mbid).catch(() => []) : Promise.resolve([]),
   ]);
   // Najpierw łatamy daty przy tym, co MusicBrainz zna, a potem dokładamy ludzi
   // i zespoły, których nie zna wcale — z podpisem, skąd pochodzą.
