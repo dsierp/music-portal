@@ -5,6 +5,8 @@ import type { Metadata } from "next";
 import { ARTWORK_ROLES, albumCrew, getArtist, getDiscography, getPlayedOn, getProduced, guessRoles, topAlbum, MbError, STRON_DOMYSLNIE } from "@/lib/musicbrainz";
 import { wikiFromLinks, wikiLogo } from "@/lib/wikipedia";
 import { MbUnavailable } from "@/components/mb-unavailable";
+import { LineupFilter } from "@/components/lineup-filter";
+import { OrderToggle } from "@/components/order-toggle";
 import { currentUser } from "@/lib/auth";
 import { artistSentiment, commentTree, favoriteCount, getMyLists, listsWith, ratingAverages, ratingSummary } from "@/lib/user-data";
 import { AddToList } from "@/components/add-to-list";
@@ -15,7 +17,7 @@ import { Comments } from "@/components/comments";
 import { AlbumCard } from "@/components/cards";
 import { YoutubeVideos } from "@/components/youtube";
 import { relatedBands } from "@/lib/related";
-import { INSTRUMENT_GROUPS, groupsOf, playsInstrument, type InstrumentKey } from "@/lib/instruments";
+import { INSTRUMENT_GROUPS, groupsOf } from "@/lib/instruments";
 import { concertsForArtist } from "@/lib/concerts";
 import { mergeDates, wdGenres, wdMembers, wdMemberships } from "@/lib/wikidata";
 import { CareerTimeline, LineupTimeline } from "@/components/lineup-timeline";
@@ -69,13 +71,16 @@ function MemberList({
 }) {
   if (!items.length) return null;
   return (
-    <div>
+    <div className="lineup-group">
       <h3 className="label mb-1">{title}</h3>
       <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
         {items.map((m, i) => {
           const albums = playedByBand?.get(m.name);
           return (
-            <li key={m.mbid + i} className="text-sm">
+            // data-i = grupy instrumentów tej osoby; po tym filtruje CSS.
+            // Gdy MusicBrainz nie podał instrumentu, bierzemy ten zgadnięty,
+            // żeby filtr nie gubił ludzi, których i tak pokazujemy z „?".
+            <li key={m.mbid + i} className="text-sm" data-i={groupsOf(m.roles.length ? m.roles : guessed?.get(m.mbid) ?? []).join(" ") || "other"}>
               <div className="flex flex-wrap items-baseline gap-x-2">
                 <Link href={`/artist/${m.mbid}`} className="font-medium hover:text-accent2 hover:underline">{m.name}</Link>
                 {m.roles.length > 0 ? (
@@ -127,28 +132,24 @@ function MemberList({
  * MusicBrainz (limit 1/s). Reszta strony nie ma na nie czekać.
  */
 
+
+
 /**
- * Filtr instrumentów nad składem.
- *
- * Przy Ozzym „Jego skład" to trzydzieści pozycji i trzy strony przewijania —
- * a zwykle szuka się jednego: kto grał na gitarze. Chipsy liczymy z tego, co
- * faktycznie jest w składzie, więc przy duecie nie zaśmiecą ekranu.
+ * Liczby do chipsów filtra: ile osób gra na czym. Liczymy z tego, co naprawdę
+ * jest w składzie, więc przy duecie chipsy się nie pojawią (LineupFilter sam
+ * je wtedy chowa).
  */
-function InstrumentFilter({
-  members,
-  wybrany,
-  mbid,
-  t,
-}: {
-  members: Membership[];
-  wybrany: string;
-  mbid: string;
-  t: Dict;
-}) {
-  const licznik = new Map<string, number>();
-  for (const m of members) for (const g of groupsOf(m.roles)) licznik.set(g, (licznik.get(g) ?? 0) + 1);
-  if (licznik.size < 2) return null;
-  const nazwa: Record<string, string> = {
+function policzInstrumenty(members: Membership[], zgadywane?: Map<string, string[]>) {
+  const licznik: Record<string, number> = {};
+  for (const m of members) {
+    for (const g of groupsOf(m.roles.length ? m.roles : zgadywane?.get(m.mbid) ?? [])) licznik[g] = (licznik[g] ?? 0) + 1;
+  }
+  const kolejnosc: string[] = [...INSTRUMENT_GROUPS.map((g) => g.key), "other"];
+  return Object.fromEntries(kolejnosc.filter((k) => licznik[k]).map((k) => [k, licznik[k]]));
+}
+
+function etykietyInstrumentow(t: Dict): Record<string, string> {
+  return {
     vocals: t.artist.timeline.roleVocal,
     guitar: t.artist.timeline.roleGuitar,
     bass: t.artist.timeline.roleBass,
@@ -156,21 +157,6 @@ function InstrumentFilter({
     keys: t.artist.timeline.roleKeys,
     other: t.artist.timeline.roleOther,
   };
-  const kolejnosc: InstrumentKey[] = [...INSTRUMENT_GROUPS.map((g) => g.key), "other"];
-  return (
-    <div className="mb-2 flex flex-wrap gap-1.5">
-      <Link href={`/artist/${mbid}`} className={`chip text-[11px] ${wybrany ? "" : "chip-on"}`}>
-        {t.common.all} <span className="ml-1 font-mono text-[10px] text-muted">{members.length}</span>
-      </Link>
-      {kolejnosc
-        .filter((k) => licznik.has(k))
-        .map((k) => (
-          <Link key={k} href={`/artist/${mbid}?i=${k}`} className={`chip text-[11px] ${wybrany === k ? "chip-on" : ""}`}>
-            {nazwa[k]} <span className="ml-1 font-mono text-[10px] text-muted">{licznik.get(k)}</span>
-          </Link>
-        ))}
-    </div>
-  );
 }
 
 /**
@@ -336,15 +322,12 @@ async function ConcertsSectionWewn({ mbid, name, locale, t }: { mbid: string; na
   );
 }
 
-async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, odNajnowszych, instrument, stron }: { artist: Artist; mbid: string; locale: Locale; t: Dict; odNajnowszych: boolean; instrument: string; stron: number }) {
-  // Adres tej samej strony z podbitą głębokością pobierania — reszta wyborów
-  // (sortowanie, filtr instrumentu) ma przetrwać kliknięcie „pobierz następne".
+async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { artist: Artist; mbid: string; locale: Locale; t: Dict; stron: number }) {
+  // Adres tej samej strony z podbitą głębokością pobierania. Sortowania ani
+  // filtra instrumentu nie ma tu po co przenosić — jedno i drugie żyje już
+  // w przeglądarce, więc kliknięcie ich nie gubi.
   const dalej = (n: number) => {
-    const q = new URLSearchParams();
-    if (odNajnowszych) q.set("plyty", "nowe");
-    if (instrument) q.set("i", instrument);
-    q.set("wiecej", String(n));
-    return `/artist/${mbid}?${q.toString()}#plyty`;
+    return `/artist/${mbid}?wiecej=${n}#plyty`;
   };
   const krotnosc = Math.max(1, Math.round(stron / STRON_DOMYSLNIE));
   // MusicBrainz nagminnie gubi daty przy członkostwie (Inferno w Behemocie od
@@ -379,10 +362,10 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, odNajnowszy
     ...produced.map((p) => p.album.mbid),
   ]), new Map<string, { avg: number; count: number }>());
   const ratings = ratingsS.value;
-  // Filtr instrumentu dotyczy SKŁADU (kto z kim grał), nie listy zespołów.
-  const graNa = (m: Membership) => playsInstrument(m.roles, instrument);
-  const current = artist.members.filter((m) => m.current && graNa(m));
-  const former = artist.members.filter((m) => !m.current && graNa(m));
+  // Filtrowanie po instrumencie robi już przeglądarka (LineupFilter) — serwer
+  // renderuje pełny skład raz, żeby klikanie chipsów było natychmiastowe.
+  const current = artist.members.filter((m) => m.current);
+  const former = artist.members.filter((m) => !m.current);
   const playedByBand = artist.isPerson ? groupByBand(played) : undefined;
   // Płyty pod oś czasu muzyka. NIE z „Grał(a) na płytach": to relacje przy
   // nagraniach, a MusicBrainz ma je tylko dla części zespołów (dla Atheist —
@@ -398,7 +381,7 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, odNajnowszy
   }
   // Kolejność płyt: najpierw wskazujemy „tę jedną", potem cały dorobek
   // kolejnością wydania — od debiutu, bo tak się czyta drogę zespołu.
-  const chronologicznie = odNajnowszych ? albums : [...albums].reverse();
+  const chronologicznie = [...albums].reverse();
   const top = topAlbum(albums, ratings);
   // Nie żywym czasie: skoro artysty już nie ma, nikt nie gra w zespole "obecnie".
   const deceased = artist.isPerson && artist.ended;
@@ -423,7 +406,12 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, odNajnowszy
       {(artist.members.length > 0 || artist.memberOf.length > 0) && (
         <section className="mt-8 space-y-4">
           <h2 className="text-2xl">{artist.isPerson ? t.artist.bandsHeading : t.artist.lineupHeading}</h2>
-          {!artist.isPerson && <InstrumentFilter members={artist.members} wybrany={instrument} mbid={mbid} t={t} />}
+          <LineupFilter
+            counts={artist.isPerson ? {} : policzInstrumenty(artist.members, zgadywane)}
+            labels={etykietyInstrumentow(t)}
+            allLabel={t.common.all}
+            total={artist.members.length}
+          >
           {artist.isPerson && deceased ? (
             <MemberList title={t.artist.playedInBands} items={artist.memberOf.filter((m) => !m.supporting)} playedByBand={playedByBand} ratings={ratings} t={t} />
           ) : (
@@ -456,6 +444,7 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, odNajnowszy
             ratings={ratings}
             t={t}
           />
+          </LineupFilter>
         </section>
       )}
 
@@ -465,11 +454,17 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, odNajnowszy
         <section className="mt-8">
           <h2 className="mb-1 text-2xl">{t.artist.ownBandHeading}</h2>
           <p className="mb-2 text-xs text-muted">{t.artist.ownBandNote}</p>
-          <InstrumentFilter members={ownBand} wybrany={instrument} mbid={mbid} t={t} />
-          <div className="space-y-4">
-            <MemberList title={t.artist.currently} items={ownBand.filter((m) => m.current && graNa(m))} ratings={ratings} t={t} />
-            <MemberList title={t.artist.formerly} items={ownBand.filter((m) => !m.current && graNa(m))} ratings={ratings} t={t} />
-          </div>
+          <LineupFilter
+            counts={policzInstrumenty(ownBand)}
+            labels={etykietyInstrumentow(t)}
+            allLabel={t.common.all}
+            total={ownBand.length}
+          >
+            <div className="space-y-4">
+              <MemberList title={t.artist.currently} items={ownBand.filter((m) => m.current)} ratings={ratings} t={t} />
+              <MemberList title={t.artist.formerly} items={ownBand.filter((m) => !m.current)} ratings={ratings} t={t} />
+            </div>
+          </LineupFilter>
         </section>
       )}
 
@@ -530,30 +525,27 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, odNajnowszy
 
       {albums.length > 0 && (
         <section className="mt-8">
-          <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-2xl">{t.artist.albumsHeading}</h2>
-            {/* Domyślnie kolejnością wydania — dorobek czyta się od początku.
-                Jedno kliknięcie odwraca, gdy chodzi o „co nowego". */}
-            <div className="flex gap-1">
-              <Link href={`/artist/${mbid}`} className={`chip text-[11px] ${odNajnowszych ? "" : "chip-on"}`}>{t.artist.sortOldest}</Link>
-              <Link href={`/artist/${mbid}?plyty=nowe`} className={`chip text-[11px] ${odNajnowszych ? "chip-on" : ""}`}>{t.artist.sortNewest}</Link>
-            </div>
-          </div>
-
-          {/* „Ta jedna płyta" na górze — punkt wejścia dla kogoś, kto zespołu nie
-              zna. Zostaje też niżej, na swoim miejscu w czasie: inaczej dorobek
-              miałby dziurę i nie dałoby się go przejrzeć chronologicznie. */}
-          {top && (
-            <div className="mb-4 rounded-lg border border-accent/50 bg-surface2 p-3">
-              <div className="label mb-2 text-accent2">
-                {top.source === "portal" ? t.artist.topFromPortal : t.artist.topFromMb}
-              </div>
-              <AlbumCard album={top.album} rating={ratings.get(top.album.mbid)} />
-            </div>
-          )}
-
-          <div className="grid gap-2 sm:grid-cols-2">
-            {chronologicznie.map((a) => (
+          {/* Domyślnie kolejnością wydania — dorobek czyta się od początku.
+              Odwrócenie robi przeglądarka: to ta sama lista, nie ma po co
+              pytać serwera (i czekać sekundy na strumieniowaną sekcję). */}
+          <OrderToggle
+            heading={<h2 className="text-2xl">{t.artist.albumsHeading}</h2>}
+            oldestLabel={t.artist.sortOldest}
+            newestLabel={t.artist.sortNewest}
+            before={
+              /* „Ta jedna płyta" na górze — punkt wejścia dla kogoś, kto zespołu
+                 nie zna. Zostaje też niżej, na swoim miejscu w czasie: inaczej
+                 dorobek miałby dziurę i nie dałoby się go przejrzeć po kolei. */
+              top ? (
+                <div className="mb-4 rounded-lg border border-accent/50 bg-surface2 p-3">
+                  <div className="label mb-2 text-accent2">
+                    {top.source === "portal" ? t.artist.topFromPortal : t.artist.topFromMb}
+                  </div>
+                  <AlbumCard album={top.album} rating={ratings.get(top.album.mbid)} />
+                </div>
+              ) : undefined
+            }
+            items={chronologicznie.map((a) => (
               <AlbumCard
                 key={a.mbid}
                 album={a}
@@ -561,7 +553,7 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, odNajnowszy
                 extra={a.mbid === top?.album.mbid ? <div className="text-xs text-accent2">{t.artist.topBadge}</div> : undefined}
               />
             ))}
-          </div>
+          />
         </section>
       )}
       {eps.length > 0 && (
@@ -651,12 +643,10 @@ export default async function ArtistPage({
   searchParams,
 }: {
   params: Promise<{ mbid: string }>;
-  searchParams: Promise<{ plyty?: string; i?: string; wiecej?: string }>;
+  searchParams: Promise<{ wiecej?: string }>;
 }) {
   const { mbid } = await params;
   const sp = await searchParams;
-  const odNajnowszych = sp.plyty === "nowe";
-  const instrument = sp.i ?? "";
   // Głębokość pobierania z MusicBrainz. Domyślnie 4 strony (~1 s na setkę);
   // „pobierz następne" podbija ją o kolejne 4, z sufitem, żeby jedno kliknięcie
   // nie zamieniło strony w minutowe oczekiwanie.
@@ -800,7 +790,7 @@ export default async function ArtistPage({
         )}
 
         <Suspense fallback={<DeepContentLoading t={t} />}>
-          <ArtistDeepContent artist={artist} mbid={mbid} locale={locale} t={t} odNajnowszych={odNajnowszych} instrument={instrument} stron={stron} />
+          <ArtistDeepContent artist={artist} mbid={mbid} locale={locale} t={t} stron={stron} />
         </Suspense>
       </div>
 
@@ -826,6 +816,6 @@ function CrewSection(p: { albums: AlbumSummary[]; t: Dict }) {
 function ConcertsSection(p: { mbid: string; name: string; locale: Locale; t: Dict }) {
   return osłona("Koncerty", () => ConcertsSectionWewn(p), p.t);
 }
-function ArtistDeepContent(p: { artist: Artist; mbid: string; locale: Locale; t: Dict; odNajnowszych: boolean; instrument: string; stron: number }) {
+function ArtistDeepContent(p: { artist: Artist; mbid: string; locale: Locale; t: Dict; stron: number }) {
   return osłona("Dyskografia i skład", () => ArtistDeepContentWewn(p), p.t);
 }

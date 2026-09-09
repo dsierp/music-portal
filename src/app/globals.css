@@ -110,3 +110,22 @@ a:hover { color: var(--accent2); }
 .album-mark { cursor: pointer; }
 .album-mark:hover circle { stroke: var(--accent2); }
 .album-mark:hover line { stroke: var(--accent2); opacity: 1; }
+
+/* Filtr instrumentów nad składem (LineupFilter).
+   Serwer renderuje całą listę raz, z `data-i` na każdej pozycji; klik w chips
+   przestawia `data-filter` na kontenerze i to CSS decyduje, co widać. Bez rundy
+   do serwera — filtrowanie ma być natychmiastowe.
+   `:has()` chowa też nagłówek grupy („Obecnie"), gdy nikt w niej nie pasuje. */
+.lineup[data-filter="vocals"] li:not([data-i~="vocals"]),
+.lineup[data-filter="guitar"] li:not([data-i~="guitar"]),
+.lineup[data-filter="bass"] li:not([data-i~="bass"]),
+.lineup[data-filter="drums"] li:not([data-i~="drums"]),
+.lineup[data-filter="keys"] li:not([data-i~="keys"]),
+.lineup[data-filter="other"] li:not([data-i~="other"]) { display: none; }
+
+.lineup[data-filter="vocals"] .lineup-group:not(:has(li[data-i~="vocals"])),
+.lineup[data-filter="guitar"] .lineup-group:not(:has(li[data-i~="guitar"])),
+.lineup[data-filter="bass"] .lineup-group:not(:has(li[data-i~="bass"])),
+.lineup[data-filter="drums"] .lineup-group:not(:has(li[data-i~="drums"])),
+.lineup[data-filter="keys"] .lineup-group:not(:has(li[data-i~="keys"])),
+.lineup[data-filter="other"] .lineup-group:not(:has(li[data-i~="other"])) { display: none; }
