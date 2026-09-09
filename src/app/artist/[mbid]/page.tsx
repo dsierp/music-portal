@@ -19,7 +19,7 @@ import { YoutubeVideos } from "@/components/youtube";
 import { relatedBands } from "@/lib/related";
 import { INSTRUMENT_GROUPS, groupsOf } from "@/lib/instruments";
 import { concertsForArtist } from "@/lib/concerts";
-import { mergeDates, wdGenres, wdMembers, wdMemberships } from "@/lib/wikidata";
+import { addMissing, mergeDates, wdGenres, wdMembers, wdMemberships } from "@/lib/wikidata";
 import { CareerTimeline, LineupTimeline } from "@/components/lineup-timeline";
 import { dbSafe } from "@/lib/db-safe";
 import { DbWarning } from "@/components/db-warning";
@@ -82,7 +82,14 @@ function MemberList({
             // żeby filtr nie gubił ludzi, których i tak pokazujemy z „?".
             <li key={m.mbid + i} className="text-sm" data-i={groupsOf(m.roles.length ? m.roles : guessed?.get(m.mbid) ?? []).join(" ") || "other"}>
               <div className="flex flex-wrap items-baseline gap-x-2">
-                <Link href={`/artist/${m.mbid}`} className="font-medium hover:text-accent2 hover:underline">{m.name}</Link>
+                {/* Bez MBID-u nie ma dokąd linkować (wpis z Wikidanych, którego
+                    MusicBrainz nie zna) — prowadzimy więc do wyszukiwarki. */}
+                {m.mbid ? (
+                  <Link href={`/artist/${m.mbid}`} className="font-medium hover:text-accent2 hover:underline">{m.name}</Link>
+                ) : (
+                  <Link href={`/szukaj?q=${encodeURIComponent(m.name)}`} className="font-medium hover:text-accent2 hover:underline">{m.name}</Link>
+                )}
+                {m.fromWikidata && <span className="font-mono text-[10px] text-faint" title={t.artist.memberFromWikidataNote}>wd</span>}
                 {m.roles.length > 0 ? (
                   <span className="text-muted">{m.roles.join(", ")}</span>
                 ) : (
@@ -334,15 +341,31 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
   // 1997 — relacja jest, dat nie ma). Wikidane trzymają to samo strukturalnie,
   // więc zanim cokolwiek narysujemy, łatamy dziury stamtąd. Pytamy tylko wtedy,
   // gdy naprawdę czegoś brakuje — jedna baza jako źródło jest mniej myląca.
-  const braki = (m: Membership[]) => m.some((x) => !x.begin || (!x.end && !x.current));
+  // Pusta lista to NAJWIĘKSZY brak, a `[].some()` jest fałszem — przez to
+  // zespół bez ani jednej relacji w MusicBrainz (Mgła) nigdy nie pytał
+  // Wikidanych i świecił brakiem składu, choć skład jest powszechnie znany.
+  const braki = (m: Membership[]) => !m.length || m.some((x) => !x.begin || (!x.end && !x.current));
   const [wdOf, wdIn] = await Promise.all([
     braki(raw.memberOf) ? wdMemberships(raw.links).catch(() => []) : Promise.resolve([]),
     braki(raw.members) ? wdMembers(raw.links).catch(() => []) : Promise.resolve([]),
   ]);
+  // Najpierw łatamy daty przy tym, co MusicBrainz zna, a potem dokładamy ludzi
+  // i zespoły, których nie zna wcale — z podpisem, skąd pochodzą.
+  const zWikidanych = (s: { mbid: string | null; label: string; begin: string | null; end: string | null }): Membership => ({
+    mbid: s.mbid ?? "",
+    name: s.label,
+    type: null,
+    roles: [],
+    begin: s.begin,
+    end: s.end,
+    current: !s.end,
+    fromWikidata: true,
+    datesFrom: s.begin || s.end ? ("wikidata" as const) : undefined,
+  });
   const artist: Artist = {
     ...raw,
-    memberOf: mergeDates(raw.memberOf, wdOf),
-    members: mergeDates(raw.members, wdIn),
+    memberOf: addMissing(mergeDates(raw.memberOf, wdOf), wdOf, zWikidanych),
+    members: addMissing(mergeDates(raw.members, wdIn), wdIn, zWikidanych),
   };
   const [disco, playedR, producedR] = await Promise.all([
     getDiscography(mbid).catch(() => []),

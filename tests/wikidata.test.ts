@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mergeDates, wdTime } from "../src/lib/wikidata.ts";
+import { mergeDates, wdTime, addMissing } from "../src/lib/wikidata.ts";
 
 test("czas z Wikidanych czytamy z uwzględnieniem precyzji", () => {
   assert.equal(wdTime({ time: "+1997-01-01T00:00:00Z", precision: 11 }), "1997-01-01");
@@ -38,4 +38,30 @@ test("bez MBID-u dopasowujemy po nazwie, a znaleziony koniec kasuje „obecnie\"
 test("puste Wikidane nic nie psują", () => {
   const items = [{ mbid: "a", name: "A", begin: null, end: null, current: true }];
   assert.deepEqual(mergeDates(items, []), items);
+});
+
+test("addMissing: dokłada ludzi, których MusicBrainz nie zna", () => {
+  const spans = [
+    { mbid: "m1", qid: "Q1", label: "Znany", begin: "2000", end: null },
+    { mbid: null, qid: "Q2", label: "Nieznany MB", begin: "2005", end: null },
+    { mbid: null, qid: "Q3", label: "ZNANY", begin: null, end: null },
+  ];
+  const out = addMissing(
+    [{ mbid: "m1", name: "Znany", begin: "2000", end: null, current: true }],
+    spans,
+    (s) => ({ mbid: s.mbid ?? "", name: s.label, begin: s.begin, end: s.end, current: !s.end }),
+  );
+  assert.equal(out.length, 2, "dubel po MBID i po nazwie (bez względu na wielkość liter) nie wchodzi");
+  assert.equal(out[1].name, "Nieznany MB");
+});
+
+test("addMissing: pusty skład to najczęstszy przypadek — bierzemy wszystko", () => {
+  const out = addMissing([], [{ mbid: null, qid: "Q1", label: "M.", begin: "2000", end: null }], (s) => ({
+    mbid: s.mbid ?? "",
+    name: s.label,
+    begin: s.begin,
+    end: s.end,
+    current: !s.end,
+  }));
+  assert.deepEqual(out.map((x) => x.name), ["M."]);
 });

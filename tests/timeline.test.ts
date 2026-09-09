@@ -105,3 +105,11 @@ test("oś czasu: współpraca sesyjna nie udaje członkostwa", () => {
   assert.equal(rows.find((r) => r.mbid === "b1")!.spans[0].supporting, undefined);
   assert.equal(rows.find((r) => r.mbid === "b2")!.spans[0].supporting, true);
 });
+
+test("oś czasu: osoby bez MBID nie zlepiają się w jeden wiersz", () => {
+  const rows = mergeSpans([
+    { mbid: "", name: "M.", roles: [], begin: "2000", end: null, current: true },
+    { mbid: "", name: "Darkside", roles: [], begin: "2008", end: null, current: true },
+  ]);
+  assert.equal(rows.length, 2);
+});

@@ -290,6 +290,13 @@ export interface Membership {
    * o tym wprost na osi, zamiast udawać, że to ten sam materiał.
    */
   datesFrom?: "wikidata";
+  /**
+   * true = tej osoby nie ma w MusicBrainz w ogóle, przyszła z Wikidanych.
+   * Zdarza się przy zespołach, których MB po prostu nie opisał — Mgła ma
+   * w Wikipedii skład, a w MusicBrainz ani jednej relacji. Lepiej pokazać
+   * z podpisem skąd, niż udawać, że zespół nie ma składu.
+   */
+  fromWikidata?: boolean;
 }
 export interface Artist {
   mbid: string;

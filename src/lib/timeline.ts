@@ -67,9 +67,12 @@ export function mergeSpans<T extends MembershipLike, M = never>(
 ): TimelineRow<M>[] {
   const map = new Map<string, TimelineRow<M>>();
   for (const m of items) {
-    const row = map.get(m.mbid) ?? { mbid: m.mbid, name: m.name, spans: [], marks: marksFor?.(m) ?? [] };
+    // Klucz po MBID, a gdy go nie ma (ludzie doniesieni z Wikidanych) — po
+    // nazwisku. Inaczej wszyscy bez MBID-u zlepiliby się w jeden wiersz.
+    const klucz = m.mbid || m.name.toLowerCase();
+    const row = map.get(klucz) ?? { mbid: m.mbid, name: m.name, spans: [], marks: marksFor?.(m) ?? [] };
     row.spans.push({ begin: m.begin, end: m.end, current: m.current, roles: m.roles, fromWikidata: m.datesFrom === "wikidata", supporting: m.supporting });
-    map.set(m.mbid, row);
+    map.set(klucz, row);
   }
   for (const row of map.values()) {
     row.spans.sort((a, b) => (a.begin ?? "").localeCompare(b.begin ?? ""));

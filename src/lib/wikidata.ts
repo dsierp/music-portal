@@ -219,3 +219,26 @@ export async function wdGenres(links: Links, lang = "en"): Promise<string[]> {
       .slice(0, 8);
   }).catch(() => []);
 }
+
+/**
+ * Dołożenie ludzi, których MusicBrainz w ogóle nie zna.
+ *
+ * `mergeDates` tylko łata daty przy istniejących pozycjach — a bywa gorzej:
+ * relacji nie ma wcale i strona zespołu świeci pustym składem (Mgła: dwie
+ * osoby w Wikipedii, zero w MusicBrainz). Wtedy bierzemy skład z Wikidanych
+ * i dopisujemy tych, których na liście nie ma — po MBID, a jak go brak, po
+ * nazwisku. Każdy taki wpis jest oznaczony, żeby było widać, skąd pochodzi.
+ */
+export function addMissing<T extends Datable>(
+  items: T[],
+  spans: WdSpan[],
+  make: (s: WdSpan) => T,
+): T[] {
+  if (!spans.length) return items;
+  const maMbid = new Set(items.map((i) => i.mbid));
+  const maNazwe = new Set(items.map((i) => i.name.toLowerCase()));
+  const nowe = spans
+    .filter((s) => !(s.mbid && maMbid.has(s.mbid)) && !maNazwe.has(s.label.toLowerCase()))
+    .map(make);
+  return [...items, ...nowe];
+}
