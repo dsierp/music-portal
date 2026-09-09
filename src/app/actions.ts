@@ -218,7 +218,7 @@ export async function addToListAction(formData: FormData) {
   });
   if (type !== "CONCERT") revalidatePath(pathFor(type, id));
   else revalidatePath("/koncerty");
-  revalidatePath(`/lista/${listId}`);
+  revalidatePath(`/podroz/${listId}`);
   revalidatePath("/listy");
 }
 
@@ -226,7 +226,7 @@ export async function removeFromListAction(formData: FormData) {
   const u = await requireUser();
   const listId = String(formData.get("listId") ?? "");
   await ud.removeFromList(u.id, listId, listTarget.parse(formData.get("type")), String(formData.get("mbid") ?? ""));
-  revalidatePath(`/lista/${listId}`);
+  revalidatePath(`/podroz/${listId}`);
 }
 
 export async function createListAction(formData: FormData) {
@@ -235,7 +235,7 @@ export async function createListAction(formData: FormData) {
   if (!title) return;
   const list = await ud.createList(u.id, title, String(formData.get("description") ?? "") || null);
   revalidatePath("/listy");
-  redirect(`/lista/${list.id}`);
+  redirect(`/podroz/${list.id}`);
 }
 
 export async function deleteListAction(formData: FormData) {
@@ -251,7 +251,7 @@ export async function shareListAction(formData: FormData) {
   const listId = String(formData.get("listId") ?? "");
   const to = formData.getAll("to").map(String).filter(Boolean);
   await ud.shareList(u.id, listId, to, String(formData.get("note") ?? "") || null);
-  revalidatePath(`/lista/${listId}`);
+  revalidatePath(`/podroz/${listId}`);
   revalidatePath("/listy");
 }
 

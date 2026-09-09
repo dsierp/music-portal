@@ -136,7 +136,7 @@ export default async function Home() {
                 <ul className="mt-2 space-y-1 text-sm">
                   {dlaMnie.slice(0, 4).map((l) => (
                     <li key={`s-${l.id}`} className="flex items-baseline justify-between gap-2">
-                      <Link href={`/lista/${l.id}`} className="truncate hover:text-accent2">
+                      <Link href={`/podroz/${l.id}`} className="truncate hover:text-accent2">
                         <span className="text-accent2">★ </span>{l.title}
                       </Link>
                       <span className="shrink-0 font-mono text-[10px] text-faint">{fmt(t.lists.sharedBy, { name: l.from })}</span>
@@ -148,7 +148,7 @@ export default async function Home() {
                 <ul className="mt-2 space-y-1 text-sm">
                   {mojeListy.slice(0, 5).map((l) => (
                     <li key={l.id} className="flex items-baseline justify-between gap-2">
-                      <Link href={`/lista/${l.id}`} className="truncate hover:text-accent2">{l.title}</Link>
+                      <Link href={`/podroz/${l.id}`} className="truncate hover:text-accent2">{l.title}</Link>
                       <span className="shrink-0 font-mono text-[10px] text-faint">{plural(locale, l.items, t.lists.itemsCount)}</span>
                     </li>
                   ))}

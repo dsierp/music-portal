@@ -330,6 +330,11 @@ export interface WorkedOn {
 export interface PlayedOn {
   album: AlbumSummary;
   roles: string[];
+  /**
+   * Ile utworów — z relacji przy NAGRANIACH. Zero znaczy „kredyt wpisany przy
+   * całym wydaniu", a nie „zagrał na zero utworów": tak MusicBrainz zapisuje
+   * większość sesyjnego grania i wtedy liczby po prostu nie ma.
+   */
   trackCount: number;
   /** nazwa zespołu, jeśli płyta jest jednego z zespołów muzyka (z memberOf); null = gościnnie/sesyjnie */
   withBand: string | null;
@@ -735,6 +740,29 @@ export async function getPlayedOn(mbid: string, bands: Membership[] = []): Promi
     return out;
   });
   const groups = new Map<string, PlayedOn>();
+
+  /**
+   * Granie wpisane przy CAŁYM WYDANIU (nie przy pojedynczych nagraniach).
+   * Tak wygląda większość kredytów sesyjnych: „drums" na całej płycie. Bez tego
+   * strona muzyka gubiła dokładnie te płyty, na których był tylko sesyjnym —
+   * a u kogoś takiego jak Colaiuta to jest jego cały dorobek.
+   */
+  const zWydan = await browseReleasesOf(mbid).catch(() => []);
+  for (const rel of zWydan) {
+    const rg = rel["release-group"];
+    if (!rg) continue;
+    const credit = rg["artist-credit"] ?? rel["artist-credit"] ?? [];
+    if (credit.some((p) => p.artist.id === mbid)) continue; // to jego własna płyta
+    const roles = (rel.relations ?? [])
+      .filter((r) => r.artist?.id === mbid && PERFORMANCE_TYPES.has(r.type))
+      .flatMap(rolesOf);
+    if (!roles.length) continue;
+    const band = credit.map((p) => bandNames.get(p.artist.id)).find(Boolean) ?? null;
+    const e = groups.get(rg.id) ?? { album: normReleaseGroup(rg, rel["artist-credit"]), roles: [], trackCount: 0, withBand: band };
+    for (const r of roles) if (!e.roles.includes(r)) e.roles.push(r);
+    groups.set(rg.id, e);
+  }
+
   for (const rec of recs) {
     // pomijamy nagrania, w których muzyk jest w artist credit (to jego dyskografia)
     if ((rec["artist-credit"] ?? []).some((p) => p.artist.id === mbid)) continue;
@@ -863,8 +891,17 @@ export interface ProducedAlbum {
   roles: string[];
 }
 
-export async function getProduced(mbid: string): Promise<ProducedAlbum[]> {
-  const releases = await cached(`mb:produced:v1:${mbid}`, TTL.lookup, async () => {
+/**
+ * Wydania powiązane z artystą — także RELACJAMI, nie tylko przez artist credit.
+ *
+ * Jedno pobranie dla dwóch pytań: „co wyprodukował" i „na czym grał". Sesyjne
+ * kredyty MusicBrainz trzyma raz przy nagraniu, a raz przy CAŁYM WYDANIU:
+ * Vinnie Colaiuta na „The System Has Failed" Megadeth jest wpisany przy wydaniu,
+ * więc przeglądanie samych nagrań go tam nie widziało — i płyta znikała z jego
+ * strony, choć na stronie płyty stał w składzie.
+ */
+async function browseReleasesOf(mbid: string): Promise<(MbRelease & { relations?: MbArtistRel[] })[]> {
+  return cached(`mb:rel-browse:v1:${mbid}`, TTL.lookup, async () => {
     const out: (MbRelease & { relations?: MbArtistRel[] })[] = [];
     for (let offset = 0; offset < 400; offset += 100) {
       const page = await mbFetch<{ releases: (MbRelease & { relations?: MbArtistRel[] })[]; "release-count": number }>(
@@ -877,6 +914,10 @@ export async function getProduced(mbid: string): Promise<ProducedAlbum[]> {
     }
     return out;
   });
+}
+
+export async function getProduced(mbid: string): Promise<ProducedAlbum[]> {
+  const releases = await browseReleasesOf(mbid);
 
   const groups = new Map<string, ProducedAlbum>();
   for (const rel of releases) {

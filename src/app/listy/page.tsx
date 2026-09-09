@@ -88,7 +88,7 @@ export default async function ListsPage() {
               <ul className="mt-3 space-y-1 text-sm">
                 {moje.map((l) => (
                   <li key={l.id} className="flex items-baseline justify-between gap-2">
-                    <Link href={`/lista/${l.id}`} className="truncate font-medium hover:text-accent2">{l.title}</Link>
+                    <Link href={`/podroz/${l.id}`} className="truncate font-medium hover:text-accent2">{l.title}</Link>
                     <span className="shrink-0 font-mono text-[10px] text-faint">{plural(locale, l.items, t.lists.itemsCount)}</span>
                   </li>
                 ))}
@@ -110,7 +110,7 @@ export default async function ListsPage() {
                 {dlaMnie.map((l) => (
                   <li key={l.id} className="rounded border border-rule bg-surface2 p-2">
                     <div className="flex items-baseline justify-between gap-2">
-                      <Link href={`/lista/${l.id}`} className="truncate font-medium hover:text-accent2">{l.title}</Link>
+                      <Link href={`/podroz/${l.id}`} className="truncate font-medium hover:text-accent2">{l.title}</Link>
                       <span className="shrink-0 font-mono text-[10px] text-faint">{plural(locale, l.items, t.lists.itemsCount)}</span>
                     </div>
                     <div className="text-xs text-muted">{fmt(t.lists.sharedBy, { name: l.from })}</div>
