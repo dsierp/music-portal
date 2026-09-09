@@ -4,7 +4,7 @@ process.env.MB_FIXTURES = "tests/fixtures/mb";
 // `||=`, nie `??=`: pusta zmienna z .env przeszłaby dalej i testy poszłyby na
 // prawdziwą bazę PGlite (czyli wolno, a przy zajętym katalogu — wcale).
 process.env.DATABASE_URL ||= "postgresql://invalid";
-import { getAlbum, getArtist, getDiscography, getPlayedOn, findAlbumMbid, searchAlbums, buildLinks, normalizeUserAgent, artistQuery, isMembershipRelation } from "../src/lib/musicbrainz";
+import { getAlbum, getArtist, getDiscography, getPlayedOn, findAlbumMbid, searchAlbums, buildLinks, normalizeUserAgent, artistQuery, isMembershipRelation, isMusicianRole } from "../src/lib/musicbrainz";
 import { ID } from "./make-fixtures";
 
 test("album: skład z relacji nagrań, najwcześniejsze wydanie, linki", async () => {
@@ -119,4 +119,15 @@ test("relacje 'grał z': sideman liczy się tak samo jak członek zespołu", () 
   // …ale nie wszystko: produkcja to osobna sekcja strony.
   assert.equal(isMembershipRelation("producer"), false);
   assert.equal(isMembershipRelation("teacher"), false);
+});
+
+test("kredyty przy wydaniach: granie odpada, wydania tej samej płyty scalone", async () => {
+  const a = await getArtist(ID.mirai);
+  // Sekcja „Produkcja, realizacja, okładki" ma nie zawierać grania — na stronie
+  // Vinnie Colaiuty trzy czwarte pozycji to były bębny.
+  for (const w of a.workedOn) {
+    for (const rola of w.roles) assert.equal(isMusicianRole(rola), false, `granie w produkcji: ${rola}`);
+  }
+  const klucze = a.workedOn.map((w) => `${w.title.toLowerCase()}|${(w.date ?? "").slice(0, 4)}`);
+  assert.equal(new Set(klucze).size, klucze.length, "ta sama płyta nie powtarza się przez reedycje");
 });

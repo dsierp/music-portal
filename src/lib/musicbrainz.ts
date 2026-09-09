@@ -311,6 +311,15 @@ export interface Artist {
   aliases: string[];
   /** produkcja, realizacja, okładki — praca przy wydaniach, nie granie */
   workedOn: WorkedOn[];
+  /**
+   * Granie wpisane przy WYDANIU, wzięte z samego lookupu artysty.
+   *
+   * To najpewniejsze źródło dorobku sesyjnego: jedno zapytanie zwraca komplet
+   * relacji tej osoby, bez stronicowania. Przeglądanie wydań (`getPlayedOn`)
+   * chodzi po setkach pozycji i przy kimś tak płodnym jak Colaiuta urywa się
+   * zanim dojdzie do Stinga — a tutaj „Sacred Love" jest od razu.
+   */
+  sessionOn: WorkedOn[];
 }
 /**
  * Praca przy wydaniu, która NIE jest graniem: produkcja, realizacja dźwięku,
@@ -669,24 +678,46 @@ export async function getArtist(mbid: string): Promise<Artist> {
   const byCurrent = (x: Membership, y: Membership) => Number(y.current) - Number(x.current) || (x.begin ?? "").localeCompare(y.begin ?? "");
   members.sort(byCurrent);
   memberOf.sort(byCurrent);
-  // Produkcja, realizacja, okładki — relacje przypięte do wydań.
+  /**
+   * Produkcja, realizacja, okładki — relacje przypięte do WYDAŃ.
+   *
+   * Dwa filtry, oba wzięły się z tego, co widać było na stronie Vinnie
+   * Colaiuty. Po pierwsze: przy wydaniu wiszą też kredyty za GRANIE
+   * („drums (drum set)", „vocals"), a te należą do „Grał(a) na płytach" —
+   * sekcja o produkcji, w której trzy czwarte pozycji to bębny, kłamie.
+   * Po drugie: ta sama płyta ma po kilka wydań (reedycje, wersje krajowe),
+   * każde z własną relacją — więc scalamy po tytule i roku, sumując role.
+   */
   const workedMap = new Map<string, WorkedOn>();
+  const sessionMap = new Map<string, WorkedOn>();
   for (const r of a.relations ?? []) {
     const rel = r.release ?? r["release-group"];
     if (!rel || (r["target-type"] !== "release" && r["target-type"] !== "release_group")) continue;
+    const wszystkie = rolesOf(r);
+    const przyPulpicie = wszystkie.filter((x) => !isMusicianRole(x));
+    const granie = wszystkie.filter((x) => isMusicianRole(x));
+    if (!przyPulpicie.length && !granie.length) continue;
     const credit = normCredit(rel["artist-credit"]);
     const relDate = ("date" in rel ? rel.date : undefined) ?? ("first-release-date" in rel ? rel["first-release-date"] : undefined) ?? null;
-    const e: WorkedOn = workedMap.get(rel.id) ?? {
-      releaseMbid: rel.id,
-      title: rel.title,
-      artistText: creditText(credit),
-      date: relDate,
-      roles: [],
+    const klucz = `${rel.title.toLowerCase()}|${(relDate ?? "").slice(0, 4)}`;
+    const dopisz = (mapa: Map<string, WorkedOn>, role: string[]) => {
+      if (!role.length) return;
+      const e: WorkedOn = mapa.get(klucz) ?? {
+        releaseMbid: rel.id,
+        title: rel.title,
+        artistText: creditText(credit),
+        date: relDate,
+        roles: [],
+      };
+      for (const rola of role) if (!e.roles.includes(rola)) e.roles.push(rola);
+      mapa.set(klucz, e);
     };
-    for (const role of rolesOf(r)) if (!e.roles.includes(role)) e.roles.push(role);
-    workedMap.set(rel.id, e);
+    dopisz(workedMap, przyPulpicie);
+    dopisz(sessionMap, granie);
   }
-  const workedOn = [...workedMap.values()].sort((x, y) => (y.date ?? "").localeCompare(x.date ?? ""));
+  const poDacie = (x: WorkedOn, y: WorkedOn) => (y.date ?? "").localeCompare(x.date ?? "");
+  const workedOn = [...workedMap.values()].sort(poDacie);
+  const sessionOn = [...sessionMap.values()].sort(poDacie);
 
   const genres = topNames(a.genres);
   const isJazz = genres.some((g) => g.includes("jazz"));
@@ -709,6 +740,7 @@ export async function getArtist(mbid: string): Promise<Artist> {
     memberOf,
     aliases: (a.aliases ?? []).map((x) => x.name).filter((n) => n !== a.name).slice(0, 5),
     workedOn,
+    sessionOn,
   };
 }
 

@@ -366,6 +366,10 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
   // renderuje pełny skład raz, żeby klikanie chipsów było natychmiastowe.
   const current = artist.members.filter((m) => m.current);
   const former = artist.members.filter((m) => !m.current);
+  // Sesyjne kredyty przy wydaniu: pokazujemy te, których nie ma już wyżej jako
+  // karty płyt — inaczej ta sama pozycja byłaby na stronie dwa razy.
+  const znane = new Set(played.map((p) => p.album.title.toLowerCase()));
+  const sesyjne = artist.sessionOn.filter((w) => !znane.has(w.title.toLowerCase())).slice(0, 120);
   const playedByBand = artist.isPerson ? groupByBand(played) : undefined;
   // Płyty pod oś czasu muzyka. NIE z „Grał(a) na płytach": to relacje przy
   // nagraniach, a MusicBrainz ma je tylko dla części zespołów (dla Atheist —
@@ -494,7 +498,7 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
         </section>
       )}
 
-      {played.length > 0 && (
+      {(played.length > 0 || sesyjne.length > 0) && (
         <section className="mt-8">
           <h2 className="mb-2 text-2xl">{t.artist.playedOnHeading} <span className="font-mono text-sm text-muted">{played.length}</span></h2>
           <p className="mb-3 text-xs text-muted">{t.artist.playedOnNote}</p>
@@ -513,6 +517,23 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
               />
             ))}
           </div>
+          {/* Granie wpisane przy wydaniu, prosto z lookupu artysty. Bez tego
+              Sting („Sacred Love") nie miał jak się pojawić: przeglądanie wydań
+              urywa się przy takiej liczbie pozycji, a ten komplet mamy od ręki.
+              Płyty, które i tak są wyżej jako karty, pomijamy. */}
+          {sesyjne.length > 0 && (
+            <ul className="mt-3 grid gap-x-6 gap-y-1 sm:grid-cols-2">
+              {sesyjne.map((w) => (
+                <li key={w.releaseMbid} className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                  <Link href={`/go/mb-release/${encodeURIComponent(w.releaseMbid)}`} className="font-medium hover:text-accent2 hover:underline">
+                    {w.artistText ? `${w.artistText} – ` : ""}<i>{w.title}</i>
+                  </Link>
+                  <span className="font-mono text-[10px] text-accent2">{w.roles.join(", ")}</span>
+                  {w.date && <span className="font-mono text-[10px] text-faint">{w.date.slice(0, 4)}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
           {played.length > 40 * krotnosc && <p className="mt-2 text-xs text-faint">{fmt(t.artist.producedMore, { n: played.length })}</p>}
           {wiecejGrania && (
             <p className="mt-3">
