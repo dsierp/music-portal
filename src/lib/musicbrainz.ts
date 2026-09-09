@@ -668,8 +668,14 @@ function normMembership(r: MbArtistRel): Membership | null {
 }
 
 export async function getArtist(mbid: string): Promise<Artist> {
-  const a = await cached(`mb:artist:${mbid}`, TTL.lookup, () =>
-    mbFetch<MbArtist>(`/artist/${mbid}`, { inc: "artist-rels+release-rels+release-group-rels+url-rels+genres+tags+aliases" }),
+  // v2: doszło `artist-credits`. Bez tego wydania przy relacjach wracały bez
+  // wykonawcy i sesyjne kredyty wyglądały jak sieroty: „Sacred Love", a nie
+  // „Sting – Sacred Love". Przy perkusiście to pół informacji — bo najciekawsze
+  // jest właśnie U KOGO grał.
+  const a = await cached(`mb:artist:v2:${mbid}`, TTL.lookup, () =>
+    mbFetch<MbArtist>(`/artist/${mbid}`, {
+      inc: "artist-rels+release-rels+release-group-rels+url-rels+genres+tags+aliases+artist-credits",
+    }),
   );
   const members: Membership[] = [];
   const memberOf: Membership[] = [];

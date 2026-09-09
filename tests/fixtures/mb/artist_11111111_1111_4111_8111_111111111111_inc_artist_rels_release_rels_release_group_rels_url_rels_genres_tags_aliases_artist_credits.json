@@ -1,0 +1,94 @@
+{
+ "id": "11111111-1111-4111-8111-111111111111",
+ "name": "Sigh",
+ "sort-name": "Sigh",
+ "type": "Group",
+ "country": "JP",
+ "area": {
+  "name": "Tokyo"
+ },
+ "life-span": {
+  "begin": "1989",
+  "ended": false
+ },
+ "disambiguation": "Japanese avant-garde black metal band",
+ "genres": [
+  {
+   "name": "black metal",
+   "count": 10
+  },
+  {
+   "name": "avant-garde metal",
+   "count": 8
+  }
+ ],
+ "tags": [],
+ "aliases": [],
+ "relations": [
+  {
+   "type": "member of band",
+   "direction": "backward",
+   "attributes": [
+    "vocals",
+    "keyboard",
+    "original"
+   ],
+   "begin": "1989",
+   "ended": false,
+   "target-type": "artist",
+   "artist": {
+    "id": "22222222-2222-4222-8222-222222222222",
+    "name": "Mirai Kawashima",
+    "type": "Person"
+   }
+  },
+  {
+   "type": "member of band",
+   "direction": "backward",
+   "attributes": [
+    "saxophone",
+    "vocals"
+   ],
+   "begin": "2007",
+   "ended": false,
+   "target-type": "artist",
+   "artist": {
+    "id": "33333333-3333-4333-8333-333333333333",
+    "name": "Dr. Mikannibal",
+    "type": "Person"
+   }
+  },
+  {
+   "type": "member of band",
+   "direction": "backward",
+   "attributes": [
+    "drums"
+   ],
+   "begin": "1990",
+   "end": "2004",
+   "ended": true,
+   "target-type": "artist",
+   "artist": {
+    "id": "66666666-6666-4666-8666-666666666666",
+    "name": "Satoshi Fujinami",
+    "type": "Person"
+   }
+  },
+  {
+   "type": "wikipedia",
+   "direction": "forward",
+   "target-type": "url",
+   "url": {
+    "resource": "https://en.wikipedia.org/wiki/Sigh_(band)"
+   }
+  },
+  {
+   "type": "official homepage",
+   "direction": "forward",
+   "target-type": "url",
+   "url": {
+    "resource": "https://sigh.example"
+   }
+  }
+ ]
+}

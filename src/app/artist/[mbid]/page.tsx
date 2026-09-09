@@ -548,7 +548,7 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
 
       {(played.length > 0 || sesyjne.length > 0) && (
         <section className="mt-8">
-          <h2 className="mb-2 text-2xl">{t.artist.playedOnHeading} <span className="font-mono text-sm text-muted">{played.length}</span></h2>
+          <h2 className="mb-2 text-2xl">{t.artist.playedOnHeading} <span className="font-mono text-sm text-muted">{played.length + sesyjne.length}</span></h2>
           <p className="mb-3 text-xs text-muted">{t.artist.playedOnNote}</p>
           <div className="grid gap-2 sm:grid-cols-2">
             {played.slice(0, 40 * krotnosc).map((p) => (
