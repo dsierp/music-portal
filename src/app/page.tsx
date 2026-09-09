@@ -11,6 +11,7 @@ import { lineupNews } from "@/lib/lineup-news";
 import { getFavoriteArtists, getGenres, getLikedAlbums, getMyLists, listsForMe, recentComments, travelJournal } from "@/lib/user-data";
 import { TravelJournal } from "@/components/travel-journal";
 import { nowPlaying, spotifyConfigured } from "@/lib/spotify";
+import { journeyFromReleases } from "@/app/actions";
 import type { JournalEvent } from "@/lib/journal";
 import { genreToSection } from "@/lib/genres";
 import { SKIP_ONBOARDING } from "@/lib/onboarding";
@@ -167,6 +168,14 @@ export default async function Home() {
               </div>
             );
           })}
+          {user && sections[0] && stars.some((r) => r.sectionId === sections[0].id && r.mbid) && (
+            <form action={journeyFromReleases} className="mt-4">
+              <input type="hidden" name="sectionId" value={sections[0].id} />
+              <input type="hidden" name="title" value={`${sections[0].title} ${sections[0].date}`} />
+              <button className="btn btn-accent">{t.releases.journeyFromReleases}</button>
+              <span className="ml-2 text-[10px] text-faint">{t.releases.journeyFromReleasesNote}</span>
+            </form>
+          )}
           {!stars.length && <p className="mt-3 text-sm text-muted">{t.home.noReleasesBefore}<code>npm run import:pns</code>{t.home.noReleasesAfter}</p>}
         </section>
 

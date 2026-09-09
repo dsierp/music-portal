@@ -9,6 +9,7 @@ import { orderByPopularity } from "@/lib/popularity";
 import { currentUser } from "@/lib/auth";
 import { getGenres } from "@/lib/user-data";
 import { i18n } from "@/lib/t";
+import { journeyFromReleases } from "@/app/actions";
 
 /** Tytuł w zakładce też idzie w języku czytelnika. */
 export async function generateMetadata(): Promise<Metadata> {
@@ -102,7 +103,19 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
       <div>
 
         {sections.map((s) => (
-          <ReleaseSection key={s.id} section={s} releases={rel.filter((r) => r.sectionId === s.id)} filter={filter} t={t} />
+          <div key={s.id}>
+            <ReleaseSection section={s} releases={rel.filter((r) => r.sectionId === s.id)} filter={filter} t={t} />
+            {/* Podróż z tego, co i tak jest na ekranie — jeden klik zamiast
+                dwudziestu „dodaj do podróży". */}
+            {user && rel.some((r) => r.sectionId === s.id && r.star === 1 && r.mbid) && (
+              <form action={journeyFromReleases} className="mb-8 mt-2">
+                <input type="hidden" name="sectionId" value={s.id} />
+                <input type="hidden" name="title" value={`${s.title} ${s.date}`} />
+                <button className="btn btn-accent">{t.releases.journeyFromReleases}</button>
+                <span className="ml-2 text-[10px] text-faint">{t.releases.journeyFromReleasesNote}</span>
+              </form>
+            )}
+          </div>
         ))}
         {!sections.length && <p className="text-muted">{t.releases.noSectionsBefore}<code>npm run import:pns</code>{t.releases.noSectionsAfter}</p>}
       </div>

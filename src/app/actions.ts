@@ -315,3 +315,44 @@ export async function sendJourneyToSpotify(formData: FormData) {
   revalidatePath(`/podroz/${listId}`);
   redirect(`/podroz/${listId}?${q.toString()}`);
 }
+
+/**
+ * Podróż z piątkowych premier — jednym kliknięciem.
+ *
+ * Bierzemy wyróżnione (★) pozycje z danego tygodnia, a zalogowanemu zawężamy je
+ * do jego gatunków: premiery i tak są mu tak podawane, więc podróż ma wyglądać
+ * jak to, co widzi na ekranie. Do podróży wchodzą tylko te płyty, które mamy
+ * rozwiązane do MBID-u — reszta nie ma u nas strony, więc byłaby ślepym
+ * przystankiem.
+ */
+export async function journeyFromReleases(formData: FormData) {
+  const u = await requireUser();
+  const sectionId = String(formData.get("sectionId") ?? "");
+  const tytul = String(formData.get("title") ?? "").slice(0, 200) || "Premiery";
+  if (!sectionId) return;
+
+  const { releasesFor } = await import("@/lib/lists");
+  const { genreToSection } = await import("@/lib/genres");
+  const wszystkie = await releasesFor([sectionId]);
+  const gatunki = await ud.getGenres(u.id).catch(() => [] as { genre: string; weight: number }[]);
+  const moje = new Set(
+    gatunki.filter((g) => g.weight >= 3).map((g) => genreToSection(g.genre)).filter(Boolean) as string[],
+  );
+  const wybrane = wszystkie.filter(
+    (r) => r.star === 1 && r.mbid && (!moje.size || moje.has(r.genre)),
+  );
+  if (!wybrane.length) return;
+
+  const lista = await ud.createList(u.id, tytul, null);
+  for (const r of wybrane) {
+    await ud
+      .addToList(u.id, lista.id, {
+        targetType: "ALBUM",
+        targetMbid: r.mbid!,
+        label: `${r.artist ?? ""} – ${r.album ?? ""}`.trim(),
+      })
+      .catch(() => {});
+  }
+  revalidatePath("/podroze");
+  redirect(`/podroz/${lista.id}`);
+}
