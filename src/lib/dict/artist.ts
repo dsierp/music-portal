@@ -19,7 +19,9 @@ const pl = {
   topBadge: "↑ ta z góry",
   producedHeading: "Wyprodukował, zrealizował, zmasterował",
   producedNote: "Płyty, przy których pracował przy pulpicie, a nie z instrumentem. Z relacji przy wydaniach w MusicBrainz — tam, gdzie zwykle wiszą kredyty producenckie.",
-  producedMore: "Pokazujemy 60 najnowszych z {n}.",
+  producedMore: "Pokazujemy najnowsze z {n}.",
+  fetchMore: "Pobierz następne",
+  fetchMoreNote: "MusicBrainz oddaje po sto pozycji naraz — doczytanie chwilę trwa.",
   roleGuessNote: "instrument dobrany z innych zespołów tej osoby — MusicBrainz nie podaje go przy tym składzie",
   sortNewest: "od najnowszych",
   sortOldest: "chronologicznie",
@@ -77,6 +79,9 @@ const pl = {
 
   timeline: {
     roleVocal: "wokal",
+    supportingNote: "sesyjnie / koncertowo, nie w składzie",
+    supportingShort: "sesyjnie",
+    legendSupporting: "cieńszy pasek — współpraca sesyjna lub koncertowa, nie członkostwo",
     unknownNote: "dat nie zna ani MusicBrainz, ani Wikidane",
     legendUnknown: "okres nieznany — wiemy, że grał, nie wiemy kiedy",
     wikidataNote: "daty z Wikidanych",
@@ -113,7 +118,9 @@ const en: T = {
   topFromMb: "Highest rated on MusicBrainz",
   topBadge: "↑ the one above",
   producedHeading: "Produced, engineered, mastered",
-  producedMore: "Showing the 60 most recent of {n}.",
+  producedMore: "Showing the most recent of {n}.",
+  fetchMore: "Fetch more",
+  fetchMoreNote: "MusicBrainz returns a hundred entries at a time — this takes a moment.",
   producedNote: "Albums they worked on at the desk rather than with an instrument. From release relationships on MusicBrainz — where production credits usually live.",
   roleGuessNote: "instrument taken from this person's other bands — MusicBrainz doesn't give one for this line-up",
   sortNewest: "newest first",
@@ -172,6 +179,9 @@ const en: T = {
 
   timeline: {
     roleVocal: "vocals",
+    supportingNote: "session / live, not a member",
+    supportingShort: "session",
+    legendSupporting: "thinner bar — session or live work, not membership",
     unknownNote: "neither MusicBrainz nor Wikidata knows the dates",
     legendUnknown: "period unknown — we know they played, not when",
     wikidataNote: "dates from Wikidata",
@@ -207,7 +217,9 @@ const es: T = {
   topFromMb: "La mejor valorada en MusicBrainz",
   topBadge: "↑ la de arriba",
   producedHeading: "Produjo, grabó, masterizó",
-  producedMore: "Mostramos los 60 más recientes de {n}.",
+  producedMore: "Mostramos los más recientes de {n}.",
+  fetchMore: "Cargar más",
+  fetchMoreNote: "MusicBrainz devuelve cien entradas por vez: tarda un momento.",
   producedNote: "Discos en los que trabajó desde la mesa, no con un instrumento. De las relaciones de las ediciones en MusicBrainz, donde suelen estar los créditos de producción.",
   roleGuessNote: "instrumento tomado de sus otras bandas — MusicBrainz no da ninguno para esta formación",
   sortNewest: "más nuevos primero",
@@ -266,6 +278,9 @@ const es: T = {
 
   timeline: {
     roleVocal: "voz",
+    supportingNote: "de sesión / en directo, no miembro",
+    supportingShort: "sesión",
+    legendSupporting: "barra más fina: trabajo de sesión o en directo, no militancia",
     unknownNote: "ni MusicBrainz ni Wikidata conocen las fechas",
     legendUnknown: "periodo desconocido — sabemos que tocó, no cuándo",
     wikidataNote: "fechas de Wikidata",
@@ -301,7 +316,9 @@ const de: T = {
   topFromMb: "Bei MusicBrainz am besten bewertet",
   topBadge: "↑ die von oben",
   producedHeading: "Produziert, aufgenommen, gemastert",
-  producedMore: "Wir zeigen die 60 neuesten von {n}.",
+  producedMore: "Wir zeigen die neuesten von {n}.",
+  fetchMore: "Weitere laden",
+  fetchMoreNote: "MusicBrainz liefert hundert Einträge auf einmal — das dauert einen Moment.",
   producedNote: "Alben, an denen er am Pult gearbeitet hat, nicht am Instrument. Aus den Beziehungen der Veröffentlichungen bei MusicBrainz — dort stehen Produktionscredits üblicherweise.",
   roleGuessNote: "Instrument aus den anderen Bands dieser Person — MusicBrainz nennt für diese Besetzung keines",
   sortNewest: "neueste zuerst",
@@ -360,6 +377,9 @@ const de: T = {
 
   timeline: {
     roleVocal: "Gesang",
+    supportingNote: "Session / live, kein Mitglied",
+    supportingShort: "Session",
+    legendSupporting: "dünnerer Balken — Session- oder Livearbeit, keine Mitgliedschaft",
     unknownNote: "weder MusicBrainz noch Wikidata kennt die Daten",
     legendUnknown: "Zeitraum unbekannt — wir wissen, dass er spielte, nicht wann",
     wikidataNote: "Daten aus Wikidata",

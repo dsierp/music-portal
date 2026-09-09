@@ -167,18 +167,18 @@ function Chart({
                     <rect
                       key={j}
                       x={x1}
-                      y={y + 4}
+                      y={y + (sp.supporting ? 8 : 4)}
                       width={Math.max(2, x2 - x1)}
-                      height={ROW_H - 8}
+                      height={ROW_H - (sp.supporting ? 16 : 8)}
                       fill={sp.unknown ? "transparent" : s.color}
                       stroke={sp.unknown ? s.color : undefined}
                       strokeWidth={sp.unknown ? 1.2 : undefined}
                       strokeDasharray={sp.unknown ? "4 3" : undefined}
                       rx={2}
-                      opacity={sp.unknown ? 0.7 : sp.inferred ? 0.45 : 1}
+                      opacity={sp.unknown ? 0.7 : sp.inferred ? 0.45 : sp.supporting ? 0.5 : 1}
                     >
                       <title>
-                        {`${row.name}: ${sp.unknown ? "?–?" : `${sp.begin?.slice(0, 4) ?? "?"}–${sp.current ? t.today : sp.end?.slice(0, 4) ?? "?"}`}${sp.roles.length ? ` (${sp.roles.join(", ")})` : ""}${zrodlo}`}
+                        {`${row.name}: ${sp.unknown ? "?–?" : `${sp.begin?.slice(0, 4) ?? "?"}–${sp.current ? t.today : sp.end?.slice(0, 4) ?? "?"}`}${sp.roles.length ? ` (${sp.roles.join(", ")})` : ""}${sp.supporting ? ` — ${t.supportingNote}` : ""}${zrodlo}`}
                       </title>
                     </rect>
                   );
@@ -214,6 +214,7 @@ function Chart({
                   <title>{row.name}</title>
                   <text x={LABEL_W - 8} y={y + ROW_H / 2 + 4} textAnchor="end" fontSize="12" fill="var(--text2)" fontFamily="var(--font-sans)">
                     {(row.name.length > maxName ? row.name.slice(0, maxName - 1) + "…" : row.name) +
+                      (row.spans.every((sp) => sp.supporting) ? ` (${t.supportingShort})` : "") +
                       (row.spans.every((sp) => sp.unknown) ? " ?" : "")}
                   </text>
                 </a>
@@ -267,6 +268,12 @@ function Chart({
           <div className="mt-1 flex items-center gap-1.5 font-mono text-[10px] text-muted">
             <span className="inline-block h-2.5 w-4 rounded-sm bg-muted" />
             {t.legendWikidata}
+          </div>
+        )}
+        {rows.some((r) => r.spans.some((sp) => sp.supporting)) && (
+          <div className="mt-1 flex items-center gap-1.5 font-mono text-[10px] text-muted">
+            <span className="inline-block h-1 w-4 rounded-sm bg-muted opacity-50" />
+            {t.legendSupporting}
           </div>
         )}
         {rows.some((r) => r.spans.some((sp) => sp.inferred)) && (

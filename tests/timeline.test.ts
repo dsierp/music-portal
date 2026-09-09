@@ -96,3 +96,12 @@ test("wiersze bez dat lądują pod tymi, które da się umiejscowić", () => {
   );
   assert.deepEqual(rows.map((r) => r.mbid), ["znany", "nieznany"]);
 });
+
+test("oś czasu: współpraca sesyjna nie udaje członkostwa", () => {
+  const rows = mergeSpans([
+    { mbid: "b1", name: "Zespół", roles: ["bass"], begin: "1990", end: "1995", current: false },
+    { mbid: "b2", name: "Gościnnie", roles: ["bass"], begin: "1998", end: null, current: true, supporting: true },
+  ]);
+  assert.equal(rows.find((r) => r.mbid === "b1")!.spans[0].supporting, undefined);
+  assert.equal(rows.find((r) => r.mbid === "b2")!.spans[0].supporting, true);
+});

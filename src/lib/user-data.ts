@@ -4,6 +4,7 @@
  */
 import { and, asc, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { scalDziennik, type JournalEvent } from "@/lib/journal";
 
 export type Target = "ALBUM" | "ARTIST";
 
@@ -515,4 +516,169 @@ export async function canSeeList(userId: string | null, listId: string, ownerId:
     where: and(eq(schema.listShares.listId, listId), eq(schema.listShares.toUserId, userId)),
   });
   return !!share;
+}
+
+// ---------- dziennik podróży ----------
+
+/**
+ * Wszystko, co użytkownik tu porobił, w jednej osi czasu.
+ *
+ * Siedem osobnych zapytań zamiast jednego UNION-a: każde jest trywialne
+ * i indeksowane, a scalanie i tak musi być w kodzie (różne kształty wierszy).
+ * Każde bierze `limit` najnowszych — więcej i tak nie zobaczymy po scaleniu.
+ *
+ * Awaria jednego strumienia nie ma kasować dziennika: brak tabeli po świeżej
+ * migracji zdarza się w praktyce częściej niż chcielibyśmy, a pusty kawałek
+ * historii jest lepszy niż pusta strona główna.
+ */
+export async function travelJournal(userId: string, limit = 12): Promise<JournalEvent[]> {
+  // Typ `never[]` celowo: dzięki niemu TypeScript nadal widzi kształt wiersza
+  // z zapytania, a nie rozmyty `unknown[]`.
+  const pusto = () => [] as never[];
+  const stronaCelu = (t: string, mbid: string) => (t === "ALBUM" ? `/album/${mbid}` : `/artist/${mbid}`);
+
+  const [przystanki, podroze, plyty, artysci, oceny, komentarze, polecone] = await Promise.all([
+    db
+      .select({
+        at: schema.listItems.createdAt,
+        label: schema.listItems.label,
+        targetType: schema.listItems.targetType,
+        targetMbid: schema.listItems.targetMbid,
+        url: schema.listItems.url,
+        listId: schema.lists.id,
+        listTitle: schema.lists.title,
+      })
+      .from(schema.listItems)
+      .innerJoin(schema.lists, eq(schema.lists.id, schema.listItems.listId))
+      .where(eq(schema.lists.userId, userId))
+      .orderBy(desc(schema.listItems.createdAt))
+      .limit(limit)
+      .catch(pusto),
+    db
+      .select({ at: schema.lists.createdAt, id: schema.lists.id, title: schema.lists.title })
+      .from(schema.lists)
+      .where(eq(schema.lists.userId, userId))
+      .orderBy(desc(schema.lists.createdAt))
+      .limit(limit)
+      .catch(pusto),
+    db
+      .select({
+        at: schema.likedAlbums.createdAt,
+        mbid: schema.likedAlbums.mbid,
+        title: schema.likedAlbums.title,
+        artistName: schema.likedAlbums.artistName,
+        kind: schema.likedAlbums.kind,
+      })
+      .from(schema.likedAlbums)
+      .where(eq(schema.likedAlbums.userId, userId))
+      .orderBy(desc(schema.likedAlbums.createdAt))
+      .limit(limit)
+      .catch(pusto),
+    db
+      .select({ at: schema.favoriteArtists.createdAt, mbid: schema.favoriteArtists.mbid, name: schema.favoriteArtists.name, kind: schema.favoriteArtists.kind })
+      .from(schema.favoriteArtists)
+      .where(eq(schema.favoriteArtists.userId, userId))
+      .orderBy(desc(schema.favoriteArtists.createdAt))
+      .limit(limit)
+      .catch(pusto),
+    db
+      .select({
+        at: schema.ratings.updatedAt,
+        targetType: schema.ratings.targetType,
+        targetMbid: schema.ratings.targetMbid,
+        score: schema.ratings.score,
+        label: schema.ratings.label,
+      })
+      .from(schema.ratings)
+      .where(eq(schema.ratings.userId, userId))
+      .orderBy(desc(schema.ratings.updatedAt))
+      .limit(limit)
+      .catch(pusto),
+    db
+      .select({
+        at: schema.comments.createdAt,
+        targetType: schema.comments.targetType,
+        targetMbid: schema.comments.targetMbid,
+        body: schema.comments.body,
+      })
+      .from(schema.comments)
+      .where(and(eq(schema.comments.userId, userId), isNull(schema.comments.deletedAt)))
+      .orderBy(desc(schema.comments.createdAt))
+      .limit(limit)
+      .catch(pusto),
+    db
+      .select({
+        at: schema.listShares.createdAt,
+        listId: schema.lists.id,
+        title: schema.lists.title,
+        fromName: schema.users.name,
+        fromEmail: schema.users.email,
+      })
+      .from(schema.listShares)
+      .innerJoin(schema.lists, eq(schema.lists.id, schema.listShares.listId))
+      .innerJoin(schema.users, eq(schema.users.id, schema.lists.userId))
+      .where(eq(schema.listShares.toUserId, userId))
+      .orderBy(desc(schema.listShares.createdAt))
+      .limit(limit)
+      .catch(pusto),
+  ]);
+
+  return scalDziennik(
+    [
+      przystanki.map((r) => ({
+        at: r.at,
+        kind: "stop" as const,
+        title: r.label,
+        // Koncert nie ma u nas strony — prowadzimy na afisz, jeśli był.
+        href: r.targetType === "CONCERT" ? r.url : stronaCelu(r.targetType, r.targetMbid),
+        context: r.listTitle,
+        contextHref: `/podroz/${r.listId}`,
+        sentiment: null,
+        score: null,
+      })),
+      podroze.map((r) => ({ at: r.at, kind: "journey" as const, title: r.title, href: `/podroz/${r.id}`, context: null, contextHref: null, sentiment: null, score: null })),
+      plyty.map((r) => ({
+        at: r.at,
+        kind: "album" as const,
+        title: `${r.artistName} – ${r.title}`,
+        href: `/album/${r.mbid}`,
+        context: null,
+        contextHref: null,
+        sentiment: r.kind,
+        score: null,
+      })),
+      artysci.map((r) => ({ at: r.at, kind: "artist" as const, title: r.name, href: `/artist/${r.mbid}`, context: null, contextHref: null, sentiment: r.kind, score: null })),
+      oceny.map((r) => ({
+        at: r.at,
+        kind: "rating" as const,
+        title: r.label || r.targetMbid,
+        href: stronaCelu(r.targetType, r.targetMbid),
+        context: null,
+        contextHref: null,
+        sentiment: null,
+        score: r.score,
+      })),
+      komentarze.map((r) => ({
+        at: r.at,
+        kind: "comment" as const,
+        title: r.body.length > 90 ? `${r.body.slice(0, 90)}…` : r.body,
+        href: stronaCelu(r.targetType, r.targetMbid),
+        context: null,
+        contextHref: null,
+        sentiment: null,
+        score: null,
+      })),
+      polecone.map((r) => ({
+        at: r.at,
+        kind: "shared" as const,
+        title: r.title,
+        href: `/podroz/${r.listId}`,
+        context: r.fromName || r.fromEmail.split("@")[0],
+        contextHref: null,
+        sentiment: null,
+        score: null,
+      })),
+    ],
+    limit,
+  );
 }

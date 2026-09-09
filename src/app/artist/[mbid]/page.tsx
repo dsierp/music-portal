@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { ARTWORK_ROLES, albumCrew, getArtist, getDiscography, getPlayedOn, getProduced, guessRoles, topAlbum, MbError } from "@/lib/musicbrainz";
+import { ARTWORK_ROLES, albumCrew, getArtist, getDiscography, getPlayedOn, getProduced, guessRoles, topAlbum, MbError, STRON_DOMYSLNIE } from "@/lib/musicbrainz";
 import { wikiFromLinks, wikiLogo } from "@/lib/wikipedia";
 import { MbUnavailable } from "@/components/mb-unavailable";
 import { currentUser } from "@/lib/auth";
@@ -336,7 +336,17 @@ async function ConcertsSectionWewn({ mbid, name, locale, t }: { mbid: string; na
   );
 }
 
-async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, odNajnowszych, instrument }: { artist: Artist; mbid: string; locale: Locale; t: Dict; odNajnowszych: boolean; instrument: string }) {
+async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, odNajnowszych, instrument, stron }: { artist: Artist; mbid: string; locale: Locale; t: Dict; odNajnowszych: boolean; instrument: string; stron: number }) {
+  // Adres tej samej strony z podbitą głębokością pobierania — reszta wyborów
+  // (sortowanie, filtr instrumentu) ma przetrwać kliknięcie „pobierz następne".
+  const dalej = (n: number) => {
+    const q = new URLSearchParams();
+    if (odNajnowszych) q.set("plyty", "nowe");
+    if (instrument) q.set("i", instrument);
+    q.set("wiecej", String(n));
+    return `/artist/${mbid}?${q.toString()}#plyty`;
+  };
+  const krotnosc = Math.max(1, Math.round(stron / STRON_DOMYSLNIE));
   // MusicBrainz nagminnie gubi daty przy członkostwie (Inferno w Behemocie od
   // 1997 — relacja jest, dat nie ma). Wikidane trzymają to samo strukturalnie,
   // więc zanim cokolwiek narysujemy, łatamy dziury stamtąd. Pytamy tylko wtedy,
@@ -351,13 +361,15 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, odNajnowszy
     memberOf: mergeDates(raw.memberOf, wdOf),
     members: mergeDates(raw.members, wdIn),
   };
-  const [disco, played, produced] = await Promise.all([
+  const [disco, playedR, producedR] = await Promise.all([
     getDiscography(mbid).catch(() => []),
-    artist.isPerson ? getPlayedOn(mbid, artist.memberOf).catch(() => []) : Promise.resolve([]),
+    artist.isPerson ? getPlayedOn(mbid, artist.memberOf, stron).catch(() => ({ items: [], wiecej: false })) : Promise.resolve({ items: [], wiecej: false }),
     // Producent nie ma dyskografii jako wykonawca — Scott Burns wyprodukował
     // pół kanonu death metalu, a jego strona świeciła „brak wydawnictw".
-    artist.isPerson ? getProduced(mbid).catch(() => []) : Promise.resolve([]),
+    artist.isPerson ? getProduced(mbid, stron).catch(() => ({ items: [], wiecej: false })) : Promise.resolve({ items: [], wiecej: false }),
   ]);
+  const { items: played, wiecej: wiecejGrania } = playedR;
+  const { items: produced, wiecej: wiecejProdukcji } = producedR;
   const albums = disco.filter((a) => a.primaryType === "Album" && !a.secondaryTypes.length);
   const eps = disco.filter((a) => a.primaryType === "EP" && !a.secondaryTypes.length);
   const rest = disco.filter((a) => !albums.includes(a) && !eps.includes(a));
@@ -468,7 +480,7 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, odNajnowszy
           </h2>
           <p className="mb-3 text-xs text-muted">{t.artist.producedNote}</p>
           <div className="grid gap-2 sm:grid-cols-2">
-            {produced.slice(0, 60).map((p) => (
+            {produced.slice(0, 60 * krotnosc).map((p) => (
               <AlbumCard
                 key={p.album.mbid}
                 album={p.album}
@@ -477,16 +489,22 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, odNajnowszy
               />
             ))}
           </div>
-          {produced.length > 60 && <p className="mt-2 text-xs text-faint">{fmt(t.artist.producedMore, { n: produced.length })}</p>}
+          {produced.length > 60 * krotnosc && <p className="mt-2 text-xs text-faint">{fmt(t.artist.producedMore, { n: produced.length })}</p>}
+          {wiecejProdukcji && (
+            <p className="mt-3">
+              <Link href={dalej(stron + STRON_DOMYSLNIE)} className="chip text-xs">{t.artist.fetchMore}</Link>
+              <span className="ml-2 text-[10px] text-faint">{t.artist.fetchMoreNote}</span>
+            </p>
+          )}
         </section>
       )}
 
       {played.length > 0 && (
         <section className="mt-8">
-          <h2 className="mb-2 text-2xl">{t.artist.playedOnHeading}</h2>
+          <h2 className="mb-2 text-2xl">{t.artist.playedOnHeading} <span className="font-mono text-sm text-muted">{played.length}</span></h2>
           <p className="mb-3 text-xs text-muted">{t.artist.playedOnNote}</p>
           <div className="grid gap-2 sm:grid-cols-2">
-            {played.slice(0, 40).map((p) => (
+            {played.slice(0, 40 * krotnosc).map((p) => (
               <AlbumCard
                 key={p.album.mbid}
                 album={p.album}
@@ -500,6 +518,13 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, odNajnowszy
               />
             ))}
           </div>
+          {played.length > 40 * krotnosc && <p className="mt-2 text-xs text-faint">{fmt(t.artist.producedMore, { n: played.length })}</p>}
+          {wiecejGrania && (
+            <p className="mt-3">
+              <Link href={dalej(stron + STRON_DOMYSLNIE)} className="chip text-xs">{t.artist.fetchMore}</Link>
+              <span className="ml-2 text-[10px] text-faint">{t.artist.fetchMoreNote}</span>
+            </p>
+          )}
         </section>
       )}
 
@@ -626,12 +651,16 @@ export default async function ArtistPage({
   searchParams,
 }: {
   params: Promise<{ mbid: string }>;
-  searchParams: Promise<{ plyty?: string; i?: string }>;
+  searchParams: Promise<{ plyty?: string; i?: string; wiecej?: string }>;
 }) {
   const { mbid } = await params;
   const sp = await searchParams;
   const odNajnowszych = sp.plyty === "nowe";
   const instrument = sp.i ?? "";
+  // Głębokość pobierania z MusicBrainz. Domyślnie 4 strony (~1 s na setkę);
+  // „pobierz następne" podbija ją o kolejne 4, z sufitem, żeby jedno kliknięcie
+  // nie zamieniło strony w minutowe oczekiwanie.
+  const stron = Math.min(24, Math.max(STRON_DOMYSLNIE, Number(sp.wiecej) || STRON_DOMYSLNIE));
   if (!UUID.test(mbid)) notFound();
   const { locale, t } = await i18n();
   let artist;
@@ -771,7 +800,7 @@ export default async function ArtistPage({
         )}
 
         <Suspense fallback={<DeepContentLoading t={t} />}>
-          <ArtistDeepContent artist={artist} mbid={mbid} locale={locale} t={t} odNajnowszych={odNajnowszych} instrument={instrument} />
+          <ArtistDeepContent artist={artist} mbid={mbid} locale={locale} t={t} odNajnowszych={odNajnowszych} instrument={instrument} stron={stron} />
         </Suspense>
       </div>
 
@@ -797,6 +826,6 @@ function CrewSection(p: { albums: AlbumSummary[]; t: Dict }) {
 function ConcertsSection(p: { mbid: string; name: string; locale: Locale; t: Dict }) {
   return osłona("Koncerty", () => ConcertsSectionWewn(p), p.t);
 }
-function ArtistDeepContent(p: { artist: Artist; mbid: string; locale: Locale; t: Dict; odNajnowszych: boolean; instrument: string }) {
+function ArtistDeepContent(p: { artist: Artist; mbid: string; locale: Locale; t: Dict; odNajnowszych: boolean; instrument: string; stron: number }) {
   return osłona("Dyskografia i skład", () => ArtistDeepContentWewn(p), p.t);
 }

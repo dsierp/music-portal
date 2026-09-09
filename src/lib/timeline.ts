@@ -31,6 +31,14 @@ export interface TimelineSpan {
   unknown?: boolean;
   /** daty dobrane z Wikidanych, bo MusicBrainz ich nie miał */
   fromWikidata?: boolean;
+  /**
+   * true = współpraca, nie członkostwo („instrumental/vocal supporting
+   * musician" w MusicBrainz). Sesyjniak i muzyk koncertowy to NIE to samo, co
+   * członek zespołu — na liście trzymamy je osobno, więc i na osi nie mogą
+   * wyglądać identycznie. Wiersz zostaje (grał tam naprawdę), tylko pasek jest
+   * cieńszy i przygaszony.
+   */
+  supporting?: boolean;
 }
 export interface TimelineRow<M> {
   mbid: string;
@@ -46,6 +54,7 @@ interface MembershipLike {
   end: string | null;
   current: boolean;
   datesFrom?: "wikidata";
+  supporting?: boolean;
 }
 
 /**
@@ -59,7 +68,7 @@ export function mergeSpans<T extends MembershipLike, M = never>(
   const map = new Map<string, TimelineRow<M>>();
   for (const m of items) {
     const row = map.get(m.mbid) ?? { mbid: m.mbid, name: m.name, spans: [], marks: marksFor?.(m) ?? [] };
-    row.spans.push({ begin: m.begin, end: m.end, current: m.current, roles: m.roles, fromWikidata: m.datesFrom === "wikidata" });
+    row.spans.push({ begin: m.begin, end: m.end, current: m.current, roles: m.roles, fromWikidata: m.datesFrom === "wikidata", supporting: m.supporting });
     map.set(m.mbid, row);
   }
   for (const row of map.values()) {

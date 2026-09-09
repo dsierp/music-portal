@@ -483,10 +483,23 @@ export async function releaseGroupOfRelease(releaseMbid: string): Promise<string
 }
 
 /** Zapytanie do indeksu artystów: sam tekst albo tekst zawężony do typu. */
+/**
+ * Zapytanie o artystę — z tolerancją na literówkę.
+ *
+ * „viennie" nie znajdowało Vinnie Colaiuty, bo MusicBrainz szuka dokładnie po
+ * słowie. Nazwiska muzyków są obce i pisze się je z pamięci, więc do każdego
+ * słowa dokładamy wariant rozmyty (`~` w Lucene: kilka znaków różnicy).
+ * Dokładne trafienie i tak wygrywa punktacją i idzie na górę listy.
+ *
+ * Słowa krótsze niż cztery znaki zostawiamy w spokoju — przy „Sun" czy „Nile"
+ * rozmycie sprowadziłoby pół bazy.
+ */
 export function artistQuery(query: string, kind?: "group" | "person"): string {
   const q = lucene(query);
   if (!q) return "";
-  return kind ? `${q} AND type:${kind}` : q;
+  const slowa = q.split(" ");
+  const rozmyte = slowa.map((w) => (w.length >= 4 ? `(${w} OR ${w}~)` : w)).join(" ");
+  return kind ? `${rozmyte} AND type:${kind}` : rozmyte;
 }
 
 /**
@@ -726,11 +739,15 @@ export async function getDiscography(mbid: string): Promise<AlbumSummary[]> {
  * Płyty, na których muzyk grał (relacje wykonawca↔nagranie), a nie jest głównym wykonawcą.
  * To jest silnik "podróży": z płyty do muzyka, z muzyka do innych płyt.
  */
-export async function getPlayedOn(mbid: string, bands: Membership[] = []): Promise<PlayedOn[]> {
+export async function getPlayedOn(
+  mbid: string,
+  bands: Membership[] = [],
+  stron = STRON_DOMYSLNIE,
+): Promise<{ items: PlayedOn[]; wiecej: boolean }> {
   const bandNames = new Map(bands.map((b) => [b.mbid, b.name]));
-  const recs = await cached(`mb:rec-browse:${mbid}`, TTL.lookup, async () => {
+  const recs = await cached(`mb:rec-browse:v2:${mbid}:${stron}`, TTL.lookup, async () => {
     const out: MbRecording[] = [];
-    for (let offset = 0; offset < 500; offset += 100) {
+    for (let offset = 0; offset < stron * 100; offset += 100) {
       const page = await mbFetch<{ recordings: MbRecording[]; "recording-count": number }>("/recording/", {
         artist: mbid, limit: 100, offset, inc: "releases+release-groups+artist-credits+artist-rels",
       });
@@ -747,7 +764,7 @@ export async function getPlayedOn(mbid: string, bands: Membership[] = []): Promi
    * strona muzyka gubiła dokładnie te płyty, na których był tylko sesyjnym —
    * a u kogoś takiego jak Colaiuta to jest jego cały dorobek.
    */
-  const zWydan = await browseReleasesOf(mbid).catch(() => []);
+  const zWydan = await browseReleasesOf(mbid, stron).catch(() => []);
   for (const rel of zWydan) {
     const rg = rel["release-group"];
     if (!rg) continue;
@@ -779,9 +796,12 @@ export async function getPlayedOn(mbid: string, bands: Membership[] = []): Promi
       groups.set(rg.id, e);
     }
   }
-  return [...groups.values()].sort(
-    (x, y) => Number(!!x.withBand) - Number(!!y.withBand) || (y.album.firstReleaseDate ?? "").localeCompare(x.album.firstReleaseDate ?? ""),
-  );
+  return {
+    items: [...groups.values()].sort(
+      (x, y) => Number(!!x.withBand) - Number(!!y.withBand) || (y.album.firstReleaseDate ?? "").localeCompare(x.album.firstReleaseDate ?? ""),
+    ),
+    wiecej: recs.length >= stron * 100 || zWydan.length >= stron * 100,
+  };
 }
 
 /** Podstawowe dane wielu artystów naraz (do list ulubionych) — z cache, po jednym lookupie. */
@@ -886,6 +906,16 @@ export async function albumCrew(albums: AlbumSummary[], limit = 6): Promise<Crew
  * Zwracamy grupy wydawnicze, żeby dziesięć reedycji nie zrobiło dziesięciu
  * pozycji na liście.
  */
+/**
+ * Ile stron po 100 pozycji dociągamy za jednym razem.
+ *
+ * MusicBrainz przepuszcza jedno zapytanie na sekundę, więc każda strona to
+ * sekunda czekania. Czterysta pozycji starcza na dziewięćdziesiąt dziewięć
+ * procent artystów; dla Colaiuty czy Steve'a Gadda nie starczy nigdy — i od
+ * tego jest przycisk „pobierz następne", zamiast karać wszystkich czekaniem.
+ */
+export const STRON_DOMYSLNIE = 4;
+
 export interface ProducedAlbum {
   album: AlbumSummary;
   roles: string[];
@@ -900,10 +930,10 @@ export interface ProducedAlbum {
  * więc przeglądanie samych nagrań go tam nie widziało — i płyta znikała z jego
  * strony, choć na stronie płyty stał w składzie.
  */
-async function browseReleasesOf(mbid: string): Promise<(MbRelease & { relations?: MbArtistRel[] })[]> {
-  return cached(`mb:rel-browse:v1:${mbid}`, TTL.lookup, async () => {
+async function browseReleasesOf(mbid: string, stron = STRON_DOMYSLNIE): Promise<(MbRelease & { relations?: MbArtistRel[] })[]> {
+  return cached(`mb:rel-browse:v1:${mbid}:${stron}`, TTL.lookup, async () => {
     const out: (MbRelease & { relations?: MbArtistRel[] })[] = [];
-    for (let offset = 0; offset < 400; offset += 100) {
+    for (let offset = 0; offset < stron * 100; offset += 100) {
       const page = await mbFetch<{ releases: (MbRelease & { relations?: MbArtistRel[] })[]; "release-count": number }>(
         "/release/",
         { artist: mbid, limit: 100, offset, inc: "artist-rels+release-groups+artist-credits" },
@@ -916,8 +946,8 @@ async function browseReleasesOf(mbid: string): Promise<(MbRelease & { relations?
   });
 }
 
-export async function getProduced(mbid: string): Promise<ProducedAlbum[]> {
-  const releases = await browseReleasesOf(mbid);
+export async function getProduced(mbid: string, stron = STRON_DOMYSLNIE): Promise<{ items: ProducedAlbum[]; wiecej: boolean }> {
+  const releases = await browseReleasesOf(mbid, stron);
 
   const groups = new Map<string, ProducedAlbum>();
   for (const rel of releases) {
@@ -932,9 +962,14 @@ export async function getProduced(mbid: string): Promise<ProducedAlbum[]> {
     for (const role of roles) if (!e.roles.includes(role)) e.roles.push(role);
     groups.set(rg.id, e);
   }
-  return [...groups.values()].sort((x, y) =>
-    (y.album.firstReleaseDate ?? "").localeCompare(x.album.firstReleaseDate ?? ""),
-  );
+  return {
+    items: [...groups.values()].sort((x, y) =>
+      (y.album.firstReleaseDate ?? "").localeCompare(x.album.firstReleaseDate ?? ""),
+    ),
+    // Pełna paczka = najpewniej jest jeszcze coś dalej. Nie zgadujemy więcej:
+    // MusicBrainz podaje licznik, ale przy relacjach bywa mylący.
+    wiecej: releases.length >= stron * 100,
+  };
 }
 
 // ---------- instrument, gdy skład go nie podaje ----------

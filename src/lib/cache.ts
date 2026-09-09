@@ -6,6 +6,11 @@ import { db, schema } from "@/db";
  * Nie budujemy własnej bazy wiedzy — to tylko bufor, który wygasa.
  */
 export async function cached<T>(key: string, ttlSeconds: number, fetcher: () => Promise<T>): Promise<T> {
+  // Tryb testowy (MB_FIXTURES) omija cache całkowicie. Bez tego test na maszynie
+  // z działającym .env czytał PRAWDZIWE, zapisane w dev-bazie odpowiedzi
+  // MusicBrainz zamiast fixture — i „przechodził" albo wywalał się zależnie od
+  // tego, co ktoś wcześniej klikał w przeglądarce.
+  if (process.env.MB_FIXTURES) return fetcher();
   try {
     const hit = await db.query.apiCache.findFirst({ where: eq(schema.apiCache.key, key) });
     if (hit && Date.now() - hit.fetchedAt.getTime() < ttlSeconds * 1000) return hit.json as T;

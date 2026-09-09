@@ -8,7 +8,9 @@ import { SearchBox } from "@/components/search-box";
 import { Banner } from "@/components/banner";
 import { Suspense } from "react";
 import { lineupNews } from "@/lib/lineup-news";
-import { getFavoriteArtists, getGenres, getLikedAlbums, getMyLists, listsForMe, recentComments } from "@/lib/user-data";
+import { getFavoriteArtists, getGenres, getLikedAlbums, getMyLists, listsForMe, recentComments, travelJournal } from "@/lib/user-data";
+import { TravelJournal } from "@/components/travel-journal";
+import type { JournalEvent } from "@/lib/journal";
 import { genreToSection } from "@/lib/genres";
 import { SKIP_ONBOARDING } from "@/lib/onboarding";
 import { i18n } from "@/lib/t";
@@ -70,6 +72,7 @@ export default async function Home() {
   let favs: Awaited<ReturnType<typeof getFavoriteArtists>> = [];
   let mojeListy: Awaited<ReturnType<typeof getMyLists>> = [];
   let dlaMnie: Awaited<ReturnType<typeof listsForMe>> = [];
+  let dziennik: JournalEvent[] = [];
   if (user) {
     const genres = await getGenres(user.id);
     const s = new Set(genres.filter((g) => g.weight >= 3).map((g) => genreToSection(g.genre)).filter(Boolean) as string[]);
@@ -77,9 +80,12 @@ export default async function Home() {
     [liked, favs] = await Promise.all([getLikedAlbums(user.id), getFavoriteArtists(user.id)]);
     // Listy na stronie głównej: to jest to, po co człowiek tu wraca — własna
     // kolejka do posłuchania i to, co ktoś mu podsunął.
-    [mojeListy, dlaMnie] = await Promise.all([
+    [mojeListy, dlaMnie, dziennik] = await Promise.all([
       getMyLists(user.id).catch(() => []),
       listsForMe(user.id).catch(() => []),
+      // Dziennik: ślad po tym, co człowiek tu porobił. Awaria nie ma wywalać
+      // strony głównej — najwyżej nie będzie tej jednej karty.
+      travelJournal(user.id, 12).catch(() => []),
     ]);
   }
   const stars = rel.filter((r) => r.star === 1 && (!prefSections || prefSections.has(r.genre)));
@@ -126,6 +132,7 @@ export default async function Home() {
         </section>
 
         <aside className="space-y-6">
+          <TravelJournal events={dziennik} locale={locale} t={t} more="/listy#dziennik" />
           {user && (mojeListy.length > 0 || dlaMnie.length > 0) && (
             <section className="card">
               <div className="flex items-baseline justify-between">

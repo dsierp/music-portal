@@ -5,7 +5,8 @@ import { desc, isNotNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { mostCommented, topRated } from "@/lib/user-data";
 import { currentUser } from "@/lib/auth";
-import { getFavoriteArtists, getLikedAlbums, getMyLists, listsForMe } from "@/lib/user-data";
+import { getFavoriteArtists, getLikedAlbums, getMyLists, listsForMe, travelJournal } from "@/lib/user-data";
+import { TravelJournal } from "@/components/travel-journal";
 import { createListAction, dismissShareAction } from "@/app/actions";
 import { i18n } from "@/lib/t";
 import { fmt, plural } from "@/lib/i18n";
@@ -38,6 +39,7 @@ export default async function ListsPage() {
   const { locale, t } = await i18n();
   const user = await currentUser();
   const [topAlbums, topArtists, comAlbums, comArtists] = await Promise.all([topRated("ALBUM", 15), topRated("ARTIST", 15), mostCommented("ALBUM", 10), mostCommented("ARTIST", 10)]);
+  const dziennik = user ? await travelJournal(user.id, 80).catch(() => []) : [];
   const [moje, dlaMnie] = user
     ? await Promise.all([getMyLists(user.id).catch(() => []), listsForMe(user.id).catch(() => [])])
     : [[] as Awaited<ReturnType<typeof getMyLists>>, [] as Awaited<ReturnType<typeof listsForMe>>];
@@ -126,6 +128,19 @@ export default async function ListsPage() {
               <p className="mt-3 text-sm text-muted">{t.lists.noSharedWithMe}</p>
             )}
           </section>
+        </div>
+      )}
+
+      {user && (
+        <div className="grid gap-4">
+          {dziennik.length ? (
+            <TravelJournal events={dziennik} locale={locale} t={t} />
+          ) : (
+            <section className="card" id="dziennik">
+              <h2 className="text-xl">{t.lists.journalTitle}</h2>
+              <p className="mt-2 text-sm text-muted">{t.lists.journalEmpty}</p>
+            </section>
+          )}
         </div>
       )}
 

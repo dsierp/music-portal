@@ -47,7 +47,8 @@ test("artysta-osoba: zespoły i płyty, na których grał (bez własnych)", asyn
   const p = await getArtist(ID.mirai);
   assert.equal(p.isPerson, true);
   assert.equal(p.memberOf[0].mbid, ID.band);
-  const played = await getPlayedOn(ID.mirai, p.memberOf);
+  const { items: played, wiecej } = await getPlayedOn(ID.mirai, p.memberOf);
+  assert.equal(wiecej, false, "przy garstce wyników nie ma czego doczytywać");
   assert.equal(played.length, 2);
   assert.equal(played[0].album.title, "Other Album", "gościnne najpierw");
   assert.equal(played[0].withBand, null);
@@ -99,9 +100,14 @@ test("User-Agent: własna wartość przechodzi, cudzysłowy z importu .env obci�
 });
 
 test("szukanie artystów: zakres zawęża zapytanie do typu", () => {
-  assert.equal(artistQuery("cynic"), "cynic");
-  assert.equal(artistQuery("cynic", "group"), "cynic AND type:group");
-  assert.equal(artistQuery("scott burns", "person"), "scott burns AND type:person");
+  assert.equal(artistQuery("cynic"), "(cynic OR cynic~)");
+  assert.equal(artistQuery("cynic", "group"), "(cynic OR cynic~) AND type:group");
+  assert.equal(
+    artistQuery("scott burns", "person"),
+    "(scott OR scott~) (burns OR burns~) AND type:person",
+  );
+  assert.equal(artistQuery("nile"), "(nile OR nile~)");
+  assert.equal(artistQuery("sun ra"), "sun ra", "krótkie słowa bez rozmycia — inaczej sypie przypadkami");
   assert.equal(artistQuery("   ", "person"), "", "puste zapytanie nie idzie do MB");
 });
 
