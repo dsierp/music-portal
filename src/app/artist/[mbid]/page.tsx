@@ -418,6 +418,9 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
   // karty płyt — inaczej ta sama pozycja byłaby na stronie dwa razy.
   const znane = new Set(played.map((p) => p.album.title.toLowerCase()));
   const sesyjne = artist.sessionOn.filter((w) => !znane.has(w.title.toLowerCase())).slice(0, 120);
+  // Najlepsza z płyt, na których grał u kogoś — liczona tak samo jak przy jego
+  // własnej dyskografii: najpierw oceny w portalu, w razie ich braku MusicBrainz.
+  const topGoscinnie = topAlbum(played.map((p) => p.album), ratings);
   const playedByBand = artist.isPerson ? groupByBand(played) : undefined;
   // Płyty pod oś czasu muzyka. NIE z „Grał(a) na płytach": to relacje przy
   // nagraniach, a MusicBrainz ma je tylko dla części zespołów (dla Atheist —
@@ -520,78 +523,6 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
         </section>
       )}
 
-      {produced.length > 0 && (
-        <section className="mt-8">
-          <h2 className="mb-1 text-2xl">
-            {t.artist.producedHeading} <span className="font-mono text-sm text-muted">{produced.length}</span>
-          </h2>
-          <p className="mb-3 text-xs text-muted">{t.artist.producedNote}</p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {produced.slice(0, 60 * krotnosc).map((p) => (
-              <AlbumCard
-                key={p.album.mbid}
-                album={p.album}
-                rating={ratings.get(p.album.mbid)}
-                extra={<div className="text-xs text-accent2">{p.roles.join(", ")}</div>}
-              />
-            ))}
-          </div>
-          {produced.length > 60 * krotnosc && <p className="mt-2 text-xs text-faint">{fmt(t.artist.producedMore, { n: produced.length })}</p>}
-          {wiecejProdukcji && (
-            <p className="mt-3">
-              <Link href={dalej(stron + STRON_DOMYSLNIE)} className="chip text-xs">{t.artist.fetchMore}</Link>
-              <span className="ml-2 text-[10px] text-faint">{t.artist.fetchMoreNote}</span>
-            </p>
-          )}
-        </section>
-      )}
-
-      {(played.length > 0 || sesyjne.length > 0) && (
-        <section className="mt-8">
-          <h2 className="mb-2 text-2xl">{t.artist.playedOnHeading} <span className="font-mono text-sm text-muted">{played.length + sesyjne.length}</span></h2>
-          <p className="mb-3 text-xs text-muted">{t.artist.playedOnNote}</p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {played.slice(0, 40 * krotnosc).map((p) => (
-              <AlbumCard
-                key={p.album.mbid}
-                album={p.album}
-                rating={ratings.get(p.album.mbid)}
-                extra={
-                  <div className="text-xs">
-                    {p.roles.length > 0 && <span className="text-accent2">{p.roles.join(", ")}</span>}
-                    {p.withBand ? <span className="ml-2 text-muted">{fmt(t.artist.withBand, { name: p.withBand })}</span> : <span className="ml-2 rounded bg-surface2 px-1 font-mono text-[10px] uppercase text-muted">{t.artist.guestBadge}</span>}
-                  </div>
-                }
-              />
-            ))}
-          </div>
-          {/* Granie wpisane przy wydaniu, prosto z lookupu artysty. Bez tego
-              Sting („Sacred Love") nie miał jak się pojawić: przeglądanie wydań
-              urywa się przy takiej liczbie pozycji, a ten komplet mamy od ręki.
-              Płyty, które i tak są wyżej jako karty, pomijamy. */}
-          {sesyjne.length > 0 && (
-            <ul className="mt-3 grid gap-x-6 gap-y-1 sm:grid-cols-2">
-              {sesyjne.map((w) => (
-                <li key={w.releaseMbid} className="flex flex-wrap items-baseline gap-x-2 text-sm">
-                  <Link href={`/go/mb-release/${encodeURIComponent(w.releaseMbid)}`} className="font-medium hover:text-accent2 hover:underline">
-                    {w.artistText ? `${w.artistText} – ` : ""}<i>{w.title}</i>
-                  </Link>
-                  <span className="font-mono text-[10px] text-accent2">{w.roles.join(", ")}</span>
-                  {w.date && <span className="font-mono text-[10px] text-faint">{w.date.slice(0, 4)}</span>}
-                </li>
-              ))}
-            </ul>
-          )}
-          {played.length > 40 * krotnosc && <p className="mt-2 text-xs text-faint">{fmt(t.artist.producedMore, { n: played.length })}</p>}
-          {wiecejGrania && (
-            <p className="mt-3">
-              <Link href={dalej(stron + STRON_DOMYSLNIE)} className="chip text-xs">{t.artist.fetchMore}</Link>
-              <span className="ml-2 text-[10px] text-faint">{t.artist.fetchMoreNote}</span>
-            </p>
-          )}
-        </section>
-      )}
-
       {albums.length > 0 && (
         <section className="mt-8">
           {/* Domyślnie kolejnością wydania — dorobek czyta się od początku.
@@ -641,6 +572,90 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
           </div>
         </details>
       )}
+      {(played.length > 0 || sesyjne.length > 0) && (
+        <section className="mt-8">
+          <h2 className="mb-2 text-2xl">{t.artist.playedOnHeading} <span className="font-mono text-sm text-muted">{played.length + sesyjne.length}</span></h2>
+          <p className="mb-3 text-xs text-muted">{t.artist.playedOnNote}</p>
+
+          {/* Wyróżniona płyta spośród cudzych — ten sam chwyt, co przy jego
+              dyskografii: punkt wejścia dla kogoś, kto nie wie, od czego zacząć
+              przy pięćdziesięciu sesjach. Zostaje też niżej, na swoim miejscu. */}
+          {topGoscinnie && (
+            <div className="mb-4 rounded-lg border border-accent/50 bg-surface2 p-3">
+              <div className="label mb-2 text-accent2">
+                {topGoscinnie.source === "portal" ? t.artist.topFromPortal : t.artist.topFromMb}
+              </div>
+              <AlbumCard album={topGoscinnie.album} rating={ratings.get(topGoscinnie.album.mbid)} />
+            </div>
+          )}
+          <div className="grid gap-2 sm:grid-cols-2">
+            {played.slice(0, 40 * krotnosc).map((p) => (
+              <AlbumCard
+                key={p.album.mbid}
+                album={p.album}
+                rating={ratings.get(p.album.mbid)}
+                extra={
+                  <div className="text-xs">
+                    {p.roles.length > 0 && <span className="text-accent2">{p.roles.join(", ")}</span>}
+                    {p.withBand ? <span className="ml-2 text-muted">{fmt(t.artist.withBand, { name: p.withBand })}</span> : <span className="ml-2 rounded bg-surface2 px-1 font-mono text-[10px] uppercase text-muted">{t.artist.guestBadge}</span>}
+                  </div>
+                }
+              />
+            ))}
+          </div>
+          {/* Granie wpisane przy wydaniu, prosto z lookupu artysty. Bez tego
+              Sting („Sacred Love") nie miał jak się pojawić: przeglądanie wydań
+              urywa się przy takiej liczbie pozycji, a ten komplet mamy od ręki.
+              Płyty, które i tak są wyżej jako karty, pomijamy. */}
+          {sesyjne.length > 0 && (
+            <ul className="mt-3 grid gap-x-6 gap-y-1 sm:grid-cols-2">
+              {sesyjne.map((w) => (
+                <li key={w.releaseMbid} className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                  <Link href={`/go/mb-release/${encodeURIComponent(w.releaseMbid)}`} className="font-medium hover:text-accent2 hover:underline">
+                    {w.artistText ? `${w.artistText} – ` : ""}<i>{w.title}</i>
+                  </Link>
+                  <span className="font-mono text-[10px] text-accent2">{w.roles.join(", ")}</span>
+                  {w.date && <span className="font-mono text-[10px] text-faint">{w.date.slice(0, 4)}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+          {played.length > 40 * krotnosc && <p className="mt-2 text-xs text-faint">{fmt(t.artist.producedMore, { n: played.length })}</p>}
+          {wiecejGrania && (
+            <p className="mt-3">
+              <Link href={dalej(stron + STRON_DOMYSLNIE)} className="chip text-xs">{t.artist.fetchMore}</Link>
+              <span className="ml-2 text-[10px] text-faint">{t.artist.fetchMoreNote}</span>
+            </p>
+          )}
+        </section>
+      )}
+
+      {produced.length > 0 && (
+        <section className="mt-8">
+          <h2 className="mb-1 text-2xl">
+            {t.artist.producedHeading} <span className="font-mono text-sm text-muted">{produced.length}</span>
+          </h2>
+          <p className="mb-3 text-xs text-muted">{t.artist.producedNote}</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {produced.slice(0, 60 * krotnosc).map((p) => (
+              <AlbumCard
+                key={p.album.mbid}
+                album={p.album}
+                rating={ratings.get(p.album.mbid)}
+                extra={<div className="text-xs text-accent2">{p.roles.join(", ")}</div>}
+              />
+            ))}
+          </div>
+          {produced.length > 60 * krotnosc && <p className="mt-2 text-xs text-faint">{fmt(t.artist.producedMore, { n: produced.length })}</p>}
+          {wiecejProdukcji && (
+            <p className="mt-3">
+              <Link href={dalej(stron + STRON_DOMYSLNIE)} className="chip text-xs">{t.artist.fetchMore}</Link>
+              <span className="ml-2 text-[10px] text-faint">{t.artist.fetchMoreNote}</span>
+            </p>
+          )}
+        </section>
+      )}
+
       {!disco.length && !played.length && !produced.length && <p className="mt-8 text-sm text-muted">{t.artist.noReleases}</p>}
 
       {artist.workedOn.length > 0 && (
