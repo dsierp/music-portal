@@ -12,6 +12,7 @@
  */
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { cacheHasNote, cacheNote } from "./cache";
 
 const API = "https://api.spotify.com/v1";
 const TOKEN_URL = "https://accounts.spotify.com/api/token";
@@ -40,6 +41,7 @@ async function kontoSpotify(userId: string): Promise<Konto | null> {
 
 /** Czy ten użytkownik podłączył Spotify (do pokazania przycisku „Połącz"). */
 export async function spotifyConnected(userId: string): Promise<boolean> {
+  if (await spotifyBlocked(userId)) return false;
   return !!(await kontoSpotify(userId).catch(() => null));
 }
 
@@ -80,6 +82,22 @@ async function tokenDla(userId: string): Promise<string | null> {
   return dane.access_token;
 }
 
+/**
+ * Odmowa dla konkretnego konta. Nowa aplikacja Spotify chodzi w trybie
+ * deweloperskim i obsługuje tylko osoby dopisane ręcznie przez właściciela —
+ * reszcie odpowiada 403. To nie jest awaria portalu i nie ma o tym krzyczeć:
+ * zapamiętujemy odmowę na godzinę i po prostu chowamy funkcje Spotify przed tą
+ * osobą. Godzina, bo dopisanie kogoś do listy ma zadziałać bez czekania do
+ * jutra.
+ */
+const BLOKADA_TTL = 60 * 60;
+const kluczBlokady = (userId: string) => `spotify:odmowa:${userId}`;
+
+/** Czy Spotify odmawia obsługi tego konta (a więc: chowamy przyciski). */
+export async function spotifyBlocked(userId: string): Promise<boolean> {
+  return cacheHasNote(kluczBlokady(userId));
+}
+
 async function api<T>(userId: string, sciezka: string, init?: RequestInit): Promise<T | null> {
   const token = await tokenDla(userId);
   if (!token) return null;
@@ -88,6 +106,10 @@ async function api<T>(userId: string, sciezka: string, init?: RequestInit): Prom
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(init?.headers ?? {}) },
     cache: "no-store",
   });
+  if (res.status === 403 || res.status === 401) {
+    await cacheNote(kluczBlokady(userId), BLOKADA_TTL);
+    return null;
+  }
   if (res.status === 204 || res.status === 202) return null; // „nic teraz nie gra"
   if (!res.ok) return null;
   const tekst = await res.text();
