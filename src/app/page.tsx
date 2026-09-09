@@ -132,12 +132,12 @@ export default async function Home() {
         </section>
 
         <aside className="space-y-6">
-          <TravelJournal events={dziennik} locale={locale} t={t} more="/listy#dziennik" />
+          <TravelJournal events={dziennik} locale={locale} t={t} more="/podroze#dziennik" />
           {user && (mojeListy.length > 0 || dlaMnie.length > 0) && (
             <section className="card">
               <div className="flex items-baseline justify-between">
                 <h2 className="text-xl">{t.lists.myListsTitle}</h2>
-                <Link href="/listy" className="text-xs text-muted hover:text-accent2">{t.common.showAll} →</Link>
+                <Link href="/podroze" className="text-xs text-muted hover:text-accent2">{t.common.showAll} →</Link>
               </div>
               {dlaMnie.length > 0 && (
                 <ul className="mt-2 space-y-1 text-sm">

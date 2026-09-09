@@ -23,7 +23,7 @@ export async function Nav() {
           <Link href="/premiery">{t.nav.releases}</Link>
           <Link href="/koncerty">{t.nav.concerts}</Link>
           <Link href="/best-of">{t.nav.bestOf}</Link>
-          <Link href="/listy">{t.nav.lists}</Link>
+          <Link href="/podroze">{t.nav.lists}</Link>
         </nav>
         <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-3">
           <div className="hidden min-w-0 max-w-md flex-1 md:block"><SearchBox placeholder={t.nav.searchPlaceholder} label={t.nav.search} /></div>

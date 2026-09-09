@@ -219,7 +219,7 @@ export async function addToListAction(formData: FormData) {
   if (type !== "CONCERT") revalidatePath(pathFor(type, id));
   else revalidatePath("/koncerty");
   revalidatePath(`/podroz/${listId}`);
-  revalidatePath("/listy");
+  revalidatePath("/podroze");
 }
 
 export async function removeFromListAction(formData: FormData) {
@@ -234,15 +234,15 @@ export async function createListAction(formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return;
   const list = await ud.createList(u.id, title, String(formData.get("description") ?? "") || null);
-  revalidatePath("/listy");
+  revalidatePath("/podroze");
   redirect(`/podroz/${list.id}`);
 }
 
 export async function deleteListAction(formData: FormData) {
   const u = await requireUser();
   await ud.deleteList(u.id, String(formData.get("listId") ?? ""));
-  revalidatePath("/listy");
-  redirect("/listy");
+  revalidatePath("/podroze");
+  redirect("/podroze");
 }
 
 /** Polecenie listy — wielu naraz, bo zwykle poleca się tym samym ludziom. */
@@ -252,12 +252,12 @@ export async function shareListAction(formData: FormData) {
   const to = formData.getAll("to").map(String).filter(Boolean);
   await ud.shareList(u.id, listId, to, String(formData.get("note") ?? "") || null);
   revalidatePath(`/podroz/${listId}`);
-  revalidatePath("/listy");
+  revalidatePath("/podroze");
 }
 
 export async function dismissShareAction(formData: FormData) {
   const u = await requireUser();
   await ud.dismissShare(u.id, String(formData.get("listId") ?? ""));
-  revalidatePath("/listy");
+  revalidatePath("/podroze");
   revalidatePath("/ja");
 }

@@ -1,7 +1,7 @@
 /**
  * Napisy ekranu: lists. Polski jest źródłem prawdy — z niego bierzemy typ.
  *
- * Obejmuje /listy ORAZ /best-of — best-of nie ma osobnego pliku słownika,
+ * Obejmuje /podroze ORAZ /best-of — best-of nie ma osobnego pliku słownika,
  * bo to blisko spokrewnione zestawienia (obie strony pokazują to samo: rangi
  * płyt i artystów, tylko z innych źródeł danych).
  */
@@ -51,12 +51,12 @@ const pl = {
   addToSubmit: "Dodaj",
   onLists: "Już w podróżach",
   emptyList: "Jeszcze pusto — bądź pierwszy.",
-  bannerTitle: "Listy",
+  bannerTitle: "Podróże",
   bannerIntro: "Stałe: ",
   weeklyReleasesLink: "premiery piątkowe",
   bannerConnected: " ({n} połączonych z MusicBrainz) i ",
   bestOfLink: "best of roku",
-  bannerOutro: ". Poniżej listy społeczności portalu.",
+  bannerOutro: ". Poniżej podróże i zestawienia społeczności portalu.",
   titleTopAlbums: "Najwyżej oceniane płyty",
   titleTopArtists: "Najwyżej oceniani artyści",
   titleMostLiked: "Najbardziej lubiane płyty",
@@ -121,7 +121,7 @@ const en: T = {
   addToSubmit: "Add",
   onLists: "Already on journeys",
   emptyList: "Still empty — be the first.",
-  bannerTitle: "Lists",
+  bannerTitle: "Journeys",
   bannerIntro: "Regulars: ",
   weeklyReleasesLink: "Friday releases",
   bannerConnected: " ({n} linked to MusicBrainz) and ",
@@ -190,7 +190,7 @@ const es: T = {
   addToSubmit: "Añadir",
   onLists: "Ya está en viajes",
   emptyList: "Todavía vacío — sé el primero.",
-  bannerTitle: "Listas",
+  bannerTitle: "Viajes",
   bannerIntro: "Fijas: ",
   weeklyReleasesLink: "novedades de los viernes",
   bannerConnected: " ({n} enlazadas con MusicBrainz) y ",
@@ -259,7 +259,7 @@ const de: T = {
   addToSubmit: "Hinzufügen",
   onLists: "Schon auf Reisen",
   emptyList: "Noch leer — sei der Erste.",
-  bannerTitle: "Listen",
+  bannerTitle: "Reisen",
   bannerIntro: "Fest: ",
   weeklyReleasesLink: "Freitagsneuerscheinungen",
   bannerConnected: " ({n} mit MusicBrainz verknüpft) und ",
