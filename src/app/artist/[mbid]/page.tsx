@@ -20,6 +20,7 @@ import { relatedBands } from "@/lib/related";
 import { INSTRUMENT_GROUPS, groupsOf } from "@/lib/instruments";
 import { concertsForArtist } from "@/lib/concerts";
 import { addMissing, mergeDates, wdGenres, wdMembers, wdMemberships } from "@/lib/wikidata";
+import { spotifyDiscography, tylkoNoweTytuly, type SpotifyAlbum } from "@/lib/spotify";
 import { CareerTimeline, LineupTimeline } from "@/components/lineup-timeline";
 import { dbSafe } from "@/lib/db-safe";
 import { DbWarning } from "@/components/db-warning";
@@ -421,6 +422,19 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
   // Najlepsza z płyt, na których grał u kogoś — liczona tak samo jak przy jego
   // własnej dyskografii: najpierw oceny w portalu, w razie ich braku MusicBrainz.
   const topGoscinnie = topAlbum(played.map((p) => p.album), ratings);
+  // Trzecie źródło dyskografii. MusicBrainz zależy od tego, czy komuś chciało
+  // się wpisać płytę; Spotify jest katalogiem wydawniczym, więc ma to, czego
+  // tam brakuje (polski jazz, małe wytwórnie). Pokazujemy WYŁĄCZNIE tytuły
+  // nieznane MusicBrainz i podpisujemy, skąd są.
+  const zeSpotify = await spotifyDiscography(artist.name, artist.links.spotify).catch(() => [] as SpotifyAlbum[]);
+  const znaneTytuly = [
+    ...disco.map((a) => a.title),
+    ...played.map((p) => p.album.title),
+    ...artist.sessionOn.map((w) => w.title),
+  ];
+  const nowe = tylkoNoweTytuly(zeSpotify, znaneTytuly);
+  const noweWlasne = nowe.filter((a) => a.group === "album");
+  const noweGoscinne = nowe.filter((a) => a.group === "appears_on");
   const playedByBand = artist.isPerson ? groupByBand(played) : undefined;
   // Płyty pod oś czasu muzyka. NIE z „Grał(a) na płytach": to relacje przy
   // nagraniach, a MusicBrainz ma je tylko dla części zespołów (dla Atheist —
@@ -621,6 +635,24 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
             </ul>
           )}
           {played.length > 40 * krotnosc && <p className="mt-2 text-xs text-faint">{fmt(t.artist.producedMore, { n: played.length })}</p>}
+
+          {noweGoscinne.length > 0 && (
+            <div className="mt-4">
+              <p className="mb-1 text-xs text-muted">{t.artist.spotifyGuestNote}</p>
+              <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
+                {noweGoscinne.map((a) => (
+                  <li key={a.id} className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                    <a href={a.url} target="_blank" rel="noopener" className="font-medium hover:text-accent2 hover:underline">
+                      {a.artists && a.artists.toLowerCase() !== artist.name.toLowerCase() ? `${a.artists} – ` : ""}
+                      <i>{a.title}</i>
+                    </a>
+                    {a.year && <span className="font-mono text-[10px] text-faint">{a.year}</span>}
+                    <span className="font-mono text-[10px] uppercase text-faint" title={t.artist.fromSpotifyNote}>spotify</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {wiecejGrania && (
             <p className="mt-3">
               <Link href={dalej(stron + STRON_DOMYSLNIE)} className="chip text-xs">{t.artist.fetchMore}</Link>

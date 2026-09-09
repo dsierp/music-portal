@@ -12,7 +12,7 @@
  */
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { cacheHasNote, cacheNote } from "./cache";
+import { cached, cacheHasNote, cacheNote } from "./cache";
 
 const API = "https://api.spotify.com/v1";
 const TOKEN_URL = "https://accounts.spotify.com/api/token";
@@ -233,4 +233,132 @@ export async function journeyToPlaylist(
     });
   }
   return { url: playlista.external_urls?.spotify ?? null, dodane: uris.length, pominiete };
+}
+
+// ---------- katalog: dyskografia bez udziału użytkownika ----------
+
+/**
+ * Token samej aplikacji (client credentials).
+ *
+ * Do czytania katalogu nie potrzeba niczyjego konta — i dobrze, bo dzięki temu
+ * łatanie dyskografii działa dla każdego odwiedzającego, także niezalogowanego,
+ * i nie dotyczy go limit pięciu osób z trybu deweloperskiego.
+ */
+async function tokenAplikacji(): Promise<string | null> {
+  if (!spotifyConfigured()) return null;
+  return cached("spotify:app-token", 55 * 60, async () => {
+    const basic = Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString("base64");
+    const res = await fetch(TOKEN_URL, {
+      method: "POST",
+      headers: { Authorization: `Basic ${basic}`, "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ grant_type: "client_credentials" }),
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const dane = (await res.json()) as { access_token?: string };
+    return dane.access_token ?? null;
+  }).catch(() => null);
+}
+
+async function katalog<T>(sciezka: string): Promise<T | null> {
+  const token = await tokenAplikacji();
+  if (!token) return null;
+  const res = await fetch(`${API}${sciezka}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as T;
+}
+
+export interface SpotifyAlbum {
+  id: string;
+  title: string;
+  year: string | null;
+  artists: string;
+  url: string;
+  cover: string | null;
+  /** „album" = pod jego nazwiskiem, „appears_on" = zagrał u kogoś */
+  group: "album" | "appears_on";
+}
+
+interface SpAlbumRaw {
+  id: string;
+  name: string;
+  release_date?: string;
+  album_group?: string;
+  external_urls?: { spotify?: string };
+  images?: { url: string }[];
+  artists?: { name: string }[];
+}
+
+/**
+ * Dopasowanie artysty po nazwie.
+ *
+ * MusicBrainz rzadko trzyma link do Spotify przy samym artyście, więc zwykle
+ * zostaje nazwa — a ta bywa niejednoznaczna. Bierzemy wyłącznie DOKŁADNE
+ * trafienie (bez względu na wielkość liter): lepiej nie pokazać nic, niż
+ * dopisać komuś cudzą dyskografię.
+ */
+async function idArtysty(name: string, spotifyLink?: string): Promise<string | null> {
+  const zLinku = spotifyLink?.match(/artist\/([A-Za-z0-9]+)/)?.[1];
+  if (zLinku) return zLinku;
+  const dane = await katalog<{ artists?: { items?: { id: string; name: string }[] } }>(
+    `/search?type=artist&limit=5&q=${encodeURIComponent(name)}`,
+  );
+  const trafienie = (dane?.artists?.items ?? []).find((a) => a.name.toLowerCase() === name.toLowerCase());
+  return trafienie?.id ?? null;
+}
+
+/**
+ * Dyskografia ze Spotify — jako ŁATKA na dziury w MusicBrainz, nie zamiennik.
+ *
+ * Spotify jest katalogiem wydawniczym, więc wie, co wyszło, także przy mniejszych
+ * wytwórniach i poza anglosaskim światem (stąd trafia tam np. polski jazz, którego
+ * w MusicBrainz nikt nie wpisał). Nie wie za to nic o składach, producentach ani
+ * datach członkostwa — te zostają przy MusicBrainz.
+ */
+export async function spotifyDiscography(name: string, spotifyLink?: string): Promise<SpotifyAlbum[]> {
+  if (!spotifyConfigured() || !name) return [];
+  return cached(`spotify:disco:v1:${name.toLowerCase()}`, 60 * 60 * 24, async () => {
+    const id = await idArtysty(name, spotifyLink);
+    if (!id) return [] as SpotifyAlbum[];
+    const dane = await katalog<{ items?: SpAlbumRaw[] }>(
+      `/artists/${id}/albums?include_groups=album,appears_on&limit=50&market=PL`,
+    );
+    return (dane?.items ?? []).map((a) => ({
+      id: a.id,
+      title: a.name,
+      year: a.release_date ? a.release_date.slice(0, 4) : null,
+      artists: (a.artists ?? []).map((x) => x.name).join(", "),
+      url: a.external_urls?.spotify ?? `https://open.spotify.com/album/${a.id}`,
+      cover: a.images?.[a.images.length - 1]?.url ?? null,
+      group: a.album_group === "appears_on" ? ("appears_on" as const) : ("album" as const),
+    }));
+  }).catch(() => []);
+}
+
+/** Uproszczony tytuł do porównań: bez interpunkcji, dopisków i wielkości liter. */
+export function kluczTytulu(t: string): string {
+  return t
+    .toLowerCase()
+    .replace(/\((?:deluxe|remaster(?:ed)?|reissue|edition|expanded)[^)]*\)/g, "")
+    .replace(/\s*[-–—]\s*(?:deluxe|remaster(?:ed)?|reissue|.*edition).*$/g, "")
+    .replace(/[^a-z0-9]+/g, "")
+    .trim();
+}
+
+/**
+ * To, czego MusicBrainz nie ma. Porównujemy po uproszczonym tytule, bo MBID-ów
+ * Spotify nie zna, a reedycje i „(Remastered)" inaczej mnożyłyby duplikaty.
+ */
+export function tylkoNoweTytuly(zeSpotify: SpotifyAlbum[], znane: string[]): SpotifyAlbum[] {
+  const maja = new Set(znane.map(kluczTytulu));
+  const widziane = new Set<string>();
+  return zeSpotify.filter((a) => {
+    const k = kluczTytulu(a.title);
+    if (!k || maja.has(k) || widziane.has(k)) return false;
+    widziane.add(k);
+    return true;
+  });
 }
