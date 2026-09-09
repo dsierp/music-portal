@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { ARTWORK_ROLES, albumCrew, getArtist, getDiscography, getPlayedOn, getProduced, guessRoles, topAlbum, MbError, STRON_DOMYSLNIE } from "@/lib/musicbrainz";
-import { wikiFromLinks, wikiLogo } from "@/lib/wikipedia";
+import { wikiBandMembers, wikiFromLinks, wikiLogo } from "@/lib/wikipedia";
 import { MbUnavailable } from "@/components/mb-unavailable";
 import { LineupFilter } from "@/components/lineup-filter";
 import { OrderToggle } from "@/components/order-toggle";
@@ -89,7 +89,11 @@ function MemberList({
                 ) : (
                   <Link href={`/szukaj?q=${encodeURIComponent(m.name)}`} className="font-medium hover:text-accent2 hover:underline">{m.name}</Link>
                 )}
-                {m.fromWikidata && <span className="font-mono text-[10px] text-faint" title={t.artist.memberFromWikidataNote}>wd</span>}
+                {m.external && (
+                  <span className="font-mono text-[10px] text-faint" title={m.external === "wikidata" ? t.artist.memberFromWikidataNote : t.artist.memberFromWikipediaNote}>
+                    {m.external === "wikidata" ? "wd" : "wiki"}
+                  </span>
+                )}
                 {m.roles.length > 0 ? (
                   <span className="text-muted">{m.roles.join(", ")}</span>
                 ) : (
@@ -351,6 +355,16 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
   ]);
   // Najpierw łatamy daty przy tym, co MusicBrainz zna, a potem dokładamy ludzi
   // i zespoły, których nie zna wcale — z podpisem, skąd pochodzą.
+  const zWiki = (p: { name: string; roles: string }, obecny: boolean): Membership => ({
+    mbid: "",
+    name: p.name,
+    type: null,
+    roles: p.roles ? p.roles.split(/\s*,\s*/).filter(Boolean).slice(0, 6) : [],
+    begin: null,
+    end: null,
+    current: obecny,
+    external: "wikipedia" as const,
+  });
   const zWikidanych = (s: { mbid: string | null; label: string; begin: string | null; end: string | null }): Membership => ({
     mbid: s.mbid ?? "",
     name: s.label,
@@ -359,13 +373,24 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
     begin: s.begin,
     end: s.end,
     current: !s.end,
-    fromWikidata: true,
+    external: "wikidata" as const,
     datesFrom: s.begin || s.end ? ("wikidata" as const) : undefined,
   });
+  let members = addMissing(mergeDates(raw.members, wdIn), wdIn, zWikidanych);
+  // Trzecie podejście: infoboks Wikipedii. Przy Mgle to jedyne miejsce, w którym
+  // skład w ogóle jest — MusicBrainz nie ma relacji, a Wikidane encji zespołu
+  // nie rozpisały. Bez dat, ale z instrumentami i z uczciwym podpisem skąd.
+  if (!members.length) {
+    const wiki = await wikiBandMembers(raw.links).catch(() => ({ current: [], past: [] }));
+    members = [
+      ...wiki.current.map((p) => zWiki(p, true)),
+      ...wiki.past.map((p) => zWiki(p, false)),
+    ];
+  }
   const artist: Artist = {
     ...raw,
     memberOf: addMissing(mergeDates(raw.memberOf, wdOf), wdOf, zWikidanych),
-    members: addMissing(mergeDates(raw.members, wdIn), wdIn, zWikidanych),
+    members,
   };
   const [disco, playedR, producedR] = await Promise.all([
     getDiscography(mbid).catch(() => []),

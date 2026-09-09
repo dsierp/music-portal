@@ -99,3 +99,77 @@ function cleanScore(raw: string): string {
   return cleanWikitext(raw);
 }
 
+
+/**
+ * Skład zespołu z infoboksu Wikipedii.
+ *
+ * Trzecie źródło po MusicBrainz i Wikidanych — potrzebne, bo bywa jedynym.
+ * Mgła: MusicBrainz nie ma ani jednej relacji członkostwa, a w Wikipedii skład
+ * stoi w infoboksie jak byk. Lepiej wziąć go stamtąd z uczciwym podpisem, niż
+ * pokazywać zespół bez ludzi.
+ *
+ * Infoboksy różnią się polami między językami, więc bierzemy wszystkie znane
+ * warianty. Wartość bywa listą po gwiazdkach albo po „<br />" — tniemy po obu.
+ */
+const POLA_OBECNI = /^(current_members|muzycy|sk[łl]ad|obecny_sk[łl]ad|members)$/i;
+const POLA_DAWNI = /^(past_members|byli_muzycy|byli_cz[łl]onkowie|dawny_sk[łl]ad|former_members)$/i;
+
+export interface InfoboxMembers {
+  current: PersonnelLine[];
+  past: PersonnelLine[];
+}
+
+export function parseInfoboxMembers(wikitext: string): InfoboxMembers {
+  const pusty: InfoboxMembers = { current: [], past: [] };
+  const start = wikitext.search(/\{\{\s*infobox/i);
+  if (start < 0) return pusty;
+  // Wycinamy sam infoboks, licząc nawiasy — w środku siedzą inne szablony.
+  let depth = 0;
+  let end = wikitext.length;
+  for (let i = start; i < wikitext.length - 1; i++) {
+    if (wikitext[i] === "{" && wikitext[i + 1] === "{") { depth++; i++; }
+    else if (wikitext[i] === "}" && wikitext[i + 1] === "}") {
+      depth--; i++;
+      if (depth === 0) { end = i + 1; break; }
+    }
+  }
+  const body = wikitext.slice(start, end);
+
+  // Pola rozdziela „|" na początku linii; wartość może iść przez kilka linii.
+  const pola = new Map<string, string>();
+  let nazwa: string | null = null;
+  let wartosc: string[] = [];
+  const zapisz = () => {
+    if (nazwa) pola.set(nazwa, wartosc.join("\n"));
+    nazwa = null;
+    wartosc = [];
+  };
+  for (const linia of body.split("\n")) {
+    const m = linia.match(/^\s*\|\s*([A-Za-z_łóąćęśżźń0-9 ]+?)\s*=\s*(.*)$/);
+    if (m) {
+      zapisz();
+      nazwa = m[1].trim().toLowerCase().replace(/\s+/g, "_");
+      wartosc = [m[2]];
+    } else if (nazwa) {
+      wartosc.push(linia);
+    }
+  }
+  zapisz();
+
+  const osoby = (raw: string | undefined): PersonnelLine[] =>
+    !raw
+      ? []
+      : raw
+          .split(/<br\s*\/?>|\n\s*\*+|^\s*\*+/gim)
+          .map((l) => cleanWikitext(l.replace(/^\s*\*+/, "")))
+          .filter((l) => l.length > 1)
+          .map(splitPersonnelLine)
+          .filter((l): l is PersonnelLine => !!l)
+          .slice(0, 30);
+
+  const znajdz = (test: RegExp) => {
+    for (const [k, v] of pola) if (test.test(k)) return v;
+    return undefined;
+  };
+  return { current: osoby(znajdz(POLA_OBECNI)), past: osoby(znajdz(POLA_DAWNI)) };
+}

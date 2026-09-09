@@ -7,6 +7,8 @@ import type { Links } from "./musicbrainz";
 import { normalizeUserAgent } from "./musicbrainz";
 import { PERSONNEL_HEADING, cleanWikitext, splitPersonnelLine, parseRatingsTemplate } from "./wikitext";
 export { parseRatingsTemplate } from "./wikitext";
+import { parseInfoboxMembers, type InfoboxMembers } from "./wikitext";
+export type { InfoboxMembers };
 import type { PersonnelLine, WikiReview } from "./wikitext";
 export type { PersonnelLine, WikiReview } from "./wikitext";
 
@@ -161,4 +163,26 @@ export async function wikiFromLinks(links: Links, preferred: string[] = ["pl", "
     }
   }
   return null;
+}
+
+/**
+ * Skład zespołu z infoboksu — ostatnia deska ratunku, gdy ani MusicBrainz, ani
+ * Wikidane nikogo nie mają. Próbujemy kolejnych języków: polski zespół opisany
+ * jest zwykle najlepiej po polsku, ale angielska Wikipedia bywa dokładniejsza,
+ * więc bierzemy pierwszy artykuł, który w ogóle ma skład.
+ */
+export async function wikiBandMembers(links: Links, preferred: string[] = ["pl", "en"]): Promise<InfoboxMembers> {
+  const titles = await titlesFromLinks(links);
+  for (const lang of preferred) {
+    const title = titles[lang];
+    if (!title) continue;
+    const out = await cached(`wiki:members:v1:${lang}:${title}`, TTL.wiki, async () => {
+      const body = await getJson<{ parse?: { wikitext?: string } }>(
+        `https://${lang}.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}&section=0&prop=wikitext&format=json&formatversion=2`,
+      );
+      return parseInfoboxMembers(body?.parse?.wikitext ?? "");
+    }).catch(() => ({ current: [], past: [] }) as InfoboxMembers);
+    if (out.current.length || out.past.length) return out;
+  }
+  return { current: [], past: [] };
 }
