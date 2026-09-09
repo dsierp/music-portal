@@ -25,6 +25,7 @@ const WYMAGANE_TABELE = [
   "list",
   "list_item",
   "list_share",
+  "list_visit",
   "release_section",
   "release",
   "best_of_year",

@@ -5,9 +5,11 @@ import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 import Apple from "next-auth/providers/apple";
 import Facebook from "next-auth/providers/facebook";
 import Credentials from "next-auth/providers/credentials";
+import Spotify from "next-auth/providers/spotify";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { SPOTIFY_SCOPES } from "@/lib/spotify";
 
 /** Dostawca jest włączony tylko, gdy ma ustawione klucze w env. */
 function enabled(...keys: string[]) {
@@ -20,6 +22,28 @@ if (enabled("AUTH_MICROSOFT_ENTRA_ID_ID", "AUTH_MICROSOFT_ENTRA_ID_SECRET"))
   providers.push(MicrosoftEntraID);
 if (enabled("AUTH_APPLE_ID", "AUTH_APPLE_SECRET")) providers.push(Apple);
 if (enabled("AUTH_FACEBOOK_ID", "AUTH_FACEBOOK_SECRET")) providers.push(Facebook);
+
+/**
+ * Spotify wchodzi jako dostawca logowania, ale służy do czegoś innego niż
+ * reszta: to sposób, żeby użytkownik PODŁĄCZYŁ swoje konto do portalu.
+ *
+ * `allowDangerousEmailAccountLinking` jest tu świadome. Bez niego ktoś
+ * zalogowany Google, kto klika „Połącz ze Spotify", dostaje błąd zamiast
+ * połączenia — bo NextAuth broni się przed sklejeniem dwóch kont o tym samym
+ * adresie. Ryzyko polega na zaufaniu, że dostawca zweryfikował adres; Spotify
+ * to robi, a alternatywą byłoby drugie, osobne konto w portalu dla tej samej
+ * osoby. Prosimy tylko o odczyt bieżącego utworu i tworzenie prywatnych list.
+ */
+if (enabled("SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET")) {
+  providers.push(
+    Spotify({
+      clientId: process.env.SPOTIFY_CLIENT_ID,
+      clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+      allowDangerousEmailAccountLinking: true,
+      authorization: { params: { scope: SPOTIFY_SCOPES } },
+    }),
+  );
+}
 
 if (process.env.AUTH_DEV_LOGIN === "true" && process.env.NODE_ENV !== "production") {
   providers.push(

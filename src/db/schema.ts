@@ -228,6 +228,33 @@ export const listItems = pgTable(
 );
 
 /**
+ * Odhaczony przystanek: „to już znam".
+ *
+ * Ma się odklikiwać SAMO — bo nikt nie wraca do listy, żeby zaznaczyć ptaszki.
+ * Wejście w Spotify albo Tidal z przystanku i wystawienie oceny liczą się jako
+ * odsłuchanie; ręczny klik zostaje dla tych, którzy słuchali gdzie indziej.
+ * `source` trzymamy, żeby dało się odróżnić „kliknął w link" od „ocenił" —
+ * i żeby ręcznego odhaczenia nie nadpisało automatyczne.
+ */
+export const visitSource = pgEnum("visit_source", ["link", "rating", "manual"]);
+
+export const listVisits = pgTable(
+  "list_visit",
+  {
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    listId: text("list_id").notNull().references(() => lists.id, { onDelete: "cascade" }),
+    targetType: listTarget("target_type").notNull(),
+    targetMbid: text("target_mbid").notNull(),
+    source: visitSource("source").notNull().default("manual"),
+    visitedAt: timestamp("visited_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.listId, t.targetType, t.targetMbid] }),
+    index("list_visit_user").on(t.userId, t.listId),
+  ],
+);
+
+/**
  * Polecenie listy komuś. Klucz (lista, odbiorca) — tej samej listy nie poleca
  * się dwa razy; ponowne wysłanie odświeża notkę. `dismissedAt` pozwala odbiorcy
  * schować polecenie, nie kasując go nadawcy sprzed nosa.

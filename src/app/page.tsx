@@ -10,6 +10,7 @@ import { Suspense } from "react";
 import { lineupNews } from "@/lib/lineup-news";
 import { getFavoriteArtists, getGenres, getLikedAlbums, getMyLists, listsForMe, recentComments, travelJournal } from "@/lib/user-data";
 import { TravelJournal } from "@/components/travel-journal";
+import { nowPlaying, spotifyConfigured } from "@/lib/spotify";
 import type { JournalEvent } from "@/lib/journal";
 import { genreToSection } from "@/lib/genres";
 import { SKIP_ONBOARDING } from "@/lib/onboarding";
@@ -24,6 +25,44 @@ export const dynamic = "force-dynamic";
  * „Kto zmienił zespół" — osobny strumień, bo to jedno zapytanie do MusicBrainz
  * na zespół (limit 1/s). Strona główna nie ma na to czekać.
  */
+/**
+ * „Słuchasz teraz" — jedno pytanie do Spotify, w osobnym strumieniu.
+ *
+ * Osobno, bo to jedyny kawałek strony, który potrafi być nieaktualny za pół
+ * minuty, i jedyny, który zależy od cudzego serwisu. Gdy nic nie leci albo
+ * konto nie jest połączone, kafelek po prostu nie istnieje — cisza jest tu
+ * normalnym stanem, nie błędem.
+ */
+async function NowPlayingCard({ userId, t }: { userId: string; t: Dict }) {
+  const teraz = await nowPlaying(userId).catch(() => null);
+  if (!teraz) return null;
+  return (
+    <section className="card">
+      <div className="label mb-2">{t.home.nowPlaying}</div>
+      <div className="flex items-center gap-3">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {teraz.cover && <img src={teraz.cover} alt="" className="h-12 w-12 rounded" />}
+        <div className="min-w-0">
+          <a href={teraz.url} target="_blank" rel="noopener" className="block truncate font-medium hover:text-accent2 hover:underline">
+            {teraz.title}
+          </a>
+          <div className="truncate text-xs text-muted">{teraz.artist}</div>
+        </div>
+      </div>
+      <SearchLink query={`${teraz.artist} ${teraz.album}`} label={t.home.nowPlayingFind} />
+    </section>
+  );
+}
+
+/** Skok z odtwarzanego utworu do tej płyty u nas — stąd zaczyna się grzebanie. */
+function SearchLink({ query, label }: { query: string; label: string }) {
+  return (
+    <Link href={`/szukaj?q=${encodeURIComponent(query)}`} className="mt-2 block text-xs text-muted hover:text-accent2">
+      {label}
+    </Link>
+  );
+}
+
 async function LineupNews({ bands, favorites, t }: { bands: { mbid: string; name: string }[]; favorites: Set<string>; t: Dict["home"] }) {
   if (!bands.length) return null;
   const news = await lineupNews(bands, favorites).catch(() => []);
@@ -132,6 +171,11 @@ export default async function Home() {
         </section>
 
         <aside className="space-y-6">
+          {user && spotifyConfigured() && (
+            <Suspense fallback={null}>
+              <NowPlayingCard userId={user.id} t={t} />
+            </Suspense>
+          )}
           <TravelJournal events={dziennik} locale={locale} t={t} more="/podroze#dziennik" />
           {user && (mojeListy.length > 0 || dlaMnie.length > 0) && (
             <section className="card">

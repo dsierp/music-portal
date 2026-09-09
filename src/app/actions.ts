@@ -36,6 +36,8 @@ export async function rate(formData: FormData) {
   const raw = formData.get("score");
   const score = raw === "" || raw === null ? null : z.coerce.number().int().min(1).max(10).parse(raw);
   await ud.setRating(u.id, t, id, score, String(formData.get("label") ?? "").slice(0, 200) || null);
+  // Ocena znaczy, że tego słuchał — odhaczamy na wszystkich jego podróżach.
+  if (score !== null) await ud.markVisitedEverywhere(u.id, t, id).catch(() => {});
   revalidatePath(pathFor(t, id));
 }
 
@@ -90,6 +92,7 @@ export async function toggleLike(formData: FormData) {
       },
       kind,
     );
+  await ud.markVisitedEverywhere(u.id, "ALBUM", id).catch(() => {});
   revalidatePath(`/album/${id}`);
   revalidatePath("/ja");
   // Po odrzuceniu płyty pytamy o artystę — jednym parametrem w adresie, bez
@@ -108,6 +111,7 @@ export async function toggleFavorite(formData: FormData) {
   const teraz = String(formData.get("current") ?? "");
   if (teraz === kind) await ud.unfavoriteArtist(u.id, id);
   else await ud.favoriteArtist(u.id, id, String(formData.get("name") ?? ""), kind);
+  await ud.markVisitedEverywhere(u.id, "ARTIST", id).catch(() => {});
   revalidatePath(`/artist/${id}`);
   revalidatePath("/ja");
   const back = String(formData.get("back") ?? "");
@@ -260,4 +264,54 @@ export async function dismissShareAction(formData: FormData) {
   await ud.dismissShare(u.id, String(formData.get("listId") ?? ""));
   revalidatePath("/podroze");
   revalidatePath("/ja");
+}
+
+// ---------- odhaczanie przystanków ----------
+
+/**
+ * Ręczne „to już znam" — dla tych, którzy słuchali gdzie indziej niż przez
+ * portal. Reszta odhacza się sama: przy ocenie i przy wejściu w Spotify/Tidal.
+ */
+export async function toggleVisitAction(formData: FormData) {
+  const u = await requireUser();
+  const listId = String(formData.get("listId") ?? "");
+  const type = listTarget.parse(formData.get("type"));
+  const id = String(formData.get("mbid") ?? "");
+  if (!listId || !id) return;
+  if (String(formData.get("current")) === "1") await ud.unmarkVisited(u.id, listId, type, id);
+  else await ud.markVisited(u.id, listId, type, id, "manual");
+  revalidatePath(`/podroz/${listId}`);
+}
+
+// ---------- Spotify ----------
+
+export async function connectSpotify(callbackUrl = "/ja") {
+  await signIn("spotify", { redirectTo: callbackUrl });
+}
+
+/**
+ * Podróż jako prywatna playlista. Zespoły i koncerty zostają poza nią —
+ * playlista Spotify to utwory — więc wynik mówi wprost, co nie weszło.
+ */
+export async function sendJourneyToSpotify(formData: FormData) {
+  const u = await requireUser();
+  const listId = String(formData.get("listId") ?? "");
+  const dane = await ud.getList(listId);
+  if (!dane || dane.list.userId !== u.id) return;
+  const { journeyToPlaylist } = await import("@/lib/spotify");
+  const wynik = await journeyToPlaylist(
+    u.id,
+    { title: dane.list.title, description: dane.list.description },
+    dane.items.map((i) => ({ targetType: i.targetType, label: i.label })),
+  ).catch(() => null);
+  const q = new URLSearchParams();
+  if (!wynik) q.set("spotify", "blad");
+  else {
+    q.set("spotify", wynik.dodane ? "ok" : "pusto");
+    q.set("n", String(wynik.dodane));
+    q.set("pominieto", String(wynik.pominiete.length));
+    if (wynik.url) q.set("url", wynik.url);
+  }
+  revalidatePath(`/podroz/${listId}`);
+  redirect(`/podroz/${listId}?${q.toString()}`);
 }

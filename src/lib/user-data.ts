@@ -682,3 +682,74 @@ export async function travelJournal(userId: string, limit = 12): Promise<Journal
     limit,
   );
 }
+
+// ---------- odhaczone przystanki ----------
+
+export type VisitSource = "link" | "rating" | "manual";
+
+/** Odhaczone przystanki tej podróży — klucze „TYP:mbid", gotowe do sprawdzania. */
+export async function visitedStops(userId: string, listId: string): Promise<Map<string, VisitSource>> {
+  const rows = await db
+    .select({ t: schema.listVisits.targetType, m: schema.listVisits.targetMbid, s: schema.listVisits.source })
+    .from(schema.listVisits)
+    .where(and(eq(schema.listVisits.userId, userId), eq(schema.listVisits.listId, listId)))
+    .catch(() => [] as { t: ListTarget; m: string; s: VisitSource }[]);
+  return new Map(rows.map((r) => [`${r.t}:${r.m}`, r.s]));
+}
+
+/**
+ * Zaznaczenie przystanku jako poznanego.
+ *
+ * Ręczne odhaczenie jest ostateczne: automat („kliknął w Spotify") nie ma go
+ * nadpisywać, bo człowiek wie lepiej. W drugą stronę automat może podnieść
+ * wcześniejszy automat — data się odświeża i tyle.
+ */
+export async function markVisited(
+  userId: string,
+  listId: string,
+  targetType: ListTarget,
+  targetMbid: string,
+  source: VisitSource = "manual",
+) {
+  await db
+    .insert(schema.listVisits)
+    .values({ userId, listId, targetType, targetMbid, source })
+    .onConflictDoUpdate({
+      target: [schema.listVisits.userId, schema.listVisits.listId, schema.listVisits.targetType, schema.listVisits.targetMbid],
+      set: { visitedAt: new Date(), ...(source === "manual" ? { source } : {}) },
+    });
+}
+
+export async function unmarkVisited(userId: string, listId: string, targetType: ListTarget, targetMbid: string) {
+  await db
+    .delete(schema.listVisits)
+    .where(
+      and(
+        eq(schema.listVisits.userId, userId),
+        eq(schema.listVisits.listId, listId),
+        eq(schema.listVisits.targetType, targetType),
+        eq(schema.listVisits.targetMbid, targetMbid),
+      ),
+    );
+}
+
+/**
+ * Ocena albo znak „lubię/nie moja bajka" też znaczą, że ktoś tę rzecz poznał —
+ * odhaczamy ją wtedy na każdej jego podróży, w której stoi. Dzięki temu lista
+ * sama się zapełnia w trakcie normalnego korzystania z portalu.
+ */
+export async function markVisitedEverywhere(userId: string, targetType: ListTarget, targetMbid: string) {
+  const listy = await db
+    .select({ id: schema.lists.id })
+    .from(schema.listItems)
+    .innerJoin(schema.lists, eq(schema.lists.id, schema.listItems.listId))
+    .where(
+      and(
+        eq(schema.lists.userId, userId),
+        eq(schema.listItems.targetType, targetType),
+        eq(schema.listItems.targetMbid, targetMbid),
+      ),
+    )
+    .catch(() => [] as { id: string }[]);
+  for (const l of listy) await markVisited(userId, l.id, targetType, targetMbid, "rating").catch(() => {});
+}

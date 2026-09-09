@@ -4,7 +4,8 @@ import type { Metadata } from "next";
 import { currentUser } from "@/lib/auth";
 import { getAreas, getFavoriteArtists, getGenres, getLikedAlbums, getUserLocale, myRatings, usersCount } from "@/lib/user-data";
 import { isAdmin } from "@/lib/admin";
-import { addAreaAction, removeAreaAction, setGenreAction, skipOnboarding, toggleFavorite, toggleLike } from "@/app/actions";
+import { addAreaAction, connectSpotify, removeAreaAction, setGenreAction, skipOnboarding, toggleFavorite, toggleLike } from "@/app/actions";
+import { spotifyConfigured, spotifyConnected } from "@/lib/spotify";
 import { MAIN_CATEGORIES } from "@/lib/genres";
 import { orderByPopularity } from "@/lib/popularity";
 import { genreImage } from "@/lib/genre-art";
@@ -53,6 +54,10 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const restOrder = await orderByPopularity(MAIN_CATEGORIES.map((c) => c.slug).filter((s) => !mineFirst.includes(s)));
   const tiles = [...mineFirst, ...restOrder].map((slug) => bySlug.get(slug)!);
   const custom = genres.filter((g) => !MAIN_CATEGORIES.some((c) => c.slug === g.genre));
+  // Spotify jest w pełni dobrowolne: bez kluczy w środowisku karta nie istnieje,
+  // a bez kliknięcia użytkownika nie mamy do jego konta żadnego dostępu.
+  const spotifyGotowy = spotifyConfigured();
+  const spotifyJest = spotifyGotowy ? await spotifyConnected(user.id).catch(() => false) : false;
 
   return (
     <div className="space-y-10">
@@ -72,6 +77,20 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           </form>
         </section>
       )}
+      {spotifyGotowy && (
+        <section className="card">
+          <h2 className="text-xl">Spotify</h2>
+          <p className="mt-1 text-xs text-muted">{t.profile.spotifyNote}</p>
+          {spotifyJest ? (
+            <p className="mt-2 text-sm text-ok">{t.profile.spotifyConnected}</p>
+          ) : (
+            <form action={connectSpotify.bind(null, "/ja")} className="mt-2">
+              <button className="btn btn-accent">{t.lists.spotifyConnect}</button>
+            </form>
+          )}
+        </section>
+      )}
+
       <header>
         <div className="label">{t.profile.profileLabel}</div>
         <h1 className="text-4xl">{user.name || user.email}</h1>

@@ -2,8 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { currentUser } from "@/lib/auth";
-import { canSeeList, getList, otherUsers, sharedWith } from "@/lib/user-data";
-import { deleteListAction, removeFromListAction, shareListAction } from "@/app/actions";
+import { canSeeList, getList, otherUsers, sharedWith, visitedStops } from "@/lib/user-data";
+import { spotifyConfigured, spotifyConnected } from "@/lib/spotify";
+import { connectSpotify, deleteListAction, removeFromListAction, sendJourneyToSpotify, shareListAction, toggleVisitAction } from "@/app/actions";
 import { Cover } from "@/components/cover";
 import { i18n } from "@/lib/t";
 import { fmt, formatDate, plural } from "@/lib/i18n";
@@ -22,8 +23,15 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
  * Lista jest prywatna: widzi ją autor i ci, którym ją polecił. Bez publicznych
  * adresów „na skróty" — polecenie ma być gestem wobec kogoś, a nie publikacją.
  */
-export default async function ListPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ListPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ spotify?: string; n?: string; pominieto?: string; url?: string }>;
+}) {
   const { id } = await params;
+  const sp = await searchParams;
   const { locale, t } = await i18n();
   const user = await currentUser();
   const data = await getList(id).catch(() => null);
@@ -35,6 +43,11 @@ export default async function ListPage({ params }: { params: Promise<{ id: strin
     ? await Promise.all([otherUsers(user!.id), sharedWith(id)])
     : [[] as { id: string; name: string; me: boolean }[], [] as { userId: string; dismissedAt: Date | null }[]];
   const juzPolecone = new Set(wyslane.map((w) => w.userId));
+  // Odhaczone przystanki są PRYWATNE dla oglądającego: ta sama podróż u dwóch
+  // osób ma osobne ptaszki, bo „znam to" jest cechą człowieka, nie listy.
+  const poznane = user ? await visitedStops(user.id, id).catch(() => new Map<string, string>()) : new Map<string, string>();
+  const spotifyGotowy = spotifyConfigured();
+  const spotifyPolaczony = moja && spotifyGotowy && user ? await spotifyConnected(user.id).catch(() => false) : false;
 
   return (
     <div className="space-y-6">
@@ -44,7 +57,9 @@ export default async function ListPage({ params }: { params: Promise<{ id: strin
         {data.list.description && <p className="mt-2 max-w-2xl text-text2">{data.list.description}</p>}
         <p className="mt-1 font-mono text-xs text-muted">
           {plural(locale, data.items.length, t.lists.itemsCount)} · {formatDate(data.list.updatedAt.toISOString().slice(0, 10), locale, { year: true })}
+          {user && data.items.length > 0 && ` · ${fmt(t.lists.visitedCount, { done: poznane.size, all: data.items.length })}`}
         </p>
+        {user && data.items.length > 0 && <p className="mt-1 text-[10px] text-faint">{t.lists.visitedNote}</p>}
       </header>
 
       {data.items.length ? (
@@ -76,7 +91,43 @@ export default async function ListPage({ params }: { params: Promise<{ id: strin
                   {it.targetType === "ALBUM" ? t.common.album : it.targetType === "ARTIST" ? t.common.band : t.nav.concerts}
                 </span>
                 {it.note && <p className="text-xs text-muted">{it.note}</p>}
+                {/* Wyjścia do serwisów prowadzą przez naszą trasę, która po
+                    drodze stawia ptaszek — „znam to" bierze się z tego, co
+                    człowiek i tak robi, a nie z pamiętania o odhaczeniu. */}
+                {it.targetType !== "CONCERT" && (
+                  <div className="mt-0.5 flex gap-3">
+                    {[
+                      { nazwa: "Spotify", url: `https://open.spotify.com/search/${encodeURIComponent(it.label)}` },
+                      { nazwa: "Tidal", url: `https://tidal.com/search?q=${encodeURIComponent(it.label)}` },
+                    ].map((s) => (
+                      <a
+                        key={s.nazwa}
+                        href={`/go/stop?listId=${encodeURIComponent(id)}&type=${it.targetType}&mbid=${encodeURIComponent(it.targetMbid)}&to=${encodeURIComponent(s.url)}`}
+                        target="_blank"
+                        rel="noopener"
+                        title={fmt(t.lists.openIn, { name: s.nazwa })}
+                        className="font-mono text-[10px] text-muted hover:text-accent2"
+                      >
+                        ▸ {s.nazwa}
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
+              {user && (
+                <form action={toggleVisitAction} className="shrink-0">
+                  <input type="hidden" name="listId" value={id} />
+                  <input type="hidden" name="type" value={it.targetType} />
+                  <input type="hidden" name="mbid" value={it.targetMbid} />
+                  <input type="hidden" name="current" value={poznane.has(`${it.targetType}:${it.targetMbid}`) ? "1" : "0"} />
+                  <button
+                    title={poznane.has(`${it.targetType}:${it.targetMbid}`) ? t.lists.unmarkVisited : t.lists.markVisited}
+                    className={`font-mono text-sm ${poznane.has(`${it.targetType}:${it.targetMbid}`) ? "text-ok" : "text-faint hover:text-accent2"}`}
+                  >
+                    ✓
+                  </button>
+                </form>
+              )}
               {moja && (
                 <form action={removeFromListAction}>
                   <input type="hidden" name="listId" value={id} />
@@ -90,6 +141,26 @@ export default async function ListPage({ params }: { params: Promise<{ id: strin
         </ol>
       ) : (
         <p className="text-sm text-muted">{t.lists.emptyMyList}</p>
+      )}
+
+      {moja && spotifyGotowy && (
+        <section className="card">
+          <h2 className="text-xl">{t.lists.toSpotify}</h2>
+          <p className="mt-1 text-xs text-muted">{t.lists.toSpotifyNote}</p>
+          {sp.spotify === "ok" && (
+            <p className="mt-2 text-sm text-ok">
+              {fmt(t.lists.spotifyOk, { n: sp.n ?? "0" })}{" "}
+              {Number(sp.pominieto) > 0 && <span className="text-muted">{fmt(t.lists.spotifySkipped, { n: sp.pominieto ?? "0" })}</span>}{" "}
+              {sp.url && <a href={sp.url} target="_blank" rel="noopener" className="underline">{t.lists.spotifyOpen}</a>}
+            </p>
+          )}
+          {sp.spotify === "pusto" && <p className="mt-2 text-sm text-warn">{t.lists.spotifyEmpty}</p>}
+          {sp.spotify === "blad" && <p className="mt-2 text-sm text-warn">{t.lists.spotifyError}</p>}
+          <form action={spotifyPolaczony ? sendJourneyToSpotify : connectSpotify.bind(null, `/podroz/${id}`)} className="mt-3">
+            <input type="hidden" name="listId" value={id} />
+            <button className="btn btn-accent">{spotifyPolaczony ? t.lists.toSpotify : t.lists.spotifyConnect}</button>
+          </form>
+        </section>
       )}
 
       {moja && (
