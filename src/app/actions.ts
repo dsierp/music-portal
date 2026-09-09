@@ -319,11 +319,12 @@ export async function sendJourneyToSpotify(formData: FormData) {
 /**
  * Podróż z piątkowych premier — jednym kliknięciem.
  *
- * Bierzemy wyróżnione (★) pozycje z danego tygodnia, a zalogowanemu zawężamy je
- * do jego gatunków: premiery i tak są mu tak podawane, więc podróż ma wyglądać
- * jak to, co widzi na ekranie. Do podróży wchodzą tylko te płyty, które mamy
- * rozwiązane do MBID-u — reszta nie ma u nas strony, więc byłaby ślepym
- * przystankiem.
+ * Bierzemy DOKŁADNIE to, co widać na ekranie: ten sam tydzień i ten sam filtr
+ * gatunków, gwiazdek i wznowień. Podróż ma być zapisem tego, co człowiek
+ * właśnie ogląda — a nie osobnym wyborem, który robi za niego portal.
+ *
+ * Odpadają tylko pozycje bez rozwiązanego MBID-u: nie mają u nas strony, więc
+ * byłyby ślepym przystankiem.
  */
 export async function journeyFromReleases(formData: FormData) {
   const u = await requireUser();
@@ -331,16 +332,20 @@ export async function journeyFromReleases(formData: FormData) {
   const tytul = String(formData.get("title") ?? "").slice(0, 200) || "Premiery";
   if (!sectionId) return;
 
-  const { releasesFor } = await import("@/lib/lists");
-  const { genreToSection } = await import("@/lib/genres");
+  const { releasesFor, splitDb } = await import("@/lib/lists");
+  const gatunki = String(formData.get("genres") ?? "").split(",").filter(Boolean);
+  const tylkoGwiazdki = String(formData.get("star") ?? "") === "1";
+  const zeWznowieniami = String(formData.get("re") ?? "") === "1";
+
   const wszystkie = await releasesFor([sectionId]);
-  const gatunki = await ud.getGenres(u.id).catch(() => [] as { genre: string; weight: number }[]);
-  const moje = new Set(
-    gatunki.filter((g) => g.weight >= 3).map((g) => genreToSection(g.genre)).filter(Boolean) as string[],
-  );
-  const wybrane = wszystkie.filter(
-    (r) => r.star === 1 && r.mbid && (!moje.size || moje.has(r.genre)),
-  );
+  // Ten sam warunek, co przy wyświetlaniu listy — inaczej podróż nie zgadzałaby
+  // się z tym, co widać.
+  const wybrane = wszystkie.filter((r) => {
+    if (gatunki.length && !gatunki.includes(splitDb(r.genre, r.description))) return false;
+    if (tylkoGwiazdki && r.star !== 1) return false;
+    if (!zeWznowieniami && r.flag && ["comp", "reissue", "live", "ep"].includes(r.flag)) return false;
+    return !!r.mbid;
+  });
   if (!wybrane.length) return;
 
   const lista = await ud.createList(u.id, tytul, null);

@@ -4,7 +4,7 @@ import type { Locale } from "@/lib/i18n";
 const pl = {
   eyebrow: "Premiery płytowe co piątek",
   journeyFromReleases: "Utwórz podróż po premierach",
-  journeyFromReleasesNote: "Wyróżnione płyty z tego tygodnia jako jedna podróż — w Twoich gatunkach.",
+  journeyFromReleasesNote: "Dokładnie to, co widzisz powyżej — ten tydzień i ten filtr — jako jedna podróż.",
   fridayPrefix: "Piątek",
   leadGenre: "Twój styl wiodący:",
   setStyles: "Ustaw swoje style",
@@ -31,7 +31,7 @@ type T = typeof pl;
 const en: T = {
   eyebrow: "New releases, every Friday",
   journeyFromReleases: "Build a journey from this week",
-  journeyFromReleasesNote: "The week\u2019s highlighted albums as one journey — in your genres.",
+  journeyFromReleasesNote: "Exactly what you see above — this week, this filter — as one journey.",
   fridayPrefix: "Friday",
   leadGenre: "Your leading style:",
   setStyles: "Set your styles",
@@ -57,7 +57,7 @@ const en: T = {
 const es: T = {
   eyebrow: "Novedades cada viernes",
   journeyFromReleases: "Crear un viaje con las novedades",
-  journeyFromReleasesNote: "Los discos destacados de la semana como un viaje, en tus géneros.",
+  journeyFromReleasesNote: "Exactamente lo que ves arriba — esta semana, este filtro — como un viaje.",
   fridayPrefix: "Viernes",
   leadGenre: "Tu estilo destacado:",
   setStyles: "Elige tus estilos",
@@ -83,7 +83,7 @@ const es: T = {
 const de: T = {
   eyebrow: "Neuerscheinungen, jeden Freitag",
   journeyFromReleases: "Reise aus den Neuheiten bauen",
-  journeyFromReleasesNote: "Die hervorgehobenen Alben der Woche als eine Reise — in deinen Genres.",
+  journeyFromReleasesNote: "Genau das, was du oben siehst — diese Woche, dieser Filter — als eine Reise.",
   fridayPrefix: "Freitag",
   leadGenre: "Dein Leitstil:",
   setStyles: "Leg deine Stile fest",

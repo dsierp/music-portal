@@ -107,10 +107,15 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
             <ReleaseSection section={s} releases={rel.filter((r) => r.sectionId === s.id)} filter={filter} t={t} />
             {/* Podróż z tego, co i tak jest na ekranie — jeden klik zamiast
                 dwudziestu „dodaj do podróży". */}
-            {user && rel.some((r) => r.sectionId === s.id && r.star === 1 && r.mbid) && (
+            {user && rel.some((r) => r.sectionId === s.id && r.mbid) && (
               <form action={journeyFromReleases} className="mb-8 mt-2">
                 <input type="hidden" name="sectionId" value={s.id} />
                 <input type="hidden" name="title" value={`${s.title} ${s.date}`} />
+                {/* Filtr z ekranu jedzie razem z formularzem — podróż ma być
+                    zapisem tego, co widać, a nie osobnym wyborem portalu. */}
+                <input type="hidden" name="genres" value={filter.genres.join(",")} />
+                <input type="hidden" name="star" value={filter.starOnly ? "1" : "0"} />
+                <input type="hidden" name="re" value={filter.showFlagged ? "1" : "0"} />
                 <button className="btn btn-accent">{t.releases.journeyFromReleases}</button>
                 <span className="ml-2 text-[10px] text-faint">{t.releases.journeyFromReleasesNote}</span>
               </form>
