@@ -40,7 +40,14 @@ if (enabled("SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET")) {
       clientId: process.env.SPOTIFY_CLIENT_ID,
       clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
       allowDangerousEmailAccountLinking: true,
-      authorization: { params: { scope: SPOTIFY_SCOPES } },
+      // Pełny adres, nie same parametry. Domyślnie Auth.js trzyma go przy tym
+      // dostawcy jako goły napis z doklejonym zakresem; podanie samych `params`
+      // nadpisuje ten napis obiektem bez adresu i logowanie kończy się „Invalid
+      // URL", czyli ekranem „problem z konfiguracją serwera".
+      authorization: {
+        url: "https://accounts.spotify.com/authorize",
+        params: { scope: SPOTIFY_SCOPES },
+      },
     }),
   );
 }
