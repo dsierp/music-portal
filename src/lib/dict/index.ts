@@ -6,6 +6,7 @@
  * zamiast pokazywać komuś w Madrycie polski komunikat.
  */
 import type { Locale } from "@/lib/i18n";
+import { about } from "./about";
 import { album } from "./album";
 import { artist } from "./artist";
 import { auth } from "./auth";
@@ -21,6 +22,7 @@ import { search } from "./search";
 
 export function dict(locale: Locale) {
   return {
+    about: about[locale],
     album: album[locale],
     artist: artist[locale],
     auth: auth[locale],

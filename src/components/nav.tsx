@@ -24,6 +24,11 @@ export async function Nav() {
           <Link href="/koncerty">{t.nav.concerts}</Link>
           <Link href="/best-of">{t.nav.bestOf}</Link>
           <Link href="/podroze">{t.nav.lists}</Link>
+          {/* Znak zapytania zamiast słowa: w menu jest już ciasno, a to i tak
+              zagląda się raz. Tytuł niesie nazwę dla czytników ekranu. */}
+          <Link href="/o-portalu" title={t.about.navHint} aria-label={t.about.navHint} className="font-mono text-muted hover:text-accent2">
+            ?
+          </Link>
         </nav>
         <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-3">
           <div className="hidden min-w-0 max-w-md flex-1 md:block"><SearchBox placeholder={t.nav.searchPlaceholder} label={t.nav.search} /></div>

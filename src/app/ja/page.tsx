@@ -60,6 +60,12 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         <section className="card border-accent/60">
           <div className="label mb-1">{t.profile.welcomeEyebrow}</div>
           <h2 className="text-2xl">{t.profile.welcomeTitle}</h2>
+          {/* Najpierw CO to za miejsce, dopiero potem prośba o gatunki — inaczej
+              pierwszy ekran po zalogowaniu prosi o coś, zanim powie po co. */}
+          <p className="mt-2 max-w-2xl text-sm text-text2">
+            {t.about.onboardingBody}{" "}
+            <Link href="/o-portalu" className="underline hover:text-accent2">{t.about.onboardingMore}</Link>
+          </p>
           <p className="mt-2 max-w-2xl text-sm text-text2">{t.profile.welcomeBody}</p>
           <form action={skipOnboarding} className="mt-3">
             <button className="text-xs text-muted underline hover:text-accent2">{t.profile.chooseLater}</button>
