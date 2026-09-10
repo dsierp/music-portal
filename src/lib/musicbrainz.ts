@@ -297,7 +297,7 @@ export interface Membership {
    * z podpisem skąd, niż udawać, że zespół nie ma składu. Rozróżniamy źródła,
    * bo Wikidane to dane strukturalne, a infoboks Wikipedii — tekst.
    */
-  external?: "wikidata" | "wikipedia";
+  external?: "wikidata" | "wikipedia" | "opis";
 }
 export interface Artist {
   mbid: string;

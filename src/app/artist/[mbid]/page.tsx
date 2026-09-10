@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { ARTWORK_ROLES, albumCrew, getArtist, getDiscography, getPlayedOn, getProduced, guessRoles, topAlbum, MbError, STRON_DOMYSLNIE } from "@/lib/musicbrainz";
+import { ARTWORK_ROLES, albumCrew, getArtist, getDiscography, getPlayedOn, getProduced, guessRoles, searchArtists, topAlbum, MbError, STRON_DOMYSLNIE } from "@/lib/musicbrainz";
 import { wikiBandMembers, wikiFromLinks, wikiLogo } from "@/lib/wikipedia";
 import { MbUnavailable } from "@/components/mb-unavailable";
 import { ScreenHelp } from "@/components/screen-help";
@@ -21,6 +21,7 @@ import { relatedBands } from "@/lib/related";
 import { INSTRUMENT_GROUPS, groupsOf } from "@/lib/instruments";
 import { concertsForArtist } from "@/lib/concerts";
 import { addMissing, mergeDates, wdGenres, wdMembers, wdMemberships } from "@/lib/wikidata";
+import { zespolyZOpisu } from "@/lib/from-disambiguation";
 import { spotifyDiscography, tylkoNoweTytuly, type SpotifyAlbum } from "@/lib/spotify";
 import { CareerTimeline, LineupTimeline } from "@/components/lineup-timeline";
 import { dbSafe } from "@/lib/db-safe";
@@ -92,8 +93,17 @@ function MemberList({
                   <Link href={`/szukaj?q=${encodeURIComponent(m.name)}`} className="font-medium hover:text-accent2 hover:underline">{m.name}</Link>
                 )}
                 {m.external && (
-                  <span className="font-mono text-[10px] text-faint" title={m.external === "wikidata" ? t.artist.memberFromWikidataNote : t.artist.memberFromWikipediaNote}>
-                    {m.external === "wikidata" ? "wd" : "wiki"}
+                  <span
+                    className="font-mono text-[10px] text-faint"
+                    title={
+                      m.external === "wikidata"
+                        ? t.artist.memberFromWikidataNote
+                        : m.external === "opis"
+                          ? t.artist.memberFromDescriptionNote
+                          : t.artist.memberFromWikipediaNote
+                    }
+                  >
+                    {m.external === "wikidata" ? "wd" : m.external === "opis" ? "opis" : "wiki"}
                   </span>
                 )}
                 {m.roles.length > 0 ? (
@@ -389,9 +399,35 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
       ...wiki.past.map((p) => zWiki(p, false)),
     ];
   }
+  // Czwarte podejście, tylko dla ludzi i tylko przy zupełnej pustce: zespół
+  // wyczytany z opisu przy artyście („drummer of Mgła"). MusicBrainz zna tam
+  // relacje wyłącznie zdaniem, więc bez tego jego strona twierdzi, że nie grał
+  // nigdzie. Nazwę szukamy w MusicBrainz, żeby dało się w nią kliknąć; gdy jej
+  // nie znajdziemy, zostaje sam napis z podpisem, skąd jest.
+  let memberOf = addMissing(mergeDates(raw.memberOf, wdOf), wdOf, zWikidanych);
+  if (!memberOf.length && raw.isPerson) {
+    const nazwy = zespolyZOpisu(raw.disambiguation);
+    const znalezione = await Promise.all(
+      nazwy.map((n) =>
+        searchArtists(n, 1, "group")
+          .then((r) => ({ nazwa: n, mbid: r[0]?.mbid ?? "" }))
+          .catch(() => ({ nazwa: n, mbid: "" })),
+      ),
+    );
+    memberOf = znalezione.map((z) => ({
+      mbid: z.mbid,
+      name: z.nazwa,
+      type: null,
+      roles: [],
+      begin: null,
+      end: null,
+      current: true,
+      external: "opis" as const,
+    }));
+  }
   const artist: Artist = {
     ...raw,
-    memberOf: addMissing(mergeDates(raw.memberOf, wdOf), wdOf, zWikidanych),
+    memberOf,
     members,
   };
   const [disco, playedR, producedR] = await Promise.all([
