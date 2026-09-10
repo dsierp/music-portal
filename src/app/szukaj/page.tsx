@@ -4,6 +4,7 @@ import { AlbumCard, ArtistCard, Empty } from "@/components/cards";
 import { FilterChips } from "@/components/filter-chips";
 import { searchAlbums, searchAlbumsBy, searchArtists } from "@/lib/musicbrainz";
 import { ratingAverages } from "@/lib/user-data";
+import { dbSafe } from "@/lib/db-safe";
 import { currentUser } from "@/lib/auth";
 import { addLikedFromSearch } from "@/app/actions";
 import { localAlbums, localAlbumsBy } from "@/lib/local-search";
@@ -69,7 +70,10 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       error = e instanceof Error ? e.message : t.search.searchError;
     }
   }
-  const ratings = await ratingAverages("ALBUM", albums.map((a) => a.mbid));
+  // Przez dbSafe: gdy baza ocen nie odpowie, ekran ma pokazać wyniki
+  // z MusicBrainz zamiast zamienić się w „Coś poszło nie tak". Oceny są tu
+  // dodatkiem, a nie treścią strony.
+  const ratings = (await dbSafe(ratingAverages("ALBUM", albums.map((a) => a.mbid)), new Map<string, { avg: number; count: number }>())).value;
 
   // Filtr typu wyniku — jak w odtwarzaczach: „wszystko" i zawężenia.
   // Trzyma się w adresie, więc wynik da się wysłać linkiem.
