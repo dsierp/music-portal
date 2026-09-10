@@ -17,6 +17,40 @@ import { cached, cacheHasNote, cacheNote } from "./cache";
 const API = "https://api.spotify.com/v1";
 const TOKEN_URL = "https://accounts.spotify.com/api/token";
 
+/**
+ * Ruch do Spotify puszczamy pojedynczo i z odstępem.
+ *
+ * Powód z życia: strona podróży rozwiązywała adresy wszystkich płyt naraz
+ * (Promise.all), więc do Spotify szło kilkanaście zapytań w tej samej chwili.
+ * Odpowiedź to 429 z „QUOTA_EXCEEDED" — i to na WSZYSTKO, także na kolejne
+ * strony, przez co wyglądało, jakby szukanie nie działało w ogóle. Limit liczy
+ * się w krótkim oknie, więc lekarstwem jest szereg, nie większy limit.
+ */
+const ODSTEP_MS = 120;
+let ogonek: Promise<unknown> = Promise.resolve();
+/** Do kiedy nie zaczepiamy Spotify (ustawiane po 429, wg Retry-After). */
+let pauzaDo = 0;
+
+function wKolejce<T>(zadanie: () => Promise<T>): Promise<T> {
+  const moje = ogonek.then(async () => {
+    await new Promise((r) => setTimeout(r, ODSTEP_MS));
+    return zadanie();
+  });
+  // Ogon nie może się przerwać na błędzie, bo wtedy kolejka staje na zawsze.
+  ogonek = moje.catch(() => {});
+  return moje;
+}
+
+/** Po 429 odczekujemy tyle, ile każe Spotify (a gdy nie powie — minutę). */
+function zapamietajPauze(res: Response) {
+  const ile = Number(res.headers.get("retry-after") ?? "");
+  pauzaDo = Date.now() + (Number.isFinite(ile) && ile > 0 ? ile * 1000 : 60_000);
+}
+
+function wPauzie(): boolean {
+  return Date.now() < pauzaDo;
+}
+
 /** Zakresy, o które prosimy przy łączeniu konta — patrz komentarz u góry. */
 export const SPOTIFY_SCOPES = ["user-read-currently-playing", "playlist-modify-private"].join(" ");
 
@@ -101,11 +135,20 @@ export async function spotifyBlocked(userId: string): Promise<boolean> {
 async function api<T>(userId: string, sciezka: string, init?: RequestInit): Promise<T | null> {
   const token = await tokenDla(userId);
   if (!token) return null;
-  const res = await fetch(`${API}${sciezka}`, {
-    ...init,
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(init?.headers ?? {}) },
-    cache: "no-store",
-  });
+  if (wPauzie()) return null;
+  const res = await wKolejce(() =>
+    fetch(`${API}${sciezka}`, {
+      ...init,
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(init?.headers ?? {}) },
+      cache: "no-store",
+    }),
+  );
+  // 429 to nasz nadmiar, nie odmowa dla tego konta — nie chowamy funkcji,
+  // tylko na chwilę milkniemy.
+  if (res.status === 429) {
+    zapamietajPauze(res);
+    return null;
+  }
   if (res.status === 403 || res.status === 401) {
     await cacheNote(kluczBlokady(userId), BLOKADA_TTL);
     return null;
@@ -328,10 +371,17 @@ async function tokenAplikacji(): Promise<string | null> {
 async function katalog<T>(sciezka: string): Promise<T | null> {
   const token = await tokenAplikacji();
   if (!token) return null;
-  const res = await fetch(`${API}${sciezka}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  });
+  if (wPauzie()) return null;
+  const res = await wKolejce(() =>
+    fetch(`${API}${sciezka}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    }),
+  );
+  if (res.status === 429) {
+    zapamietajPauze(res);
+    return null;
+  }
   if (!res.ok) return null;
   return (await res.json()) as T;
 }

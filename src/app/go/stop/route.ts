@@ -14,7 +14,25 @@ const DOZWOLONE = ["open.spotify.com", "tidal.com", "listen.tidal.com", "bandcam
 
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
-  const to = sp.get("to") ?? "";
+  let to = sp.get("to") ?? "";
+
+  /**
+   * Adres płyty w Spotify wyszukujemy DOPIERO tu, przy kliknięciu.
+   *
+   * Wcześniej strona podróży rozwiązywała wszystkie płyty z góry, równolegle —
+   * kilkanaście zapytań w jednej chwili, na które Spotify odpowiadał 429
+   * („QUOTA_EXCEEDED") i przez to nie trafiał żaden link. Teraz jedno kliknięcie
+   * to jedno zapytanie, a wynik i tak leży potem w buforze.
+   */
+  if (sp.get("serwis") === "spotify") {
+    const etykieta = sp.get("etykieta") ?? "";
+    const { rozbijEtykiete, spotifyAlbumUrl } = await import("@/lib/spotify");
+    const { artist, title } = rozbijEtykiete(etykieta);
+    const znaleziony = await spotifyAlbumUrl(artist, title).catch(() => null);
+    // Gdy się nie uda — wyszukiwarka. Lepsza niż odnośnik donikąd.
+    to = znaleziony ?? `https://open.spotify.com/search/${encodeURIComponent(etykieta.replace(/\s+[–—-]\s+/, " "))}`;
+  }
+
   let cel: URL;
   try {
     cel = new URL(to);

@@ -3,8 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { currentUser } from "@/lib/auth";
 import { canSeeList, getList, otherUsers, sharedWith, visitedStops } from "@/lib/user-data";
-import { spotifyAlbumUrl, spotifyConfigured, spotifyConnected } from "@/lib/spotify";
-import { rozbijEtykiete } from "@/lib/spotify";
+import { spotifyConfigured, spotifyConnected } from "@/lib/spotify";
 import { connectSpotify, deleteListAction, removeFromListAction, sendJourneyToSpotify, shareListAction, toggleVisitAction } from "@/app/actions";
 import { Cover } from "@/components/cover";
 import { i18n } from "@/lib/t";
@@ -49,21 +48,10 @@ export default async function ListPage({
   const poznane = user ? await visitedStops(user.id, id).catch(() => new Map<string, string>()) : new Map<string, string>();
   const spotifyGotowy = spotifyConfigured();
   const spotifyPolaczony = moja && spotifyGotowy && user ? await spotifyConnected(user.id).catch(() => false) : false;
-  // Adresy płyt w Spotify rozwiązujemy z góry, równolegle: link ma prowadzić
-  // PROSTO na płytę, a nie do wyszukiwarki, w którą i tak trzeba potem celować.
-  // Dopasowania trzymamy w buforze, więc to kosztuje tylko przy pierwszym wejściu.
-  const adresySpotify = new Map<string, string>();
-  if (spotifyGotowy) {
-    await Promise.all(
-      data.items
-        .filter((i) => i.targetType === "ALBUM")
-        .map(async (i) => {
-          const { artist, title } = rozbijEtykiete(i.label);
-          const url = await spotifyAlbumUrl(artist, title).catch(() => null);
-          if (url) adresySpotify.set(i.targetMbid, url);
-        }),
-    );
-  }
+  // Adresów płyt w Spotify NIE rozwiązujemy tutaj. Robiliśmy tak — wszystkie
+  // naraz, przez Promise.all — i Spotify odpowiadał 429 („QUOTA_EXCEEDED"),
+  // przez co nie trafiał żaden link. Teraz robi to trasa /go/stop w chwili
+  // kliknięcia: jedno wyjście = jedno zapytanie.
 
   return (
     <div className="space-y-6">
@@ -113,19 +101,23 @@ export default async function ListPage({
                 {it.targetType !== "CONCERT" && (
                   <div className="mt-0.5 flex gap-3">
                     {[
-                      // Prosto na płytę, gdy udało się ją dopasować; inaczej
-                      // zostaje wyszukiwarka — lepsze to niż martwy odnośnik.
+                      // Spotify: adres dobiera trasa /go/stop przy kliknięciu —
+                      // prosto na płytę, a gdy jej nie znajdzie, wyszukiwarka.
                       {
                         nazwa: "Spotify",
-                        url:
-                          adresySpotify.get(it.targetMbid) ??
-                          `https://open.spotify.com/search/${encodeURIComponent(it.label.replace(/\s+[–—-]\s+/, " "))}`,
+                        param:
+                          it.targetType === "ALBUM" && spotifyGotowy
+                            ? `&serwis=spotify&etykieta=${encodeURIComponent(it.label)}`
+                            : `&to=${encodeURIComponent(`https://open.spotify.com/search/${encodeURIComponent(it.label.replace(/\s+[–—-]\s+/, " "))}`)}`,
                       },
-                      { nazwa: "Tidal", url: `https://tidal.com/search?q=${encodeURIComponent(it.label.replace(/\s+[–—-]\s+/, " "))}` },
+                      {
+                        nazwa: "Tidal",
+                        param: `&to=${encodeURIComponent(`https://tidal.com/search?q=${encodeURIComponent(it.label.replace(/\s+[–—-]\s+/, " "))}`)}`,
+                      },
                     ].map((s) => (
                       <a
                         key={s.nazwa}
-                        href={`/go/stop?listId=${encodeURIComponent(id)}&type=${it.targetType}&mbid=${encodeURIComponent(it.targetMbid)}&to=${encodeURIComponent(s.url)}`}
+                        href={`/go/stop?listId=${encodeURIComponent(id)}&type=${it.targetType}&mbid=${encodeURIComponent(it.targetMbid)}${s.param}`}
                         target="_blank"
                         rel="noopener"
                         title={fmt(t.lists.openIn, { name: s.nazwa })}
