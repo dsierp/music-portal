@@ -254,7 +254,9 @@ export async function journeyToPlaylist(
       continue;
     }
     const { artist, title } = rozbijEtykiete(p.label);
-    const albumId = await znajdzAlbum(userId, artist, title);
+    // Szukamy tokenem aplikacji — to samo dopasowanie, co przy linkach, więc
+    // playlista i odnośniki na stronie zawsze pokazują tę samą płytę.
+    const albumId = (await spotifyFindAlbum(artist, title))?.id ?? (await znajdzAlbum(userId, artist, title));
     if (!albumId) {
       pominiete.push({ label: p.label, powod: "nieznaleziono" });
       continue;
@@ -384,6 +386,50 @@ export async function spotifyDiscography(name: string, spotifyLink?: string): Pr
       group: a.album_group === "appears_on" ? ("appears_on" as const) : ("album" as const),
     }));
   }).catch(() => []);
+}
+
+/**
+ * Adres płyty w Spotify — prosto na album, nie do wyszukiwarki.
+ *
+ * Dotąd linki prowadziły na `/search/<tekst>`, więc nigdy nie trafiały w płytę,
+ * tylko w listę wyników (a przy etykiecie z myślnikiem — w wyniki bez sensu).
+ * Tu pytamy katalog TOKENEM APLIKACJI: bez logowania kogokolwiek, więc działa
+ * dla każdego odwiedzającego i wynik da się trzymać w buforze na tydzień.
+ */
+export async function spotifyAlbumUrl(artist: string, title: string): Promise<string | null> {
+  const znaleziony = await spotifyFindAlbum(artist, title);
+  return znaleziony?.url ?? null;
+}
+
+export async function spotifyFindAlbum(
+  artist: string,
+  title: string,
+): Promise<{ id: string; url: string; title: string; artists: string } | null> {
+  if (!spotifyConfigured() || !title) return null;
+  return cached(`spotify:album:v1:${artist.toLowerCase()}|${title.toLowerCase()}`, 60 * 60 * 24 * 7, async () => {
+    const proba = async (q: string) => {
+      const dane = await katalog<{ albums?: { items?: SpAlbumRaw[] } }>(
+        `/search?type=album&limit=5&q=${encodeURIComponent(q)}`,
+      );
+      return dane?.albums?.items ?? [];
+    };
+    // Najpierw po polach (precyzyjnie), potem luźno — tytuły bywają zapisane
+    // inaczej po obu stronach, a wtedy filtr pola nie trafia, a zwykłe szukanie
+    // owszem.
+    let items = await proba(zapytanieOAlbum(artist, title));
+    if (!items.length) items = await proba([artist, title].filter(Boolean).join(" "));
+    // Bierzemy pierwsze trafienie o zgodnym tytule; gdy takiego nie ma —
+    // pierwsze z brzegu jest gorsze niż nic, bo prowadziłoby na obcą płytę.
+    const chce = kluczTytulu(title);
+    const traf = items.find((a) => kluczTytulu(a.name) === chce) ?? null;
+    if (!traf) return null;
+    return {
+      id: traf.id,
+      url: traf.external_urls?.spotify ?? `https://open.spotify.com/album/${traf.id}`,
+      title: traf.name,
+      artists: (traf.artists ?? []).map((x) => x.name).join(", "),
+    };
+  }).catch(() => null);
 }
 
 /** Uproszczony tytuł do porównań: bez interpunkcji, dopisków i wielkości liter. */
