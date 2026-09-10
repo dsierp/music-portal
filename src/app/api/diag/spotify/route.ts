@@ -86,7 +86,10 @@ export async function GET(req: Request) {
     teraz: (await nowPlaying(user.id).catch(() => null)) ? "coś leci" : "nic nie leci albo brak dostępu",
   };
 
-  if (album || artist) {
+  // Samo odświeżenie tej strony potrafiło zjeść pięć zapytań, a kwota aplikacji
+  // w trybie deweloperskim jest mała i wspólna dla całego portalu. Dlatego
+  // próbne szukanie robimy tylko na wyraźne życzenie: &sonda=1.
+  if ((album || artist) && sp.get("sonda") === "1") {
     const { szukajAlbumuDiag, spotifyFindAlbum } = await import("@/lib/spotify");
     wynik.szukanie = await szukajAlbumuDiag(user.id, artist, album).catch((e) => ({
       blad: e instanceof Error ? e.message : String(e),

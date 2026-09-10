@@ -498,7 +498,12 @@ export async function spotifyFindAlbum(
   }).catch(() => null);
   // Brak dopasowania NIE zostaje w buforze: inaczej jedna nieudana próba (np.
   // gdy Spotify chwilowo odmówił) trzymałaby pustkę przez tydzień.
-  if (!znalezione) await zapomnij(klucz);
+  // Pustkę zapominamy TYLKO wtedy, gdy powodem była cisza po stronie Spotify
+  // (pauza po 429 albo chwilowa awaria). Gdy naprawdę nie ma takiej płyty,
+  // pusty wynik zostaje w buforze — inaczej każde wejście na stronę pytałoby od
+  // nowa, a kwota aplikacji w trybie deweloperskim jest mała i wspólna dla
+  // wszystkich odwiedzających.
+  if (!znalezione && wPauzie()) await zapomnij(klucz);
   return znalezione;
 }
 
