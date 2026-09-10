@@ -26,3 +26,14 @@ test("okładki oddzielamy od studia", () => {
   assert.ok(!ARTWORK_ROLES.test("producer"));
   assert.ok(!ARTWORK_ROLES.test("mastering"));
 });
+
+test("autor okładki nie jest muzykiem — w żadnym zapisie MusicBrainz", () => {
+  // Lista dokładnych napisów przepuszczała samo „design", więc graficy
+  // Demigoda stali wśród muzyków Behemotha.
+  for (const rola of ["design", "cover design", "graphic design", "artwork", "photography", "layout"]) {
+    assert.equal(isMusicianRole(rola), false, rola);
+  }
+  for (const rola of ["electric guitar", "drums", "lead vocals", "trumpet", "tenor saxophone", "choir vocals"]) {
+    assert.equal(isMusicianRole(rola), true, rola);
+  }
+});

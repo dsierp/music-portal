@@ -460,8 +460,22 @@ function rolesOf(r: MbArtistRel): string[] {
 }
 const PERFORMANCE_TYPES = new Set(["instrument", "vocal", "performer", "performing orchestra", "conductor"]);
 
+/**
+ * Role, które NIE są graniem ani śpiewaniem.
+ *
+ * Wzorzec, a nie lista dokładnych napisów — bo lista przepuszczała wszystko,
+ * czego nie przewidziała. MusicBrainz zapisuje to samo na kilka sposobów
+ * („design", „cover design", „graphic design", „artwork"), więc autorzy okładek
+ * Demigoda lądowali wśród muzyków Behemotha. Wzorzec łapie każdą odmianę.
+ *
+ * Kompozytor i aranżer też są tutaj: to nieocenione role, ale odpowiadają na
+ * pytanie „kto to napisał", a sekcja wyżej odpowiada na „kto to zagrał".
+ */
+const NIE_MUZYK =
+  /produc|mix|master|engineer|recording|editor|design|illustration|photograph|art direction|graphic|artwork|layout|lettering|misc|programming|liner notes|copyright|publishing|booking|legal|management|A&R|arrang|compos|lyric|writ/i;
+
 export function isMusicianRole(role: string) {
-  return !["producer", "mix", "mastering", "engineer", "recording", "editor", "design/illustration", "photography", "art direction", "graphic design", "misc", "programming", "liner notes", "phonographic copyright", "copyright", "publishing", "booking", "legal representation"].includes(role);
+  return !NIE_MUZYK.test(role);
 }
 
 // ---------- wyszukiwanie ----------

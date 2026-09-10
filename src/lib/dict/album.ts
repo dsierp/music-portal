@@ -17,7 +17,7 @@ const pl = {
   likeAdd: "♡ Lubię tę płytę",
   likesCount: { one: "{n} osoba lubi", few: "{n} osoby lubią", many: "{n} osób lubi" } as { one: string; few?: string; many: string },
 
-  lineupHeading: "Skład",
+  lineupHeading: "Muzycy",
   trackCountSuffix: "utw.",
   wikiCreditsPrefix: "Źródło:",
   wikiCreditsSuffix: " — MusicBrainz nie ma jeszcze tego składu na poziomie nagrań. Nazwiska rozpoznane w MusicBrainz prowadzą do profilu; pozostałe (kropkowane) do wyszukiwarki portalu.",
@@ -28,7 +28,7 @@ const pl = {
   currentLineupHeading: "Zespół w tym czasie",
   currentLineupNote: "Z dat członkostwa w MusicBrainz — kto był w składzie, gdy płyta wychodziła. To nie są credits z okładki: MusicBrainz opisuje nagrania wybiórczo, więc lista wyżej bywa krótsza niż rzeczywisty skład.",
 
-  staffSummary: "Produkcja, realizacja, grafika ({n})",
+  staffSummary: "Pozostałe osoby ({n})",
 
   tracksHeading: "Utwory",
   discLabel: "Dysk {n}",
@@ -62,7 +62,7 @@ const en: T = {
   likeAdd: "♡ Like this album",
   likesCount: { one: "{n} person likes this", many: "{n} people like this" },
 
-  lineupHeading: "Lineup",
+  lineupHeading: "Musicians",
   trackCountSuffix: "trk.",
   wikiCreditsPrefix: "Source:",
   wikiCreditsSuffix: " — MusicBrainz doesn't have this lineup at the recording level yet. Names MusicBrainz recognises link to their profile; the rest (dotted underline) link to the portal search.",
@@ -73,7 +73,7 @@ const en: T = {
   currentLineupHeading: "Band at the time",
   currentLineupNote: "From membership dates on MusicBrainz — who was in the lineup when this album came out. These aren't sleeve credits: MusicBrainz's recording data is selective, so this list can be shorter than the actual lineup.",
 
-  staffSummary: "Production, engineering, artwork ({n})",
+  staffSummary: "Everyone else ({n})",
 
   tracksHeading: "Tracklist",
   discLabel: "Disc {n}",
@@ -105,7 +105,7 @@ const es: T = {
   likeAdd: "♡ Me gusta este disco",
   likesCount: { one: "{n} persona le da me gusta", many: "{n} personas le dan me gusta" },
 
-  lineupHeading: "Formación",
+  lineupHeading: "Músicos",
   trackCountSuffix: "pistas",
   wikiCreditsPrefix: "Fuente:",
   wikiCreditsSuffix: " — MusicBrainz todavía no tiene esta formación a nivel de grabación. Los nombres que MusicBrainz reconoce enlazan a su perfil; el resto (subrayado punteado) enlaza al buscador del portal.",
@@ -116,7 +116,7 @@ const es: T = {
   currentLineupHeading: "La banda en ese momento",
   currentLineupNote: "Según las fechas de pertenencia en MusicBrainz — quién estaba en la formación cuando salió este disco. No son créditos de la portada: MusicBrainz describe las grabaciones de forma selectiva, así que esta lista puede ser más corta que la formación real.",
 
-  staffSummary: "Producción, ingeniería, diseño ({n})",
+  staffSummary: "Las demás personas ({n})",
 
   tracksHeading: "Canciones",
   discLabel: "Disco {n}",
@@ -148,7 +148,7 @@ const de: T = {
   likeAdd: "♡ Album gefällt mir",
   likesCount: { one: "{n} Person gefällt das", many: "{n} Personen gefällt das" },
 
-  lineupHeading: "Besetzung",
+  lineupHeading: "Musiker",
   trackCountSuffix: "Titel",
   wikiCreditsPrefix: "Quelle:",
   wikiCreditsSuffix: " — MusicBrainz hat diese Besetzung auf Aufnahmeebene noch nicht erfasst. Namen, die MusicBrainz kennt, führen zum Profil; die übrigen (gepunktet unterstrichen) zur Portalsuche.",
@@ -159,7 +159,7 @@ const de: T = {
   currentLineupHeading: "Die Band zu dieser Zeit",
   currentLineupNote: "Nach Mitgliedschaftsdaten von MusicBrainz — wer zur Besetzung gehörte, als dieses Album erschien. Das sind keine Album-Credits: MusicBrainz erfasst Aufnahmen selektiv, daher kann diese Liste kürzer sein als die tatsächliche Besetzung.",
 
-  staffSummary: "Produktion, Technik, Artwork ({n})",
+  staffSummary: "Alle Übrigen ({n})",
 
   tracksHeading: "Titelliste",
   discLabel: "CD {n}",
