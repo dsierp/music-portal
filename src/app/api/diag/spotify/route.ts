@@ -96,6 +96,12 @@ export async function GET(req: Request) {
     wynik.katalogAplikacji = await spotifyFindAlbum(artist, album).catch((e) => ({
       blad: e instanceof Error ? e.message : String(e),
     }));
+    // Surowo: status HTTP i początek odpowiedzi. Bez tego „pusto" oznacza
+    // jednocześnie „zero wyników" i „Spotify odmówił", a to zupełnie co innego.
+    const { spotifySondaSzukania, zapytanieOAlbum } = await import("@/lib/spotify");
+    wynik.surowo = await spotifySondaSzukania(user.id, zapytanieOAlbum(artist, album)).catch((e) => ({
+      blad: e instanceof Error ? e.message : String(e),
+    }));
   }
 
   return NextResponse.json(wynik);
