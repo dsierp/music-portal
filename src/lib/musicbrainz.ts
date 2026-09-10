@@ -11,6 +11,7 @@
  */
 import { cached, TTL } from "./cache";
 import { createThrottle } from "./throttle";
+import { czytelnaRola } from "./instruments";
 
 const MB_BASE = "https://musicbrainz.org/ws/2";
 
@@ -430,10 +431,18 @@ export function buildLinks(rels: MbArtistRel[] | undefined, query: string, isJaz
   return links;
 }
 
-/** Rola z relacji MB: "instrument" + attributes → "guitar"; "vocal" → "vocals"; inne → typ. */
+/**
+ * Rola z relacji MB: "instrument" + attributes → "guitar"; "vocal" → "vocals"; inne → typ.
+ *
+ * Po drodze zamieniamy żargon klasyfikacji instrumentów na nazwy, które ktoś
+ * rozpozna — patrz `czytelnaRola`. Robimy to TU, przy wejściu danych, żeby
+ * każdy widok (skład, oś czasu, kredyty) mówił tym samym językiem.
+ */
 function rolesOf(r: MbArtistRel): string[] {
-  const attrs = (r.attributes ?? []).filter((a) => !["additional", "guest", "solo", "minor"].includes(a));
-  if (r.type === "instrument") return attrs.length ? attrs : ["instrument"];
+  const attrs = (r.attributes ?? [])
+    .filter((a) => !["additional", "guest", "solo", "minor"].includes(a))
+    .map(czytelnaRola);
+  if (r.type === "instrument") return attrs.length ? [...new Set(attrs)] : ["instrument"];
   if (r.type === "vocal") return attrs.length ? attrs : ["vocals"];
   if (r.type === "performer") return attrs.length ? attrs : ["performer"];
   if (r.type === "performing orchestra") return ["orchestra"];

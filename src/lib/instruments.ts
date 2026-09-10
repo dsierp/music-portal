@@ -38,3 +38,31 @@ export function playsInstrument(roles: string[], key: string): boolean {
   if (!key) return true;
   return groupsOf(roles).includes(key as InstrumentKey);
 }
+
+/**
+ * Żargon MusicBrainz na nazwę, którą ktoś rozpozna.
+ *
+ * MusicBrainz nazywa instrumenty według rodziny z klasyfikacji Hornbostela-Sachsa,
+ * więc perkusista Atheista figuruje jako „membranophone", a nie jako perkusista.
+ * Redaktorzy sięgają po te ogólne nazwy, gdy nie wiedzą, na czym dokładnie ktoś
+ * grał — informacja jest prawdziwa, tylko zapisana dla muzykologa.
+ *
+ * Podmieniamy WYŁĄCZNIE takie ogólniki. „bass guitar" czy „lead vocals" zostają
+ * bez zmian: są zrozumiałe, a przepisywanie ich po swojemu oddalałoby portal od
+ * tego, co naprawdę stoi w bazie.
+ */
+const ZARGON: [RegExp, string][] = [
+  [/^membranophone$/i, "drums"],
+  [/^idiophone$/i, "percussion"],
+  [/^aerophone$/i, "wind instrument"],
+  [/^chordophone$/i, "string instrument"],
+  [/^electrophone$/i, "electronic instrument"],
+  [/^drums \(drum set\)$/i, "drums"],
+  [/^other instruments$/i, "instrument"],
+];
+
+export function czytelnaRola(role: string): string {
+  const t = role.trim();
+  for (const [wzorzec, nazwa] of ZARGON) if (wzorzec.test(t)) return nazwa;
+  return t;
+}

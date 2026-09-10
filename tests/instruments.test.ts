@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { groupsOf, instrumentGroup, playsInstrument } from "../src/lib/instruments.ts";
+import { czytelnaRola, groupsOf, instrumentGroup, playsInstrument } from "../src/lib/instruments.ts";
 
 test("bas przed gitarą — „electric bass guitar\" to basista", () => {
   assert.equal(instrumentGroup("electric bass guitar"), "bass");
@@ -26,4 +26,13 @@ test("pusty filtr przepuszcza wszystkich", () => {
   assert.equal(playsInstrument(["harmonica"], ""), true);
   assert.equal(playsInstrument(["harmonica"], "guitar"), false);
   assert.equal(playsInstrument(["guitar", "keyboard"], "keys"), true);
+});
+
+test("żargon MusicBrainz zamienia się na nazwę, którą ktoś rozpozna", () => {
+  assert.equal(czytelnaRola("membranophone"), "drums");
+  assert.equal(czytelnaRola("drums (drum set)"), "drums");
+  assert.equal(czytelnaRola("idiophone"), "percussion");
+  // Zrozumiałych nazw nie ruszamy — mają zostać takie, jak stoją w bazie.
+  assert.equal(czytelnaRola("bass guitar"), "bass guitar");
+  assert.equal(czytelnaRola("lead vocals"), "lead vocals");
 });
