@@ -197,6 +197,32 @@ async function utworyAlbumu(userId: string, albumId: string): Promise<string[]> 
   return (dane?.items ?? []).map((t) => t.uri).filter(Boolean);
 }
 
+/**
+ * To samo szukanie, co przy wysyłce, ale ze stanem po drodze — do diagnostyki.
+ * Zwraca zapytania i to, ile pozycji wróciło, żeby dało się zobaczyć, na czym
+ * dokładnie się wykłada, zamiast zgadywać z komunikatu „nic nie znaleziono".
+ */
+export async function szukajAlbumuDiag(userId: string, artist: string, title: string) {
+  const proba = async (q: string) => {
+    const dane = await api<{ albums?: { items?: { id: string; name: string; artists?: { name: string }[] }[] } }>(
+      userId,
+      `/search?type=album&limit=3&q=${encodeURIComponent(q)}`,
+    ).catch((e) => ({ blad: e instanceof Error ? e.message : String(e) }) as never);
+    const items = (dane as { albums?: { items?: { id: string; name: string; artists?: { name: string }[] }[] } })?.albums?.items ?? [];
+    return {
+      zapytanie: q,
+      ile: items.length,
+      pierwsze: items[0] ? `${(items[0].artists ?? []).map((a) => a.name).join(", ")} – ${items[0].name}` : null,
+      odpowiedzPusta: dane === null,
+    };
+  };
+  return {
+    rozbicie: { artist, title },
+    poPolach: await proba(zapytanieOAlbum(artist, title)),
+    luzno: await proba([artist, title].filter(Boolean).join(" ")),
+  };
+}
+
 export interface WynikWysylki {
   url: string | null;
   dodane: number;

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
+import { rozbijEtykiete } from "@/lib/spotify";
 
 /**
  * Diagnostyka połączenia ze Spotify — dla administratora, bez ujawniania kluczy.
@@ -13,7 +14,7 @@ import { isAdmin } from "@/lib/admin";
  * Nie zwraca wartości kluczy — tylko długości i to, czy mają na końcu spację
  * albo cudzysłów, bo dokładnie to najczęściej psuje wklejanie do panelu.
  */
-export async function GET() {
+export async function GET(req: Request) {
   const user = await currentUser().catch(() => null);
   if (!user || !isAdmin(user.email)) {
     return NextResponse.json({ error: "tylko administrator" }, { status: 403 });
@@ -55,6 +56,16 @@ export async function GET() {
       wynik.token = { blad: e instanceof Error ? e.message : String(e) };
     }
   }
+  /**
+   * Próbne szukanie płyty — po to, żeby zobaczyć, co Spotify NAPRAWDĘ odpowiada.
+   * Wywołanie: /api/diag/spotify?album=Achilles&artist=Audrey%20Horne
+   * albo krócej: ?etykieta=Audrey%20Horne%20%E2%80%93%20Achilles
+   */
+  const sp = new URL(req.url).searchParams;
+  const etykieta = sp.get("etykieta");
+  const artist = sp.get("artist") ?? (etykieta ? rozbijEtykiete(etykieta).artist : "");
+  const album = sp.get("album") ?? (etykieta ? rozbijEtykiete(etykieta).title : "");
+
   // Druga połowa: konto TEGO użytkownika. Klucze aplikacji mogą być idealne,
   // a wysyłka i tak nie zadziała, bo konto nie jest połączone albo Spotify
   // odmawia mu obsługi (tryb deweloperski dopuszcza tylko dopisane osoby).
@@ -64,6 +75,13 @@ export async function GET() {
     odmowaZapamietana: await spotifyBlocked(user.id).catch(() => false),
     teraz: (await nowPlaying(user.id).catch(() => null)) ? "coś leci" : "nic nie leci albo brak dostępu",
   };
+
+  if (album || artist) {
+    const { szukajAlbumuDiag } = await import("@/lib/spotify");
+    wynik.szukanie = await szukajAlbumuDiag(user.id, artist, album).catch((e) => ({
+      blad: e instanceof Error ? e.message : String(e),
+    }));
+  }
 
   return NextResponse.json(wynik);
 }
