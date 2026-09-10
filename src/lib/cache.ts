@@ -79,7 +79,12 @@ export async function cacheForgetPrefix(prefix: string): Promise<number> {
 }
 
 export const TTL = {
-  search: 60 * 60 * 24, // 1 dzień
+  // Nazwy zespołów i tytuły płyt się nie zmieniają, a szukanie w MusicBrainz
+  // jest najdroższą rzeczą w portalu (jedno zapytanie na sekundę, do tego
+  // ponawiane przy przeciążeniu). Dzień był ostrożnością bez pokrycia: to samo
+  // pytanie zadane tydzień później i tak dawało tę samą listę, tylko po
+  // kilkunastu sekundach czekania.
+  search: 60 * 60 * 24 * 30, // 30 dni
   lookup: 60 * 60 * 24 * 7, // 7 dni
   wiki: 60 * 60 * 24 * 14,
 };

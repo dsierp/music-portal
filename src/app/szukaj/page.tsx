@@ -25,31 +25,36 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 export const dynamic = "force-dynamic";
 
-interface Zapytanie {
+interface Pytanie {
   q: string;
   artistQ: string;
   titleQ: string;
   f: string;
-  lubie?: string;
 }
 
-/** Zawężanie ma pierwszeństwo przed jednym polem — patrz `Wyniki`. */
+/** Zawężanie ma pierwszeństwo przed jednym polem — patrz komentarz przy `Plyty`. */
 function zawezone(artistQ: string, titleQ: string) {
   return artistQ.trim().length > 1 || titleQ.trim().length > 1;
 }
 
 /**
- * Ekran szukania: szkielet natychmiast, wyniki osobno.
+ * Ekran szukania: nic nie czeka na nic.
  *
- * MusicBrainz przyjmuje jedno zapytanie na sekundę, więc odpowiedź potrafi iść
- * kilka sekund — a przez ten czas przeglądarka trzymała jedno otwarte
- * połączenie i czekała na CAŁOŚĆ strony. W pociągu wystarczył jeden tunel, żeby
- * przepadło wszystko razem z polem szukania, i wyglądało to na awarię portalu.
+ * Szukanie jest najdroższą rzeczą w portalu, bo MusicBrainz przyjmuje jedno
+ * zapytanie na sekundę i przy przeciążeniu każe ponawiać. Dopóki strona
+ * powstawała w całości na serwerze, czytelnik czekał na SUMĘ wszystkiego:
+ * płyty + artyści + baza portalu, jedno po drugim, a zerwane połączenie
+ * kasowało cały ten wysiłek. Przy słabej sieci kończyło się to pustą stroną.
  *
- * Teraz nagłówek, pole szukania i zawężanie lecą do przeglądarki od razu, a
- * wyniki dopinają się drugim kawałkiem, gdy MusicBrainz odpowie. Zerwane
- * połączenie psuje wtedy najwyżej wyniki — a te ponawia przycisk przy nich,
- * bez przeładowywania całej strony.
+ * Teraz każdy kawałek leci osobno i pojawia się, gdy jest gotowy: szkielet
+ * z polem szukania natychmiast, potem to, co portal ma u siebie (baza, więc
+ * od razu), a płyty i artyści niezależnie od siebie. Zerwane połączenie psuje
+ * najwyżej jeden kawałek — reszta zostaje, a przy tym jednym stoi przycisk
+ * ponowienia.
+ *
+ * Liczniki przy zakresach przeniosły się do nagłówków sekcji: gdyby zostały
+ * przy chipsach, wszystkie chipsy musiałyby czekać na komplet wyników — czyli
+ * dokładnie na to, z czym kończymy.
  */
 export default async function SearchPage({
   searchParams,
@@ -59,12 +64,41 @@ export default async function SearchPage({
   const { t } = await i18n();
   const { q = "", a: artistQ = "", t: titleQ = "", f = "", miss, lubie } = await searchParams;
   const narrowed = zawezone(artistQ, titleQ);
+  const czegoSzukamy = q || narrowed;
+
+  const showAlbums = f === "" || f === "plyty";
+  const showBands = f === "" || f === "zespoly";
+  const showPeople = f === "" || f === "ludzie";
+  const showArtists = showBands || showPeople;
+  const showMine = f === "" || f === "portal";
+
+  // Adres liczymy TU, na serwerze: do komponentu klienckiego wolno przesłać
+  // tekst, ale nie funkcję, która go wyliczy.
+  const params = (kind: string) => {
+    const sp = new URLSearchParams();
+    if (q) sp.set("q", q);
+    if (artistQ) sp.set("a", artistQ);
+    if (titleQ) sp.set("t", titleQ);
+    if (kind) sp.set("f", kind);
+    return `/szukaj?${sp.toString()}`;
+  };
+  const FILTERS = [
+    { id: "", label: t.common.all },
+    { id: "plyty", label: t.common.albums },
+    { id: "zespoly", label: t.common.bands },
+    { id: "ludzie", label: t.common.people },
+    { id: "portal", label: t.search.inPortal },
+  ].map((x) => ({ ...x, count: null, href: params(x.id) }));
+
+  const pytanie: Pytanie = { q, artistQ, titleQ, f };
+  const klucz = `${q}|${artistQ}|${titleQ}|${f}`;
 
   return (
     <div>
       <h1 className="mb-4 text-4xl">{t.nav.search}</h1>
       <ScreenHelp screen="szukaj" />
       <SearchBox defaultValue={q} big placeholder={t.nav.searchPlaceholder} label={t.nav.search} />
+      {czegoSzukamy && <FilterChips items={FILTERS} active={f} />}
       <form action="/szukaj" className="mt-3 flex flex-wrap items-end gap-2">
         <label className="text-xs text-muted">
           {/* "Sigh" i "Goh-Ka" to przykładowe nazwa zespołu i tytuł płyty — nazwy własne, nie tłumaczymy. */}
@@ -80,199 +114,188 @@ export default async function SearchPage({
       </form>
       {miss && <p className="mt-3 text-sm text-warn">{t.search.missNotice}</p>}
       {lubie && <p className="mt-3 text-sm text-muted">{t.search.likeNotice}</p>}
-      {(q || narrowed) && (
-        // `key` po treści zapytania: nowe szukanie ma pokazać szkielet od nowa,
-        // zamiast trzymać poprzednie wyniki do czasu odpowiedzi.
-        <Suspense key={`${q}|${artistQ}|${titleQ}|${f}`} fallback={<ListSkeleton note={t.search.loadingData} />}>
-          <Wyniki q={q} artistQ={artistQ} titleQ={titleQ} f={f} lubie={lubie} />
-        </Suspense>
+
+      {czegoSzukamy && (
+        <>
+          {/* Baza portalu odpowiada od razu — i odpowiada nawet wtedy, gdy
+              MusicBrainz milczy. Dlatego stoi wyżej niż wyniki z sieci. */}
+          {showMine && (
+            <Suspense key={`u-nas-${klucz}`} fallback={null}>
+              <UNas {...pytanie} />
+            </Suspense>
+          )}
+          <div className={`mt-8 grid gap-8 ${showAlbums && showArtists ? "md:grid-cols-[1fr_320px]" : ""}`}>
+            {showAlbums && (
+              <Suspense key={`plyty-${klucz}`} fallback={<ListSkeleton note={t.search.loadingData} />}>
+                <Plyty {...pytanie} lubie={lubie} />
+              </Suspense>
+            )}
+            {showArtists && (
+              <Suspense key={`artysci-${klucz}`} fallback={<ListSkeleton note={t.search.loadingData} />}>
+                <Artysci {...pytanie} />
+              </Suspense>
+            )}
+          </div>
+        </>
       )}
     </div>
   );
 }
 
-/** Wszystko, co wymaga czekania: MusicBrainz, baza portalu, oceny. */
-async function Wyniki({ q, artistQ, titleQ, f, lubie }: Zapytanie) {
+/** Trafienia w tym, co portal ma u siebie: premiery i best of. */
+async function UNas({ q, artistQ, titleQ }: Pytanie) {
   const { t } = await i18n();
   const narrowed = zawezone(artistQ, titleQ);
-  const shown = narrowed ? [artistQ, titleQ].filter(Boolean).join(" — ") : q;
-
-  // Który zakres wyników pokazujemy (i o który w ogóle pytamy).
-  const showAlbums = f === "" || f === "plyty";
-  const showBands = f === "" || f === "zespoly";
-  const showPeople = f === "" || f === "ludzie";
-  const showArtists = showBands || showPeople;
-  const showMine = f === "" || f === "portal";
-  const user = await currentUser();
-  let albums: Awaited<ReturnType<typeof searchAlbums>> = [];
-  let artists: Awaited<ReturnType<typeof searchArtists>> = [];
-  let error: string | null = null;
-  // Najpierw to, co portal ma u siebie — ta część działa nawet wtedy, gdy
-  // MusicBrainz nie odpowiada.
   const mine = narrowed
     ? await localAlbumsBy({ artist: artistQ, title: titleQ }).catch(() => [])
     : q.trim()
       ? await localAlbums(q).catch(() => [])
       : [];
+  if (!mine.length) return null;
+  return (
+    <section className="mt-6">
+      <h2 className="label mb-3">
+        {t.search.inPortal} <span className="font-mono text-[10px] text-muted">{mine.length}</span>
+      </h2>
+      <div className="grid gap-2">
+        {mine.map((h) => (
+          <Link key={h.href} href={h.href} className="block rounded-lg border border-rule bg-surface2 px-3 py-2 hover:border-accent">
+            <span className="display text-lg leading-tight">{h.artist} — <em>{h.album}</em></span>
+            <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-muted">{h.sub}</span>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+async function Plyty({ q, artistQ, titleQ, f, lubie }: Pytanie & { lubie?: string }) {
+  const { t } = await i18n();
+  const narrowed = zawezone(artistQ, titleQ);
+  const shown = narrowed ? [artistQ, titleQ].filter(Boolean).join(" — ") : q;
+  const user = await currentUser();
+  let albums: Awaited<ReturnType<typeof searchAlbums>> = [];
+  let error: string | null = null;
   try {
-    // Zakres zmienia SAMO PYTANIE, nie tylko to, co pokazujemy: „Zespoły"
-    // pyta MusicBrainz o `type:group`, „Ludzie" o `type:person`, a „Płyty"
-    // w ogóle nie zawraca głowy indeksowi artystów. Dzięki temu w zawężeniu
-    // mieści się więcej trafień tego jednego rodzaju, zamiast dziesięciu
-    // wymieszanych.
-    const kind = f === "zespoly" ? ("group" as const) : f === "ludzie" ? ("person" as const) : undefined;
-    const artistTerm = narrowed ? artistQ.trim() : q;
-    [albums, artists] = await Promise.all([
-      !showAlbums
-        ? Promise.resolve([])
-        : narrowed
-          ? searchAlbumsBy({ artist: artistQ, title: titleQ }, f === "plyty" ? 30 : 15)
-          : searchAlbums(q, f === "plyty" ? 30 : 15),
-      !showArtists || !artistTerm ? Promise.resolve([]) : searchArtists(artistTerm, kind ? 25 : 10, kind),
-    ]);
+    // Zawężanie pyta MusicBrainz osobno o pole artysty i osobno o tytuł —
+    // „Sigh" w jednym polu zwraca wszystko, w czym to słowo się pojawia.
+    albums = narrowed
+      ? await searchAlbumsBy({ artist: artistQ, title: titleQ }, f === "plyty" ? 30 : 15)
+      : await searchAlbums(q, f === "plyty" ? 30 : 15);
   } catch (e) {
     error = e instanceof Error ? e.message : t.search.searchError;
   }
-  // Przez dbSafe: gdy baza ocen nie odpowie, ekran ma pokazać wyniki
-  // z MusicBrainz zamiast zamienić się w „Coś poszło nie tak". Oceny są tu
-  // dodatkiem, a nie treścią strony.
+  // Przez dbSafe: gdy baza ocen nie odpowie, mają zostać same wyniki.
   const ratingsS = await dbSafe(
     ratingAverages("ALBUM", albums.map((a) => a.mbid)),
     new Map<string, { avg: number; count: number }>(),
   );
   const ratings = ratingsS.value;
 
-  // Filtr typu wyniku — jak w odtwarzaczach: „wszystko" i zawężenia.
-  // Trzyma się w adresie, więc wynik da się wysłać linkiem.
-  const params = (kind: string) => {
-    const sp = new URLSearchParams();
-    if (q) sp.set("q", q);
-    if (artistQ) sp.set("a", artistQ);
-    if (titleQ) sp.set("t", titleQ);
-    if (kind) sp.set("f", kind);
-    return `/szukaj?${sp.toString()}`;
-  };
-  /**
-   * Liczniki tylko tam, gdzie naprawdę pytaliśmy.
-   *
-   * Po zawężeniu do „Zespoły" nie pytamy w ogóle o płyty — a licznik pokazywał
-   * wtedy „Płyty 0", czyli nieprawdę. Zero, którego nie sprawdziliśmy, jest
-   * gorsze niż brak liczby.
-   */
-  const ile = (widoczne: boolean, n: number) => (widoczne ? n : null);
-  const FILTERS: { id: string; label: string; count: number | null; href: string }[] = [
-    { id: "", label: t.common.all, count: null },
-    { id: "plyty", label: t.common.albums, count: ile(showAlbums, albums.length) },
-    { id: "zespoly", label: t.common.bands, count: ile(showBands, artists.filter((a) => !a.isPerson).length) },
-    { id: "ludzie", label: t.common.people, count: ile(showPeople, artists.filter((a) => a.isPerson).length) },
-    { id: "portal", label: t.search.inPortal, count: ile(showMine, mine.length) },
-    // Adres liczymy TU, na serwerze: do komponentu klienckiego wolno przesłać
-    // tekst, ale nie funkcję, która go wyliczy.
-  ].map((x) => ({ ...x, href: params(x.id) }));
-
   return (
-    <>
-      <FilterChips items={FILTERS} active={f} />
-      {error && (
+    <section>
+      <h2 className="label mb-3">
+        {t.common.albums} {albums.length > 0 && <span className="font-mono text-[10px] text-muted">{albums.length}</span>}
+      </h2>
+      {error ? (
         <>
-          <PartFail
-            what={`${t.common.partFailSearch}${mine.length > 0 ? ` ${t.search.errorMineFallback}` : ""}`}
-            retryLabel={t.common.partFailRetry}
-          />
+          <PartFail what={t.common.partFailSearch} retryLabel={t.common.partFailRetry} />
           <p className="text-xs text-faint">{error}</p>
         </>
-      )}
-      {/* Oceny to dodatek — gdy padną, wyniki zostają, a ponowić da się samo to. */}
-      {ratingsS.failed && albums.length > 0 && (
-        <PartFail what={t.common.partFailRatings} retryLabel={t.common.partFailRetry} />
-      )}
-      {showMine && mine.length > 0 && (
-        <section className="mt-6">
-          <h2 className="label mb-3">{t.search.inPortal}</h2>
-          <div className="grid gap-2">
-            {mine.map((h) => (
-              <Link key={h.href} href={h.href} className="block rounded-lg border border-rule bg-surface2 px-3 py-2 hover:border-accent">
-                <span className="display text-lg leading-tight">{h.artist} — <em>{h.album}</em></span>
-                <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-muted">{h.sub}</span>
-              </Link>
+      ) : albums.length ? (
+        <>
+          {ratingsS.failed && <PartFail what={t.common.partFailRatings} retryLabel={t.common.partFailRetry} />}
+          <div className="grid gap-3">
+            {albums.map((a) => (
+              <AlbumCard
+                key={a.mbid}
+                album={a}
+                rating={ratings.get(a.mbid)}
+                extra={
+                  lubie && user ? (
+                    <form action={addLikedFromSearch} className="mt-1">
+                      <input type="hidden" name="mbid" value={a.mbid} />
+                      <input type="hidden" name="title" value={a.title} />
+                      <input type="hidden" name="artistName" value={a.artistText} />
+                      <input type="hidden" name="artistMbid" value={a.credit[0]?.mbid ?? ""} />
+                      <button className="btn text-xs">{t.search.likeThisAlbum}</button>
+                    </form>
+                  ) : null
+                }
+              />
             ))}
           </div>
-        </section>
+        </>
+      ) : (
+        <Empty>{fmt(t.search.noAlbumsFor, { name: shown })}</Empty>
       )}
-      <div className={`mt-8 grid gap-8 ${showAlbums && showArtists ? "md:grid-cols-[1fr_320px]" : ""}`}>
-        {showAlbums && (
-          <section>
-            <h2 className="label mb-3">{t.common.albums}</h2>
-            {albums.length ? (
-              <div className="grid gap-3">
-                {albums.map((a) => (
-                  <AlbumCard
-                    key={a.mbid}
-                    album={a}
-                    rating={ratings.get(a.mbid)}
-                    extra={
-                      lubie && user ? (
-                        <form action={addLikedFromSearch} className="mt-1">
-                          <input type="hidden" name="mbid" value={a.mbid} />
-                          <input type="hidden" name="title" value={a.title} />
-                          <input type="hidden" name="artistName" value={a.artistText} />
-                          <input type="hidden" name="artistMbid" value={a.credit[0]?.mbid ?? ""} />
-                          <button className="btn text-xs">{t.search.likeThisAlbum}</button>
-                        </form>
-                      ) : null
-                    }
-                  />
-                ))}
-              </div>
-            ) : (
-              <Empty>{fmt(t.search.noAlbumsFor, { name: shown })}</Empty>
-            )}
-          </section>
-        )}
-        {showArtists && (
-          <section>
-            <h2 className="label mb-3">
-              {f === "zespoly" ? t.common.bands : f === "ludzie" ? t.common.people : t.search.artistsAndMusicians}
-            </h2>
-            {artists.length ? (
-              <div className="grid gap-2">
-                {artists.map((a) => {
-                  // Sama nazwa nie wystarcza: „Cynic" to w MusicBrainz kilka
-                  // zespołów. Lata, miejsce i gatunki przychodzą w tej samej
-                  // odpowiedzi wyszukiwarki, więc pokazujemy je od razu.
-                  const lata = a.begin || a.end ? `${a.begin?.slice(0, 4) ?? "?"}–${a.ended ? (a.end?.slice(0, 4) ?? "") : ""}` : null;
-                  const skad = [a.city, a.area ?? a.country].filter(Boolean).join(", ");
-                  return (
-                    <ArtistCard
-                      key={a.mbid}
-                      mbid={a.mbid}
-                      name={a.name}
-                      sub={[a.isPerson ? t.search.person : a.type?.toLowerCase(), skad || null, lata].filter(Boolean).join(" · ")}
-                      extra={
-                        <>
-                          {a.disambiguation && <div className="mt-0.5 text-xs text-text2">{a.disambiguation}</div>}
-                          {a.tags.length > 0 && (
-                            <div className="mt-1 flex flex-wrap gap-1">
-                              {a.tags.map((tag) => (
-                                <span key={tag} className="chip text-[10px]">{tag}</span>
-                              ))}
-                            </div>
-                          )}
-                          {a.aliases.length > 0 && (
-                            <div className="mt-1 text-[10px] text-faint">{t.search.akaPrefix} {a.aliases.join(", ")}</div>
-                          )}
-                        </>
-                      }
-                    />
-                  );
-                })}
-              </div>
-            ) : (
-              <Empty>{f === "zespoly" ? t.search.noBands : f === "ludzie" ? t.search.noPeople : t.search.noArtists}</Empty>
-            )}
-          </section>
-        )}
-      </div>
-    </>
+    </section>
+  );
+}
+
+async function Artysci({ q, artistQ, titleQ, f }: Pytanie) {
+  const { t } = await i18n();
+  const narrowed = zawezone(artistQ, titleQ);
+  const artistTerm = narrowed ? artistQ.trim() : q;
+  let artists: Awaited<ReturnType<typeof searchArtists>> = [];
+  let error: string | null = null;
+  try {
+    // Zakres zmienia SAMO PYTANIE: „Zespoły" pyta o `type:group`, „Ludzie"
+    // o `type:person`. Dzięki temu w zawężeniu mieści się więcej trafień tego
+    // jednego rodzaju, zamiast dziesięciu wymieszanych.
+    const kind = f === "zespoly" ? ("group" as const) : f === "ludzie" ? ("person" as const) : undefined;
+    if (artistTerm) artists = await searchArtists(artistTerm, kind ? 25 : 10, kind);
+  } catch (e) {
+    error = e instanceof Error ? e.message : t.search.searchError;
+  }
+
+  return (
+    <section>
+      <h2 className="label mb-3">
+        {f === "zespoly" ? t.common.bands : f === "ludzie" ? t.common.people : t.search.artistsAndMusicians}{" "}
+        {artists.length > 0 && <span className="font-mono text-[10px] text-muted">{artists.length}</span>}
+      </h2>
+      {error ? (
+        <>
+          <PartFail what={t.common.partFailSearch} retryLabel={t.common.partFailRetry} />
+          <p className="text-xs text-faint">{error}</p>
+        </>
+      ) : artists.length ? (
+        <div className="grid gap-2">
+          {artists.map((a) => {
+            // Sama nazwa nie wystarcza: „Cynic" to w MusicBrainz kilka zespołów.
+            // Lata, miejsce i gatunki przychodzą w tej samej odpowiedzi
+            // wyszukiwarki, więc pokazujemy je od razu.
+            const lata = a.begin || a.end ? `${a.begin?.slice(0, 4) ?? "?"}–${a.ended ? (a.end?.slice(0, 4) ?? "") : ""}` : null;
+            const skad = [a.city, a.area ?? a.country].filter(Boolean).join(", ");
+            return (
+              <ArtistCard
+                key={a.mbid}
+                mbid={a.mbid}
+                name={a.name}
+                sub={[a.isPerson ? t.search.person : a.type?.toLowerCase(), skad || null, lata].filter(Boolean).join(" · ")}
+                extra={
+                  <>
+                    {a.disambiguation && <div className="mt-0.5 text-xs text-text2">{a.disambiguation}</div>}
+                    {a.tags.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {a.tags.map((tag) => (
+                          <span key={tag} className="chip text-[10px]">{tag}</span>
+                        ))}
+                      </div>
+                    )}
+                    {a.aliases.length > 0 && (
+                      <div className="mt-1 text-[10px] text-faint">{t.search.akaPrefix} {a.aliases.join(", ")}</div>
+                    )}
+                  </>
+                }
+              />
+            );
+          })}
+        </div>
+      ) : (
+        <Empty>{f === "zespoly" ? t.search.noBands : f === "ludzie" ? t.search.noPeople : t.search.noArtists}</Empty>
+      )}
+    </section>
   );
 }
