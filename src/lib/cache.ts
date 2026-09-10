@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, like } from "drizzle-orm";
 import { db, schema } from "@/db";
 
 /**
@@ -65,6 +65,16 @@ export async function cacheForget(key: string) {
     await db.delete(schema.apiCache).where(eq(schema.apiCache.key, key));
   } catch {
     /* ignore */
+  }
+}
+
+/** Wymiecenie całej rodziny wpisów (po przedrostku klucza). Zwraca ile poszło. */
+export async function cacheForgetPrefix(prefix: string): Promise<number> {
+  try {
+    const usuniete = await db.delete(schema.apiCache).where(like(schema.apiCache.key, `${prefix}%`)).returning({ k: schema.apiCache.key });
+    return usuniete.length;
+  } catch {
+    return 0;
   }
 }
 

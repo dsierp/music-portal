@@ -20,6 +20,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "tylko administrator" }, { status: 403 });
   }
 
+  let wyczyszczono: number | null = null;
   const id = process.env.SPOTIFY_CLIENT_ID ?? "";
   const secret = process.env.SPOTIFY_CLIENT_SECRET ?? "";
   const opis = (v: string) => ({
@@ -62,6 +63,15 @@ export async function GET(req: Request) {
    * albo krócej: ?etykieta=Audrey%20Horne%20%E2%80%93%20Achilles
    */
   const sp = new URL(req.url).searchParams;
+
+  // ?wyczysc=1 — wymiata zapamiętane odpowiedzi Spotify. Potrzebne, bo bufor
+  // potrafił zapisać PUSTY wynik (gdy serwis chwilowo odmówił) i trzymać go
+  // tydzień, przez co dopasowanie płyt nie działało mimo poprawnego kodu.
+  if (sp.get("wyczysc") === "1") {
+    const { cacheForgetPrefix } = await import("@/lib/cache");
+    wyczyszczono = await cacheForgetPrefix("spotify:");
+    wynik.wyczyszczonoWpisow = wyczyszczono;
+  }
   const etykieta = sp.get("etykieta");
   const artist = sp.get("artist") ?? (etykieta ? rozbijEtykiete(etykieta).artist : "");
   const album = sp.get("album") ?? (etykieta ? rozbijEtykiete(etykieta).title : "");
