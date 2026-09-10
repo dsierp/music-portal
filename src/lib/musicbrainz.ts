@@ -13,6 +13,8 @@ import { cached, TTL } from "./cache";
 import { createThrottle } from "./throttle";
 import { czytelnaRola } from "./instruments";
 
+/** Ile czekamy na jedną odpowiedź MusicBrainz (potem próba od nowa). */
+const MB_TIMEOUT_MS = 8000;
 const MB_BASE = "https://musicbrainz.org/ws/2";
 
 /**
@@ -70,7 +72,14 @@ async function mbFetch<T>(path: string, params: Record<string, string | number>)
     for (let attempt = 0; attempt < 4; attempt++) {
       let res: Response;
       try {
-        res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json" }, cache: "no-store" });
+        // Twardy limit czasu: bez niego zadyszka MusicBrainz trzymała otwartą
+        // odpowiedź naszej strony, aż przeglądarka odpuściła — a czytelnik
+        // widział pustkę zamiast informacji, że baza nie odpowiada.
+        res = await fetch(url, {
+          headers: { "User-Agent": UA, Accept: "application/json" },
+          cache: "no-store",
+          signal: AbortSignal.timeout(MB_TIMEOUT_MS),
+        });
       } catch {
         // zerwane połączenie / brak sieci — traktujemy jak chwilową niedostępność
         if (attempt === 3) throw new MbError("Brak połączenia z MusicBrainz", 503);
