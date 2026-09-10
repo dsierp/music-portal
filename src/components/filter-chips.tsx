@@ -19,11 +19,18 @@ import { useState, useTransition } from "react";
 export function FilterChips({
   items,
   active,
-  hrefFor,
 }: {
-  items: { id: string; label: string; count: number | null }[];
+  /**
+   * Gotowe adresy, nie funkcja licząca adres.
+   *
+   * Wcześniej szedł tu `hrefFor: (id) => string`. Funkcji NIE DA SIĘ przesłać
+   * z serwera do komponentu klienckiego — React rzuca wtedy błędem i przy
+   * każdym szukaniu z hasłem cały ekran zamieniał się w komunikat o awarii
+   * (puste /szukaj działało, bo te zakresy rysują się dopiero, gdy jest czego
+   * szukać). Adresy liczy więc serwer i przekazuje jako zwykły tekst.
+   */
+  items: { id: string; label: string; count: number | null; href: string }[];
   active: string;
-  hrefFor: (id: string) => string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -35,7 +42,7 @@ export function FilterChips({
       {items.map((x) => (
         <Link
           key={x.id || "all"}
-          href={hrefFor(x.id)}
+          href={x.href}
           className={`chip ${wybrany === x.id ? "chip-on" : ""}`}
           onClick={(e) => {
             // Zwykły klik obsługujemy sami; Ctrl/⌘/środkowy zostawiamy
@@ -43,7 +50,7 @@ export function FilterChips({
             if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
             e.preventDefault();
             setWybrany(x.id);
-            start(() => router.push(hrefFor(x.id)));
+            start(() => router.push(x.href));
           }}
         >
           {x.label}

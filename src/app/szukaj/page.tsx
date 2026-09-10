@@ -95,20 +95,22 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
    * gorsze niż brak liczby.
    */
   const ile = (widoczne: boolean, n: number) => (widoczne ? n : null);
-  const FILTERS: { id: string; label: string; count: number | null }[] = [
+  const FILTERS: { id: string; label: string; count: number | null; href: string }[] = [
     { id: "", label: t.common.all, count: null },
     { id: "plyty", label: t.common.albums, count: ile(showAlbums, albums.length) },
     { id: "zespoly", label: t.common.bands, count: ile(showBands, artists.filter((a) => !a.isPerson).length) },
     { id: "ludzie", label: t.common.people, count: ile(showPeople, artists.filter((a) => a.isPerson).length) },
     { id: "portal", label: t.search.inPortal, count: ile(showMine, mine.length) },
-  ];
+    // Adres liczymy TU, na serwerze: do komponentu klienckiego wolno przesłać
+    // tekst, ale nie funkcję, która go wyliczy.
+  ].map((x) => ({ ...x, href: params(x.id) }));
   return (
     <div>
       <h1 className="mb-4 text-4xl">{t.nav.search}</h1>
       <ScreenHelp screen="szukaj" />
       <SearchBox defaultValue={q} big placeholder={t.nav.searchPlaceholder} label={t.nav.search} />
       {(q || narrowed) && (
-        <FilterChips items={FILTERS} active={f} hrefFor={params} />
+        <FilterChips items={FILTERS} active={f} />
       )}
       <form action="/szukaj" className="mt-3 flex flex-wrap items-end gap-2">
         <label className="text-xs text-muted">
