@@ -59,6 +59,15 @@ export async function cacheHasNote(key: string): Promise<boolean> {
   }
 }
 
+/** Usunięcie wpisu z bufora — gdy zapisany wynik okazał się bezwartościowy. */
+export async function cacheForget(key: string) {
+  try {
+    await db.delete(schema.apiCache).where(eq(schema.apiCache.key, key));
+  } catch {
+    /* ignore */
+  }
+}
+
 export const TTL = {
   search: 60 * 60 * 24, // 1 dzień
   lookup: 60 * 60 * 24 * 7, // 7 dni

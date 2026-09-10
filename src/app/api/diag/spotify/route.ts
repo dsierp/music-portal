@@ -77,8 +77,13 @@ export async function GET(req: Request) {
   };
 
   if (album || artist) {
-    const { szukajAlbumuDiag } = await import("@/lib/spotify");
+    const { szukajAlbumuDiag, spotifyFindAlbum } = await import("@/lib/spotify");
     wynik.szukanie = await szukajAlbumuDiag(user.id, artist, album).catch((e) => ({
+      blad: e instanceof Error ? e.message : String(e),
+    }));
+    // Ścieżka, którą naprawdę chodzą teraz linki i wysyłka playlisty: katalog
+    // pytany tokenem APLIKACJI, bez udziału konta użytkownika.
+    wynik.katalogAplikacji = await spotifyFindAlbum(artist, album).catch((e) => ({
       blad: e instanceof Error ? e.message : String(e),
     }));
   }

@@ -287,6 +287,12 @@ export async function journeyToPlaylist(
 
 // ---------- katalog: dyskografia bez udziału użytkownika ----------
 
+/** Skasowanie wpisu z bufora — patrz komentarz przy `spotifyFindAlbum`. */
+async function zapomnij(klucz: string) {
+  const { cacheForget } = await import("./cache");
+  await cacheForget(klucz).catch(() => {});
+}
+
 /**
  * Token samej aplikacji (client credentials).
  *
@@ -294,9 +300,15 @@ export async function journeyToPlaylist(
  * łatanie dyskografii działa dla każdego odwiedzającego, także niezalogowanego,
  * i nie dotyczy go limit pięciu osób z trybu deweloperskiego.
  */
+let tokenWPamieci: { wartosc: string; do: number } | null = null;
+
 async function tokenAplikacji(): Promise<string | null> {
   if (!spotifyConfigured()) return null;
-  return cached("spotify:app-token", 55 * 60, async () => {
+  // Świadomie BEZ bufora w bazie: `cached` zapisuje także wynik nieudany, więc
+  // jedna chwilowa awaria Spotify unieruchamiałaby katalog na godzinę. Token
+  // trzymamy w pamięci procesu — tanio, a nieudana próba nie zostawia śladu.
+  if (tokenWPamieci && tokenWPamieci.do > Date.now()) return tokenWPamieci.wartosc;
+  const pobierz = async () => {
     const basic = Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString("base64");
     const res = await fetch(TOKEN_URL, {
       method: "POST",
@@ -307,7 +319,10 @@ async function tokenAplikacji(): Promise<string | null> {
     if (!res.ok) return null;
     const dane = (await res.json()) as { access_token?: string };
     return dane.access_token ?? null;
-  }).catch(() => null);
+  };
+  const token = await pobierz().catch(() => null);
+  if (token) tokenWPamieci = { wartosc: token, do: Date.now() + 55 * 60 * 1000 };
+  return token;
 }
 
 async function katalog<T>(sciezka: string): Promise<T | null> {
@@ -406,7 +421,8 @@ export async function spotifyFindAlbum(
   title: string,
 ): Promise<{ id: string; url: string; title: string; artists: string } | null> {
   if (!spotifyConfigured() || !title) return null;
-  return cached(`spotify:album:v1:${artist.toLowerCase()}|${title.toLowerCase()}`, 60 * 60 * 24 * 7, async () => {
+  const klucz = `spotify:album:v1:${artist.toLowerCase()}|${title.toLowerCase()}`;
+  const znalezione = await cached(klucz, 60 * 60 * 24 * 7, async () => {
     const proba = async (q: string) => {
       const dane = await katalog<{ albums?: { items?: SpAlbumRaw[] } }>(
         `/search?type=album&limit=5&q=${encodeURIComponent(q)}`,
@@ -430,6 +446,10 @@ export async function spotifyFindAlbum(
       artists: (traf.artists ?? []).map((x) => x.name).join(", "),
     };
   }).catch(() => null);
+  // Brak dopasowania NIE zostaje w buforze: inaczej jedna nieudana próba (np.
+  // gdy Spotify chwilowo odmówił) trzymałaby pustkę przez tydzień.
+  if (!znalezione) await zapomnij(klucz);
+  return znalezione;
 }
 
 /** Uproszczony tytuł do porównań: bez interpunkcji, dopisków i wielkości liter. */
