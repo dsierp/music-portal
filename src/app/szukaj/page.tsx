@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { SearchBox } from "@/components/search-box";
 import { AlbumCard, ArtistCard, Empty } from "@/components/cards";
+import { FilterChips } from "@/components/filter-chips";
 import { searchAlbums, searchAlbumsBy, searchArtists } from "@/lib/musicbrainz";
 import { ratingAverages } from "@/lib/user-data";
 import { currentUser } from "@/lib/auth";
@@ -79,26 +80,27 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
     if (kind) sp.set("f", kind);
     return `/szukaj?${sp.toString()}`;
   };
-  const FILTERS: { id: string; label: string; count: number }[] = [
-    { id: "", label: t.common.all, count: albums.length + artists.length + mine.length },
-    { id: "plyty", label: t.common.albums, count: albums.length },
-    { id: "zespoly", label: t.common.bands, count: artists.filter((a) => !a.isPerson).length },
-    { id: "ludzie", label: t.common.people, count: artists.filter((a) => a.isPerson).length },
-    { id: "portal", label: t.search.inPortal, count: mine.length },
+  /**
+   * Liczniki tylko tam, gdzie naprawdę pytaliśmy.
+   *
+   * Po zawężeniu do „Zespoły" nie pytamy w ogóle o płyty — a licznik pokazywał
+   * wtedy „Płyty 0", czyli nieprawdę. Zero, którego nie sprawdziliśmy, jest
+   * gorsze niż brak liczby.
+   */
+  const ile = (widoczne: boolean, n: number) => (widoczne ? n : null);
+  const FILTERS: { id: string; label: string; count: number | null }[] = [
+    { id: "", label: t.common.all, count: null },
+    { id: "plyty", label: t.common.albums, count: ile(showAlbums, albums.length) },
+    { id: "zespoly", label: t.common.bands, count: ile(showBands, artists.filter((a) => !a.isPerson).length) },
+    { id: "ludzie", label: t.common.people, count: ile(showPeople, artists.filter((a) => a.isPerson).length) },
+    { id: "portal", label: t.search.inPortal, count: ile(showMine, mine.length) },
   ];
   return (
     <div>
       <h1 className="mb-4 text-4xl">{t.nav.search}</h1>
       <SearchBox defaultValue={q} big placeholder={t.nav.searchPlaceholder} label={t.nav.search} />
       {(q || narrowed) && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {FILTERS.map((x) => (
-            <Link key={x.id || "all"} href={params(x.id)} className={`chip ${f === x.id ? "chip-on" : ""}`}>
-              {x.label}
-              {x.id !== "" && <span className="ml-1.5 font-mono text-[10px] text-muted">{x.count}</span>}
-            </Link>
-          ))}
-        </div>
+        <FilterChips items={FILTERS} active={f} hrefFor={params} />
       )}
       <form action="/szukaj" className="mt-3 flex flex-wrap items-end gap-2">
         <label className="text-xs text-muted">
