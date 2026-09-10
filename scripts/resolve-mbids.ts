@@ -15,6 +15,23 @@
  *   npm run resolve:mbids -- --all → także pozycje, przy których próba się nie udała
  */
 import "dotenv/config";
+import { config } from "dotenv";
+
+// Jak przy cache:sweep — lokalny .env ma pusty DATABASE_URL (na maszynie chodzi
+// PGlite), a dowiązywać trzeba pozycje w bazie PRODUKCYJNEJ.
+config({ path: ".env.production.local", override: true });
+config({ path: ".env.local", override: true });
+if (process.env.DATABASE_URL_PROD) process.env.DATABASE_URL = process.env.DATABASE_URL_PROD;
+if (!process.env.DATABASE_URL) {
+  console.error(
+    [
+      "Brak adresu bazy. Dla produkcji:",
+      "  npx vercel env pull .env.production.local",
+      "  npm run resolve:mbids -- --all",
+    ].join("\n"),
+  );
+  process.exit(1);
+}
 
 async function main() {
   const { db, schema } = await import("../src/db");
