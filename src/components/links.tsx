@@ -75,8 +75,17 @@ export async function ReviewLinks({ links, ratings }: { links: Links; ratings?: 
   );
 }
 
-/** Linki wyszukiwania dla pozycji bez MBID (premiery, best of). */
+/**
+ * Linki dla pozycji bez MBID (premiery, best of).
+ *
+ * Spotify prowadzi przez naszą trasę, która dopiero przy kliknięciu szuka
+ * konkretnej płyty — na stronie z premierami jest ich kilkadziesiąt, a kwota
+ * aplikacji nie zniosłaby pytania o wszystkie z góry.
+ */
 export function searchLinks(artist: string, album: string): Links {
   const q = encodeURIComponent(`${artist} ${album}`);
-  return { spotify: `https://open.spotify.com/search/${q}`, tidal: `https://listen.tidal.com/search?q=${q}` };
+  return {
+    spotify: `/go/spotify?artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(album)}`,
+    tidal: `https://listen.tidal.com/search?q=${q}`,
+  };
 }

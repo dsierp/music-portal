@@ -5,7 +5,6 @@ import { getAlbum, getArtist, getDiscography, isMusicianRole, fmtLength, MbError
 import { wikiAlbumRatings, wikiFromLinks, wikiPersonnel } from "@/lib/wikipedia";
 import { nameKeys } from "@/lib/names";
 import { MbUnavailable } from "@/components/mb-unavailable";
-import { spotifyAlbumUrl } from "@/lib/spotify";
 import { ScreenHelp } from "@/components/screen-help";
 import { currentUser } from "@/lib/auth";
 import { albumSentiment, commentTree, getMyLists, likeCount, listsWith, ratingAverages, ratingSummary } from "@/lib/user-data";
@@ -67,14 +66,17 @@ export default async function AlbumPage({
    * Adres płyty w Spotify.
    *
    * MusicBrainz rzadko ma bezpośredni link, a wtedy `buildLinks` daje adres do
-   * WYSZUKIWARKI — i tam trzeba było celować drugi raz. Pytamy więc katalog
-   * Spotify (tokenem aplikacji, bez logowania) i podmieniamy na adres płyty.
-   * Gdy nic nie pasuje, zostaje wyszukiwarka: lepsza niż martwy odnośnik.
+   * WYSZUKIWARKI — i tam trzeba było celować drugi raz. Gdy więc nie ma linku
+   * wprost, prowadzimy przez naszą trasę: ta znajdzie płytę w chwili kliknięcia
+   * (a nie przy każdym wejściu na stronę — kwota aplikacji Spotify jest mała
+   * i wspólna dla całego portalu).
    */
-  const spotifyProsto = album.links.spotify.includes("/search/")
-    ? await spotifyAlbumUrl(album.artistText, album.title).catch(() => null)
-    : null;
-  const linki = spotifyProsto ? { ...album.links, spotify: spotifyProsto } : album.links;
+  const linki = album.links.spotify.includes("/search/")
+    ? {
+        ...album.links,
+        spotify: `/go/spotify?artist=${encodeURIComponent(album.artistText)}&album=${encodeURIComponent(album.title)}`,
+      }
+    : album.links;
   // Dane z bazy przez dbSafe: gdy lokalna baza padnie, strona ma dalej pokazać
   // to, co pochodzi z MusicBrainz/Wikipedii, a nie zamienić się w ekran błędu.
   const [summaryS, treeS, likedS, likesS, wiki, more, externalRatings, pressRatings, band] = await Promise.all([
