@@ -9,6 +9,7 @@ import { getFavoriteArtists, getLikedAlbums, getMyLists, listsForMe, travelJourn
 import { TravelJournal } from "@/components/travel-journal";
 import { createListAction, dismissShareAction } from "@/app/actions";
 import { i18n } from "@/lib/t";
+import { ScreenHelp } from "@/components/screen-help";
 import { fmt, plural } from "@/lib/i18n";
 
 /** Tytuł w zakładce też idzie w języku czytelnika. */
@@ -79,6 +80,7 @@ export default async function ListsPage() {
           <Link href="/best-of" className="underline">{t.lists.bestOfLink}</Link>{t.lists.bannerOutro}
         </p>
       </Banner>
+      <ScreenHelp screen="podroze" />
       {/* Własne listy najpierw: rankingi portalu są ciekawe, ale to, co człowiek
           sam ułożył (i co dostał od kogoś), jest jego. */}
       {user && (

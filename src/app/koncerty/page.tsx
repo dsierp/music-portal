@@ -9,6 +9,7 @@ import { getAreas, getFavoriteArtists, getGenres, getUserLocale, getMyLists } fr
 import { acceptedLabels, concertWindow, concertsByArea, concertsByAreaMb, concertsForFavorites, dedupe, hasTicketmasterKey, matchesGenres, offGenre, type Concert } from "@/lib/concerts";
 import { dbSafe } from "@/lib/db-safe";
 import { i18n } from "@/lib/t";
+import { ScreenHelp } from "@/components/screen-help";
 import { fmt, formatDate, type Locale } from "@/lib/i18n";
 import type { Dict } from "@/lib/dict";
 
@@ -249,6 +250,7 @@ export default async function ConcertsPage({ searchParams }: { searchParams: Pro
     return (
       <>
         <Masthead art={heroArt(null)} eyebrow={t.concerts.title} title={t.concerts.heroTitle} />
+      <ScreenHelp screen="koncerty" />
         <p className="mt-8 text-sm text-muted">
           <Link href="/login" className="underline">{t.nav.logIn}</Link> {t.concerts.loginIntro}
         </p>

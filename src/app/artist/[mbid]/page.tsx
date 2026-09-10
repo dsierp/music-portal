@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import { ARTWORK_ROLES, albumCrew, getArtist, getDiscography, getPlayedOn, getProduced, guessRoles, topAlbum, MbError, STRON_DOMYSLNIE } from "@/lib/musicbrainz";
 import { wikiBandMembers, wikiFromLinks, wikiLogo } from "@/lib/wikipedia";
 import { MbUnavailable } from "@/components/mb-unavailable";
+import { ScreenHelp } from "@/components/screen-help";
 import { LineupFilter } from "@/components/lineup-filter";
 import { OrderToggle } from "@/components/order-toggle";
 import { currentUser } from "@/lib/auth";
@@ -904,6 +905,8 @@ export default async function ArtistPage({
             <a href={wiki.url} target="_blank" rel="noopener" className="text-xs text-muted hover:text-accent2">{fmt(t.common.wikipediaLink, { lang: wiki.lang })}</a>
           </section>
         )}
+
+        <ScreenHelp screen="artysta" />
 
         <Suspense fallback={<DeepContentLoading t={t} />}>
           <ArtistDeepContent artist={artist} mbid={mbid} locale={locale} t={t} stron={stron} />

@@ -16,6 +16,7 @@ import type { JournalEvent } from "@/lib/journal";
 import { genreToSection } from "@/lib/genres";
 import { SKIP_ONBOARDING } from "@/lib/onboarding";
 import { i18n } from "@/lib/t";
+import { ScreenHelp } from "@/components/screen-help";
 import { fmt, plural } from "@/lib/i18n";
 import { genreLabel } from "@/lib/dict";
 import type { Dict } from "@/lib/dict";
@@ -147,6 +148,7 @@ export default async function Home() {
         <div className="mt-5 max-w-xl"><SearchBox big placeholder={t.nav.searchPlaceholder} label={t.nav.search} /></div>
         {!user && <p className="mt-3 text-sm text-muted"><Link href="/login" className="underline">{t.home.loginCta}</Link>{t.home.loginPromptRest}</p>}
       </Banner>
+      <ScreenHelp screen="start" />
 
       <div className="grid gap-10 lg:grid-cols-[1fr_320px]">
         <Suspense fallback={<p className="font-mono text-xs text-muted">{t.home.lineupLoading}</p>}>

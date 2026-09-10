@@ -9,6 +9,7 @@ import { orderByPopularity } from "@/lib/popularity";
 import { currentUser } from "@/lib/auth";
 import { getGenres } from "@/lib/user-data";
 import { i18n } from "@/lib/t";
+import { ScreenHelp } from "@/components/screen-help";
 import { journeyFromReleases } from "@/app/actions";
 
 /** Tytuł w zakładce też idzie w języku czytelnika. */
@@ -74,6 +75,7 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
         </>
       }
     />
+    <ScreenHelp screen="premiery" />
     <div className="mt-8 grid gap-8 md:grid-cols-[220px_1fr]">
       <aside className="md:sticky md:top-20 md:self-start">
         <div className="label mb-2">{t.releases.genresLabel}</div>

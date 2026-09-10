@@ -5,6 +5,7 @@ import { getAlbum, getArtist, getDiscography, isMusicianRole, fmtLength, MbError
 import { wikiAlbumRatings, wikiFromLinks, wikiPersonnel } from "@/lib/wikipedia";
 import { nameKeys } from "@/lib/names";
 import { MbUnavailable } from "@/components/mb-unavailable";
+import { ScreenHelp } from "@/components/screen-help";
 import { currentUser } from "@/lib/auth";
 import { albumSentiment, commentTree, getMyLists, likeCount, listsWith, ratingAverages, ratingSummary } from "@/lib/user-data";
 import { AddToList } from "@/components/add-to-list";
@@ -221,6 +222,7 @@ export default async function AlbumPage({
               )}
               {likes > 0 && <span className="font-mono text-xs text-muted">{plural(locale, likes, t.album.likesCount)}</span>}
             </div>
+            <ScreenHelp screen="plyta" />
             {/* Odrzuciłeś płytę — pytamy o artystę, bo to zwykle „nie mój
                 klimat", a nie „ta jedna płyta wyszła słabo". Pytanie znika samo
                 po odpowiedzi albo po przejściu dalej. */}

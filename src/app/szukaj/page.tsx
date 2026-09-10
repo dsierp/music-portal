@@ -8,6 +8,7 @@ import { currentUser } from "@/lib/auth";
 import { addLikedFromSearch } from "@/app/actions";
 import { localAlbums, localAlbumsBy } from "@/lib/local-search";
 import { i18n } from "@/lib/t";
+import { ScreenHelp } from "@/components/screen-help";
 import { fmt } from "@/lib/i18n";
 import Link from "next/link";
 
@@ -98,6 +99,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   return (
     <div>
       <h1 className="mb-4 text-4xl">{t.nav.search}</h1>
+      <ScreenHelp screen="szukaj" />
       <SearchBox defaultValue={q} big placeholder={t.nav.searchPlaceholder} label={t.nav.search} />
       {(q || narrowed) && (
         <FilterChips items={FILTERS} active={f} hrefFor={params} />

@@ -13,6 +13,7 @@ import { auth } from "./auth";
 import { common } from "./common";
 import { concerts } from "./concerts";
 import { genres } from "./genres";
+import { help } from "./help";
 import { home } from "./home";
 import { lists } from "./lists";
 import { nav } from "./nav";
@@ -29,6 +30,7 @@ export function dict(locale: Locale) {
     common: common[locale],
     concerts: concerts[locale],
     genres: genres[locale],
+    help: help[locale],
     home: home[locale],
     lists: lists[locale],
     nav: nav[locale],

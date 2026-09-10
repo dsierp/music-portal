@@ -26,7 +26,7 @@ export async function Nav() {
           <Link href="/podroze">{t.nav.lists}</Link>
           {/* Znak zapytania zamiast słowa: w menu jest już ciasno, a to i tak
               zagląda się raz. Tytuł niesie nazwę dla czytników ekranu. */}
-          <Link href="/o-portalu" title={t.about.navHint} aria-label={t.about.navHint} className="font-mono text-muted hover:text-accent2">
+          <Link href="/pomoc" title={t.help.guideTitle} aria-label={t.help.guideTitle} className="font-mono text-muted hover:text-accent2">
             ?
           </Link>
         </nav>
