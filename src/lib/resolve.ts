@@ -12,7 +12,7 @@
  */
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { findAlbumMbid, MbError } from "./musicbrainz";
+import { findAlbumMbid, MbError, searchArtists } from "./musicbrainz";
 
 /**
  * Jak długo nie wracamy do pozycji, której w MusicBrainz naprawdę nie ma.
@@ -62,4 +62,18 @@ export async function resolveBestOf(id: string): Promise<string | null> {
     .where(eq(schema.bestOfEntries.id, id))
     .catch(() => {});
   return mbid;
+}
+
+/**
+ * Gdy płyty nie ma w MusicBrainz — a to przy świeżych premierach normalne —
+ * pytamy chociaż o ARTYSTĘ.
+ *
+ * Wysyłanie kogoś do wyszukiwarki jest wtedy podwójnie bez sensu: tam też nic
+ * nie znajdzie, bo tej płyty po prostu nie ma. Strona artysty daje mu za to
+ * jego pozostałe płyty i cały skład — czyli podróż, po którą przyszedł.
+ */
+export async function resolveArtistOnly(artist: string): Promise<string | null> {
+  if (!artist.trim()) return null;
+  const znalezieni = await searchArtists(artist, 1).catch(() => []);
+  return znalezieni[0]?.mbid ?? null;
 }

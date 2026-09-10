@@ -800,7 +800,7 @@ export default async function ArtistPage({
   searchParams,
 }: {
   params: Promise<{ mbid: string }>;
-  searchParams: Promise<{ wiecej?: string }>;
+  searchParams: Promise<{ wiecej?: string; brak?: string }>;
 }) {
   const { mbid } = await params;
   const sp = await searchParams;
@@ -859,6 +859,22 @@ export default async function ArtistPage({
   return (
     <>
     {dbDown && <DbWarning />}
+    {/* Trafił tu z listy premier, bo tej płyty nie ma jeszcze w MusicBrainz.
+        Mówimy to wprost i podajemy drogę do uzupełnienia bazy — portal ma
+        pokazywać dziury, a nie udawać, że ich nie ma. */}
+    {sp.brak && (
+      <div className="mb-4 rounded border border-warn/40 bg-warn/10 p-3 text-sm">
+        <span className="text-text2">{fmt(t.artist.missingAlbumNotice, { title: sp.brak })}</span>{" "}
+        <a
+          href={`https://musicbrainz.org/search?query=${encodeURIComponent(`${artist.name} ${sp.brak}`)}&type=release_group`}
+          target="_blank"
+          rel="noopener"
+          className="underline hover:text-accent2"
+        >
+          {t.artist.missingAlbumAdd}
+        </a>
+      </div>
+    )}
     <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
       <div>
         <header className="flex gap-4">
