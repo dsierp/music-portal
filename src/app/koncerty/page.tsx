@@ -76,6 +76,23 @@ function ConcertList({
               />
             </div>
           )}
+          {/* Kto gra — i od razu droga do posłuchania. Bilet kupuje się raz,
+              a przed wyjściem chce się wiedzieć, na co się idzie: te odnośniki
+              prowadzą na strony zespołów u nas (a stamtąd w Spotify/Tidala). */}
+          {(c.lineup?.length ?? 0) > 0 && (
+            <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs">
+              <span className="text-faint">{t.concerts.listenBefore}</span>
+              {c.lineup!.map((nazwa) => (
+                <Link
+                  key={nazwa}
+                  href={`/go/mb?typ=artist&nazwa=${encodeURIComponent(nazwa)}`}
+                  className="text-muted underline decoration-dotted hover:text-accent2"
+                >
+                  {nazwa}
+                </Link>
+              ))}
+            </div>
+          )}
           {c.genres.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-1">
               {c.genres.slice(0, 3).map((g) => <span key={g} className="chip text-[10px]">{g}</span>)}

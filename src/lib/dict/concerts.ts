@@ -31,6 +31,7 @@ const pl = {
   showAll: "Pokaż wszystko",
   noFavoriteConcerts: "MusicBrainz nie ma zapowiedzi Twoich ulubionych zespołów na ten okres.",
   fromFavorites: "z Twoich ulubionych:",
+  listenBefore: "posłuchaj przed koncertem:",
   wholeCountry: "cały kraj: {country}",
 };
 type T = typeof pl;
@@ -65,6 +66,7 @@ const en: T = {
   showAll: "Show everything",
   noFavoriteConcerts: "MusicBrainz has no upcoming shows for your favourite bands in this period.",
   fromFavorites: "from your favourites:",
+  listenBefore: "listen before you go:",
   wholeCountry: "whole country: {country}",
 };
 
@@ -98,6 +100,7 @@ const es: T = {
   showAll: "Mostrar todo",
   noFavoriteConcerts: "MusicBrainz no tiene anuncios de tus bandas favoritas para este periodo.",
   fromFavorites: "de tus favoritos:",
+  listenBefore: "escúchalo antes de ir:",
   wholeCountry: "todo el país: {country}",
 };
 
@@ -131,6 +134,7 @@ const de: T = {
   showAll: "Alles anzeigen",
   noFavoriteConcerts: "MusicBrainz hat für diesen Zeitraum keine Ankündigungen zu deinen Lieblingsbands.",
   fromFavorites: "aus deinen Favoriten:",
+  listenBefore: "vorher reinhören:",
   wholeCountry: "ganzes Land: {country}",
 };
 

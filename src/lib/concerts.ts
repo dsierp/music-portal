@@ -39,6 +39,15 @@ export interface Concert {
   /** Który zespół z ulubionych to wywołał (jeśli szukaliśmy po artyście). */
   artistName?: string;
   artistMbid?: string;
+  /**
+   * Kto gra — nazwy wykonawców podane przez Ticketmastera.
+   *
+   * Po to, żeby dało się posłuchać PRZED wyjściem z domu: sam tytuł afisza
+   * („Allegaeon x Gorod, support: Halysis") jest tekstem reklamowym i nie da
+   * się z niego niczego kliknąć, a te nazwy prowadzą prosto na strony zespołów
+   * w portalu.
+   */
+  lineup?: string[];
   genres: string[];
 }
 
@@ -154,7 +163,11 @@ interface TmEvent {
   url?: string;
   dates?: { start?: { localDate?: string; localTime?: string | null } };
   classifications?: { genre?: { name?: string }; subGenre?: { name?: string } }[];
-  _embedded?: { venues?: { name?: string; city?: { name?: string }; country?: { countryCode?: string; name?: string } }[] };
+  _embedded?: {
+    venues?: { name?: string; city?: { name?: string }; country?: { countryCode?: string; name?: string } }[];
+    /** Wykonawcy wydarzenia — z tego bierzemy nazwy do odnalezienia ich u nas. */
+    attractions?: { name?: string }[];
+  };
 }
 
 /**
@@ -201,6 +214,7 @@ async function tmSearch(area: Area, genre: string | null, size = 40): Promise<Co
       url: e.url ?? null,
       source: "ticketmaster" as const,
       genres: [...new Set((e.classifications ?? []).flatMap((c) => [c.genre?.name, c.subGenre?.name]).filter((x): x is string => Boolean(x) && x !== "Undefined"))],
+      lineup: [...new Set((e._embedded?.attractions ?? []).map((a) => a.name?.trim()).filter((x): x is string => !!x))].slice(0, 4),
     };
   }).filter((c) => c.date);
 }
@@ -374,6 +388,7 @@ export async function tmByArtist(name: string, country?: string, size = 20): Pro
         url: e.url ?? null,
         source: "ticketmaster" as const,
         genres: [...new Set((e.classifications ?? []).flatMap((c) => [c.genre?.name, c.subGenre?.name]).filter((x): x is string => Boolean(x) && x !== "Undefined"))],
+        lineup: [...new Set((e._embedded?.attractions ?? []).map((a) => a.name?.trim()).filter((x): x is string => !!x))].slice(0, 4),
       };
     })
     .filter((c) => c.date && c.name.toLowerCase().includes(szukane));
