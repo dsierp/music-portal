@@ -141,6 +141,11 @@ export default async function AlbumPage({
   for (const c of album.credits) for (const k of nameKeys(c.name)) knownPeople.set(k, c.mbid);
   const findPerson = (name: string) => nameKeys(name).map((k) => knownPeople.get(k)).find(Boolean) ?? null;
 
+  // Kto stoi wyżej, w składzie zespołu — żeby nie pokazywać go drugi raz
+  // w kredytach poniżej. Porównujemy po nazwisku, bo credits z Wikipedii
+  // nie mają MBID-ów.
+  const wSkladzie = new Set(lineupThen.map((m) => m.name.toLowerCase()));
+
   return (
     <>
     {dbDown && <DbWarning />}
@@ -269,6 +274,23 @@ export default async function AlbumPage({
 
         <section className="mt-8">
           <h2 className="mb-2 text-2xl">{t.album.lineupHeading}</h2>
+          {lineupThen.length > 0 && (
+            <div className="mb-5">
+              <h3 className="label mb-1">{t.album.currentLineupHeading}</h3>
+              <ul className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+                {lineupThen.map((m) => (
+                  <li key={m.mbid} className="flex items-baseline gap-2">
+                    <Link href={`/artist/${m.mbid}`} className="font-medium hover:text-accent2 hover:underline">{m.name}</Link>
+                    {m.roles.length > 0 && <span className="text-muted">{m.roles.join(", ")}</span>}
+                    <span className="font-mono text-[10px] text-faint">
+                      {m.begin?.slice(0, 4) ?? "?"}–{m.current ? "" : (m.end?.slice(0, 4) ?? "?")}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1 text-xs text-faint">{t.album.currentLineupNote}</p>
+            </div>
+          )}
           {musicians.length ? (
             <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
               {musicians.map((c) => (
@@ -282,7 +304,7 @@ export default async function AlbumPage({
           ) : wikiCredits?.length ? (
             <div>
               <ul className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
-                {wikiCredits.map((line, i) => {
+                {wikiCredits.filter((line) => !wSkladzie.has(line.name.toLowerCase())).map((line, i) => {
                   const personMbid = findPerson(line.name);
                   return (
                     <li key={i} className="flex items-baseline gap-2">
@@ -308,23 +330,6 @@ export default async function AlbumPage({
             </p>
           )}
 
-          {lineupThen.length > 0 && (
-            <div className="mt-4">
-              <h3 className="label mb-1">{t.album.currentLineupHeading}</h3>
-              <ul className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
-                {lineupThen.map((m) => (
-                  <li key={m.mbid} className="flex items-baseline gap-2">
-                    <Link href={`/artist/${m.mbid}`} className="font-medium hover:text-accent2 hover:underline">{m.name}</Link>
-                    {m.roles.length > 0 && <span className="text-muted">{m.roles.join(", ")}</span>}
-                    <span className="font-mono text-[10px] text-faint">
-                      {m.begin?.slice(0, 4) ?? "?"}–{m.current ? "" : (m.end?.slice(0, 4) ?? "?")}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-1 text-xs text-faint">{t.album.currentLineupNote}</p>
-            </div>
-          )}
           {staff.length > 0 && (
             <details className="mt-3 text-sm">
               <summary className="cursor-pointer text-muted hover:text-accent2">{fmt(t.album.staffSummary, { n: formatNumber(staff.length, locale) })}</summary>
