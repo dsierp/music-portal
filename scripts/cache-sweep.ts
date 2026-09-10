@@ -13,7 +13,14 @@
  * wolno wyrzucić w całości: to, co potrzebne, pobierze się ponownie.
  */
 import "dotenv/config";
+import { config } from "dotenv";
 import { Client } from "pg";
+
+// Lokalne .env ma PUSTY DATABASE_URL (na maszynie chodzi PGlite), a sprzątać
+// trzeba bazę PRODUKCYJNĄ. Bierzemy więc adres z pliku, który ściąga Vercel,
+// albo z podanego wprost argumentu — sekret nie musi nigdzie się przewijać.
+config({ path: ".env.production.local", override: true });
+config({ path: ".env.local", override: true });
 
 const dni = Number(process.argv[2] ?? 30);
 
@@ -22,9 +29,20 @@ function mb(bajty: number) {
 }
 
 async function main() {
-  const url = process.env.DATABASE_URL;
+  const url = process.env.DATABASE_URL_PROD || process.env.DATABASE_URL;
   if (!url) {
-    console.error("Brak DATABASE_URL — uruchom w katalogu projektu, z .env.local.");
+    console.error(
+      [
+        "Brak adresu bazy produkcyjnej.",
+        "",
+        "Najprościej ściągnąć go z Vercela do pliku:",
+        "  npx vercel env pull .env.production.local",
+        "  npm run cache:sweep",
+        "",
+        "Albo podać na jedno uruchomienie (adres zostaje w historii powłoki):",
+        "  DATABASE_URL_PROD='postgres://…' npm run cache:sweep",
+      ].join("\n"),
+    );
     process.exit(1);
   }
   const c = new Client({ connectionString: url });
