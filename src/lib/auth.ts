@@ -131,7 +131,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);
  * chwilowa awaria bazy nie może wyrzucać ludzi z konta.
  */
 export async function currentUser() {
-  const session = await auth();
+  // `auth()` potrafi rzucić — uszkodzone albo przeterminowane ciasteczko sesji,
+  // zmieniony sekret, chwilowa awaria dostawcy. Każda strona woła to na wejściu,
+  // więc taki wyjątek zabierał CAŁY ekran, choć jedyny skutek braku sesji to
+  // widok dla niezalogowanego. Traktujemy to jak „nikt nie jest zalogowany".
+  const session = await auth().catch((e) => {
+    console.error("[auth] nie udało się odczytać sesji:", e instanceof Error ? e.message : e);
+    return null;
+  });
   if (!session?.user?.id) return null;
   const me = { id: session.user.id, email: session.user.email ?? "", name: session.user.name ?? null, image: session.user.image ?? null };
   return (await userExists(me.id)) ? me : null;
