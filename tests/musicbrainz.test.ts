@@ -100,14 +100,12 @@ test("User-Agent: własna wartość przechodzi, cudzysłowy z importu .env obci�
 });
 
 test("szukanie artystów: zakres zawęża zapytanie do typu", () => {
-  assert.equal(artistQuery("cynic"), "(cynic OR cynic~)");
-  assert.equal(artistQuery("cynic", "group"), "(cynic OR cynic~) AND type:group");
-  assert.equal(
-    artistQuery("scott burns", "person"),
-    "(scott OR scott~) (burns OR burns~) AND type:person",
-  );
-  assert.equal(artistQuery("nile"), "(nile OR nile~)");
-  assert.equal(artistQuery("sun ra"), "sun ra", "krótkie słowa bez rozmycia — inaczej sypie przypadkami");
+  assert.equal(artistQuery("cynic"), "cynic", "domyślnie dokładnie — rozmycie przeciąża MusicBrainz");
+  assert.equal(artistQuery("cynic", "group"), "cynic AND type:group");
+  assert.equal(artistQuery("scott burns", "person"), "scott burns AND type:person");
+  assert.equal(artistQuery("blink-182", "group"), "blink 182 AND type:group", "myślnik nie trafia do zapytania");
+  assert.equal(artistQuery("cynic", undefined, true), "(cynic OR cynic~)", "rozmycie na żądanie");
+  assert.equal(artistQuery("sun ra", undefined, true), "sun ra", "krótkie słowa bez rozmycia");
   assert.equal(artistQuery("   ", "person"), "", "puste zapytanie nie idzie do MB");
 });
 

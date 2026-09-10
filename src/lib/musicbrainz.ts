@@ -500,22 +500,22 @@ export async function releaseGroupOfRelease(releaseMbid: string): Promise<string
 
 /** Zapytanie do indeksu artystów: sam tekst albo tekst zawężony do typu. */
 /**
- * Zapytanie o artystę — z tolerancją na literówkę.
+ * Zapytanie o artystę. `rozmyte` dokłada wariant z tolerancją na literówkę
+ * (`~` w Lucene) do słów od czterech znaków — krótsze zostawiamy w spokoju, bo
+ * przy „Sun" czy „Nile" rozmycie sprowadziłoby pół bazy.
  *
- * „viennie" nie znajdowało Vinnie Colaiuty, bo MusicBrainz szuka dokładnie po
- * słowie. Nazwiska muzyków są obce i pisze się je z pamięci, więc do każdego
- * słowa dokładamy wariant rozmyty (`~` w Lucene: kilka znaków różnicy).
- * Dokładne trafienie i tak wygrywa punktacją i idzie na górę listy.
- *
- * Słowa krótsze niż cztery znaki zostawiamy w spokoju — przy „Sun" czy „Nile"
- * rozmycie sprowadziłoby pół bazy.
+ * Rozmycia NIE używamy domyślnie: takie zapytanie jest dla wyszukiwarki
+ * MusicBrainz dużo droższe i przy popularnych hasłach („blink-182") kończyło się
+ * przeciążeniem, czyli zerem wyników zamiast czegokolwiek. Woła je dopiero
+ * `searchArtists`, gdy dokładne szukanie nic nie znalazło.
  */
-export function artistQuery(query: string, kind?: "group" | "person"): string {
+export function artistQuery(query: string, kind?: "group" | "person", rozmyte = false): string {
   const q = lucene(query);
   if (!q) return "";
-  const slowa = q.split(" ");
-  const rozmyte = slowa.map((w) => (w.length >= 4 ? `(${w} OR ${w}~)` : w)).join(" ");
-  return kind ? `${rozmyte} AND type:${kind}` : rozmyte;
+  const tresc = rozmyte
+    ? q.split(" ").map((w) => (w.length >= 4 ? `(${w} OR ${w}~)` : w)).join(" ")
+    : q;
+  return kind ? `${tresc} AND type:${kind}` : tresc;
 }
 
 /**
@@ -528,12 +528,21 @@ export async function searchArtists(
   limit = 20,
   kind?: "group" | "person",
 ): Promise<ArtistHit[]> {
-  const full = artistQuery(query, kind);
-  if (!full) return [];
-  // v2: doszły lata działalności, gatunki i miasto — patrz ArtistHit.
-  const data = await cached(`mb:artist-search:v2:${full}:${limit}`, TTL.search, () =>
-    mbFetch<{ artists: MbArtist[] }>("/artist/", { query: full, limit }),
-  );
+  const pytaj = async (rozmyte: boolean) => {
+    const full = artistQuery(query, kind, rozmyte);
+    if (!full) return null;
+    // v2: doszły lata działalności, gatunki i miasto — patrz ArtistHit.
+    return cached(`mb:artist-search:v2:${full}:${limit}`, TTL.search, () =>
+      mbFetch<{ artists: MbArtist[] }>("/artist/", { query: full, limit }),
+    );
+  };
+
+  // Najpierw dokładnie — tak wygląda 99% szukań i tak jest najtaniej.
+  // Rozmycie („viennie" → Vinnie) tylko wtedy, gdy dokładne nic nie dało.
+  let data = await pytaj(false);
+  if (!data) return [];
+  if (!data.artists.length) data = (await pytaj(true).catch(() => null)) ?? data;
+
   return data.artists.map((a) => ({
     mbid: a.id,
     name: a.name,
