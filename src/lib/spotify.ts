@@ -161,13 +161,35 @@ export function rozbijEtykiete(label: string): { artist: string; title: string }
   return reszta.length ? { artist: a.trim(), title: reszta.join(" – ").trim() } : { artist: "", title: label.trim() };
 }
 
+/**
+ * Zapytanie do wyszukiwarki Spotify.
+ *
+ * Wartości MUSZĄ być w cudzysłowie: bez niego `album:Exercises in Futility`
+ * znaczy dla Spotify „album o tytule Exercises" plus luźne słowa, więc nic nie
+ * pasuje. Na tym poległa cała wysyłka podróży — wynik brzmiał „nie udało się
+ * dopasować żadnej płyty", choć płyty były w katalogu.
+ */
+export function zapytanieOAlbum(artist: string, title: string): string {
+  const czysty = (v: string) => v.replace(/["']/g, " ").replace(/\s+/g, " ").trim();
+  const t = czysty(title);
+  const a = czysty(artist);
+  if (!t) return a;
+  return a ? `album:"${t}" artist:"${a}"` : `album:"${t}"`;
+}
+
 async function znajdzAlbum(userId: string, artist: string, title: string): Promise<string | null> {
-  const q = artist ? `album:${title} artist:${artist}` : title;
-  const dane = await api<{ albums?: { items?: { id: string }[] } }>(
-    userId,
-    `/search?type=album&limit=1&q=${encodeURIComponent(q)}`,
-  ).catch(() => null);
-  return dane?.albums?.items?.[0]?.id ?? null;
+  const szukaj = async (q: string) => {
+    if (!q) return null;
+    const dane = await api<{ albums?: { items?: { id: string }[] } }>(
+      userId,
+      `/search?type=album&limit=1&q=${encodeURIComponent(q)}`,
+    ).catch(() => null);
+    return dane?.albums?.items?.[0]?.id ?? null;
+  };
+  // Najpierw dokładnie po polach, a gdy nic — luźno całą etykietą. Tytuły bywają
+  // zapisane inaczej po obu stronach (podtytuły, znaki diakrytyczne), a wtedy
+  // zwykłe szukanie po całości trafia lepiej niż filtr pola.
+  return (await szukaj(zapytanieOAlbum(artist, title))) ?? (await szukaj([artist, title].filter(Boolean).join(" ")));
 }
 
 async function utworyAlbumu(userId: string, albumId: string): Promise<string[]> {

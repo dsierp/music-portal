@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { rozbijEtykiete, kluczTytulu, tylkoNoweTytuly } from "../src/lib/spotify.ts";
+import { rozbijEtykiete, kluczTytulu, tylkoNoweTytuly, zapytanieOAlbum } from "../src/lib/spotify.ts";
 
 test("etykieta przystanku: artysta i tytuł", () => {
   assert.deepEqual(rozbijEtykiete("Mgła – Exercises in Futility"), { artist: "Mgła", title: "Exercises in Futility" });
@@ -39,4 +39,15 @@ test("ze Spotify zostaje tylko to, czego MusicBrainz nie ma", () => {
 test("pusta lista znanych tytułów nie wywala filtra", () => {
   const sp = [{ id: "1", title: "X", year: null, artists: "", url: "u", cover: null, group: "album" as const }];
   assert.equal(tylkoNoweTytuly(sp, []).length, 1);
+});
+
+test("zapytanie do Spotify: wartości w cudzysłowie", () => {
+  // Bez cudzysłowu Spotify bierze tylko pierwsze słowo tytułu i nie znajduje nic.
+  assert.equal(
+    zapytanieOAlbum("Mgła", "Exercises in Futility"),
+    'album:"Exercises in Futility" artist:"Mgła"',
+  );
+  assert.equal(zapytanieOAlbum("", "Kingdom of Ants"), 'album:"Kingdom of Ants"');
+  // Cudzysłów w tytule wycinamy, żeby nie rozwalił zapytania.
+  assert.equal(zapytanieOAlbum("AC/DC", 'Back in "Black"'), 'album:"Back in Black" artist:"AC/DC"');
 });

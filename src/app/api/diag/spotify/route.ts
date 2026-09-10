@@ -55,5 +55,15 @@ export async function GET() {
       wynik.token = { blad: e instanceof Error ? e.message : String(e) };
     }
   }
+  // Druga połowa: konto TEGO użytkownika. Klucze aplikacji mogą być idealne,
+  // a wysyłka i tak nie zadziała, bo konto nie jest połączone albo Spotify
+  // odmawia mu obsługi (tryb deweloperski dopuszcza tylko dopisane osoby).
+  const { spotifyBlocked, spotifyConnected, nowPlaying } = await import("@/lib/spotify");
+  wynik.konto = {
+    polaczone: await spotifyConnected(user.id).catch(() => false),
+    odmowaZapamietana: await spotifyBlocked(user.id).catch(() => false),
+    teraz: (await nowPlaying(user.id).catch(() => null)) ? "coś leci" : "nic nie leci albo brak dostępu",
+  };
+
   return NextResponse.json(wynik);
 }
