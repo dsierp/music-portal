@@ -452,6 +452,53 @@ export async function spotifyFindAlbum(
   return znalezione;
 }
 
+/**
+ * Surowa sonda szukania — bez żadnego przetwarzania po drodze.
+ *
+ * Dotychczasowa diagnostyka mówiła tylko „odpowiedź pusta", a to zlepek dwóch
+ * różnych rzeczy: zero wyników i odmowa Spotify. Tu wychodzi status HTTP i
+ * początek treści, więc widać, KTÓRA to.
+ */
+export async function spotifySondaSzukania(userId: string | null, q: string) {
+  const wynik = async (res: Response) => {
+    const tresc = await res.text();
+    let ile: number | null = null;
+    try {
+      ile = (JSON.parse(tresc) as { albums?: { items?: unknown[] } })?.albums?.items?.length ?? null;
+    } catch {
+      /* nie JSON — wtedy liczy się sam fragment */
+    }
+    return { status: res.status, ok: res.ok, ile, fragment: tresc.slice(0, 300) };
+  };
+  const sciezka = `/search?type=album&limit=3&q=${encodeURIComponent(q)}`;
+  const out: Record<string, unknown> = { zapytanie: q };
+
+  const app = await tokenAplikacji().catch(() => null);
+  out.tokenAplikacji = app ? `jest (${app.length} zn.)` : "brak";
+  if (app) {
+    out.aplikacja = await fetch(`${API}${sciezka}`, {
+      headers: { Authorization: `Bearer ${app}` },
+      cache: "no-store",
+    })
+      .then(wynik)
+      .catch((e) => ({ blad: e instanceof Error ? e.message : String(e) }));
+  }
+
+  if (userId) {
+    const uz = await tokenDla(userId).catch(() => null);
+    out.tokenUzytkownika = uz ? `jest (${uz.length} zn.)` : "brak";
+    if (uz) {
+      out.uzytkownik = await fetch(`${API}${sciezka}`, {
+        headers: { Authorization: `Bearer ${uz}` },
+        cache: "no-store",
+      })
+        .then(wynik)
+        .catch((e) => ({ blad: e instanceof Error ? e.message : String(e) }));
+    }
+  }
+  return out;
+}
+
 /** Uproszczony tytuł do porównań: bez interpunkcji, dopisków i wielkości liter. */
 export function kluczTytulu(t: string): string {
   return t
