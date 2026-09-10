@@ -70,6 +70,11 @@ const pl = {
   dbWarningIntro: "Najczęstsza przyczyna: serwer był ubity w trakcie zapisu albo dwa procesy pisały do jednej bazy. Naprawa:",
   dbWarningThen: "potem",
 
+  // --- Kawałek strony się nie wczytał (part-fail.tsx) ---
+  partFailRetry: "Wczytaj ponownie",
+  partFailRatings: "Nie udało się wczytać ocen z portalu. Reszta strony działa.",
+  partFailSearch: "Nie udało się wczytać wyników z MusicBrainz.",
+
   // --- Filmiki z YouTube (youtube.tsx) ---
   ytHeading: "Filmiki (YouTube)",
   ytMore: "więcej wyników na YouTube ↗",
@@ -140,6 +145,10 @@ const en: T = {
   dbWarningIntro: "Usual cause: the server got killed mid-write, or two processes were writing to the same database. Fix:",
   dbWarningThen: "then",
 
+  partFailRetry: "Load again",
+  partFailRatings: "Couldn't load the portal's ratings. The rest of the page works.",
+  partFailSearch: "Couldn't load results from MusicBrainz.",
+
   ytHeading: "Videos (YouTube)",
   ytMore: "more results on YouTube ↗",
 
@@ -207,6 +216,10 @@ const es: T = {
   dbWarningIntro: "Causa habitual: el servidor se cerró a mitad de una escritura, o dos procesos escribían a la vez en la misma base de datos. Solución:",
   dbWarningThen: "y luego",
 
+  partFailRetry: "Cargar de nuevo",
+  partFailRatings: "No se pudieron cargar las puntuaciones del portal. El resto de la página funciona.",
+  partFailSearch: "No se pudieron cargar los resultados de MusicBrainz.",
+
   ytHeading: "Vídeos (YouTube)",
   ytMore: "más resultados en YouTube ↗",
 
@@ -273,6 +286,10 @@ const de: T = {
   dbWarningDetails: "Bewertungen, Kommentare und Favoriten sind kurzzeitig nicht verfügbar — Beschreibung und Besetzung des Albums kommen weiter direkt von MusicBrainz und sind wie gewohnt zu sehen.",
   dbWarningIntro: "Häufigste Ursache: Der Server wurde mitten im Schreibvorgang beendet, oder zwei Prozesse haben gleichzeitig in dieselbe Datenbank geschrieben. Behebung:",
   dbWarningThen: "danach",
+
+  partFailRetry: "Erneut laden",
+  partFailRatings: "Die Bewertungen des Portals ließen sich nicht laden. Der Rest der Seite funktioniert.",
+  partFailSearch: "Die Ergebnisse von MusicBrainz ließen sich nicht laden.",
 
   ytHeading: "Videos (YouTube)",
   ytMore: "weitere Ergebnisse auf YouTube ↗",

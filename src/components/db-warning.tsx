@@ -1,4 +1,5 @@
 import { i18n } from "@/lib/t";
+import { RetryButton } from "./part-fail";
 
 /**
  * Pasek pokazywany, gdy lokalna baza nie odpowiada. Reszta strony (dane
@@ -16,6 +17,11 @@ export async function DbWarning() {
         <code className="font-mono text-accent2">npm run db:reset</code>, {t.common.dbWarningThen}{" "}
         <code className="font-mono text-accent2">npm run dev</code>.
       </span>
+      {/* Ponowienie tylko tej części: reszta strony (MusicBrainz, Wikipedia)
+          już się wczytała i nie ma powodu jej przeładowywać. */}
+      <div>
+        <RetryButton label={t.common.partFailRetry} />
+      </div>
     </div>
   );
 }

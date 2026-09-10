@@ -5,6 +5,7 @@ import { FilterChips } from "@/components/filter-chips";
 import { searchAlbums, searchAlbumsBy, searchArtists } from "@/lib/musicbrainz";
 import { ratingAverages } from "@/lib/user-data";
 import { dbSafe } from "@/lib/db-safe";
+import { PartFail } from "@/components/part-fail";
 import { currentUser } from "@/lib/auth";
 import { addLikedFromSearch } from "@/app/actions";
 import { localAlbums, localAlbumsBy } from "@/lib/local-search";
@@ -73,7 +74,8 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   // Przez dbSafe: gdy baza ocen nie odpowie, ekran ma pokazać wyniki
   // z MusicBrainz zamiast zamienić się w „Coś poszło nie tak". Oceny są tu
   // dodatkiem, a nie treścią strony.
-  const ratings = (await dbSafe(ratingAverages("ALBUM", albums.map((a) => a.mbid)), new Map<string, { avg: number; count: number }>())).value;
+  const ratingsS = await dbSafe(ratingAverages("ALBUM", albums.map((a) => a.mbid)), new Map<string, { avg: number; count: number }>());
+  const ratings = ratingsS.value;
 
   // Filtr typu wyniku — jak w odtwarzaczach: „wszystko" i zawężenia.
   // Trzyma się w adresie, więc wynik da się wysłać linkiem.
@@ -124,10 +126,17 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       {miss && <p className="mt-3 text-sm text-warn">{t.search.missNotice}</p>}
       {lubie && <p className="mt-3 text-sm text-muted">{t.search.likeNotice}</p>}
       {error && (
-        <p className="mt-3 text-sm text-warn">
-          {error}
-          {mine.length > 0 && ` ${t.search.errorMineFallback}`}
-        </p>
+        <>
+          <PartFail
+            what={`${t.common.partFailSearch}${mine.length > 0 ? ` ${t.search.errorMineFallback}` : ""}`}
+            retryLabel={t.common.partFailRetry}
+          />
+          <p className="text-xs text-faint">{error}</p>
+        </>
+      )}
+      {/* Oceny to dodatek — gdy padną, wyniki zostają, a ponowić da się samo to. */}
+      {ratingsS.failed && albums.length > 0 && (
+        <PartFail what={t.common.partFailRatings} retryLabel={t.common.partFailRetry} />
       )}
       {showMine && mine.length > 0 && (
         <section className="mt-6">
