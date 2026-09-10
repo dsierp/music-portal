@@ -36,3 +36,11 @@ test("żargon MusicBrainz zamienia się na nazwę, którą ktoś rozpozna", () =
   assert.equal(czytelnaRola("bass guitar"), "bass guitar");
   assert.equal(czytelnaRola("lead vocals"), "lead vocals");
 });
+
+test("bas nie jest gitarą — także w zapisie „bass guitar\"", () => {
+  // Oba wzorce pasują do tego samego napisu, więc liczy się kolejność.
+  // Na osi czasu przy odwrotnej cały skład wychodził na gitarzystów.
+  assert.equal(instrumentGroup("bass guitar"), "bass");
+  assert.equal(instrumentGroup("electric bass guitar"), "bass");
+  assert.equal(instrumentGroup("guitar"), "guitar");
+});

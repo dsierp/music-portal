@@ -18,6 +18,7 @@
     "fetch:releases": "tsx scripts/fetch-releases.ts",
     "resolve:mbids": "tsx scripts/resolve-mbids.ts",
     "neon:setup": "tsx scripts/neon-setup.ts",
+    "cache:sweep": "tsx scripts/cache-sweep.ts",
     "typecheck": "tsc --noEmit",
     "test": "DATABASE_URL=${DATABASE_URL:-postgresql://testy-nie-dotykaja-bazy} tsx --test tests/*.test.ts",
     "setup": "npm run db:migrate && npm run import:pns -- data/purenewshit.html"

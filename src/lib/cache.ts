@@ -1,10 +1,51 @@
-import { eq, like } from "drizzle-orm";
+import { eq, like, lt, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 
 /**
  * Prosty cache odpowiedzi zewnętrznych API w Postgresie.
  * Nie budujemy własnej bazy wiedzy — to tylko bufor, który wygasa.
+ *
+ * UWAGA, DROGO OKUPIONA: bufor MUSI sam po sobie sprzątać. Przez pierwsze
+ * miesiące nie usuwał niczego — każda odpowiedź MusicBrainz, Wikipedii i Cover
+ * Art Archive zostawała na zawsze — aż tabela dobiła do limitu Neona (512 MB).
+ * Po jego przekroczeniu baza odmawia ZAPISÓW (nie dało się postawić oceny)
+ * i dławi odczyty tak, że strony wiszą minutami. Wyglądało to na powolność
+ * MusicBrainz, a to był nasz śmietnik.
  */
+
+/**
+ * Najstarsze wpisy, które trzymamy. Najdłuższy TTL w portalu to 30 dni, więc
+ * wszystko starsze jest z definicji nieświeże — nikt tego już nie odczyta.
+ */
+const MAX_WIEK_DNI = 31;
+/** Odpowiedzi grubsze niż to nie trafiają do bufora — patrz `zaGruby`. */
+const MAX_BAJTOW = 256 * 1024;
+/** Co ile zapisów zaglądamy, czy nie ma czego wyrzucić (1 = zawsze). */
+const SZANSA_SPRZATANIA = 0.02;
+
+function zaGruby(v: unknown): boolean {
+  try {
+    // Pojedyncze odpowiedzi potrafią mieć megabajty (dyskografia molocha
+    // z pełnymi relacjami). Takie wpisy zjadają bufor na rzecz setek małych,
+    // które są odczytywane o wiele częściej.
+    return JSON.stringify(v).length > MAX_BAJTOW;
+  } catch {
+    return true;
+  }
+}
+
+/** Kasuje wpisy starsze niż MAX_WIEK_DNI. Cicha, bo to sprzątanie w tle. */
+export async function cacheSweep(): Promise<number> {
+  try {
+    const usuniete = await db
+      .delete(schema.apiCache)
+      .where(lt(schema.apiCache.fetchedAt, sql`now() - interval '${sql.raw(String(MAX_WIEK_DNI))} days'`))
+      .returning({ k: schema.apiCache.key });
+    return usuniete.length;
+  } catch {
+    return 0;
+  }
+}
 export async function cached<T>(key: string, ttlSeconds: number, fetcher: () => Promise<T>): Promise<T> {
   // Tryb testowy (MB_FIXTURES) omija cache całkowicie. Bez tego test na maszynie
   // z działającym .env czytał PRAWDZIWE, zapisane w dev-bazie odpowiedzi
@@ -18,11 +59,15 @@ export async function cached<T>(key: string, ttlSeconds: number, fetcher: () => 
     // brak bazy (np. testy) — lecimy bez cache
   }
   const value = await fetcher();
+  if (zaGruby(value)) return value;
   try {
     await db
       .insert(schema.apiCache)
       .values({ key, json: value as object, fetchedAt: new Date() })
       .onConflictDoUpdate({ target: schema.apiCache.key, set: { json: value as object, fetchedAt: new Date() } });
+    // Sprzątamy przy okazji zapisu, raz na jakiś czas: bez osobnego zadania
+    // w tle, a bufor nie ma szans urosnąć ponad to, co naprawdę świeże.
+    if (Math.random() < SZANSA_SPRZATANIA) void cacheSweep();
   } catch {
     /* ignore */
   }

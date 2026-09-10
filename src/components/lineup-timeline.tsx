@@ -2,6 +2,7 @@ import type { AlbumSummary, Membership } from "@/lib/musicbrainz";
 import { fillMissingSpans, mergeSpans, rowRoles, type TimelineRow } from "@/lib/timeline";
 import { fmt, plural, type Locale } from "@/lib/i18n";
 import type { Dict } from "@/lib/dict";
+import { instrumentGroup, type InstrumentKey } from "@/lib/instruments";
 
 /**
  * Oś czasu — dwa spojrzenia na to samo:
@@ -30,23 +31,55 @@ import type { Dict } from "@/lib/dict";
  */
 type TimelineLabels = Dict["artist"]["timeline"];
 
-/** Kolejność dopasowania ma znaczenie — pierwsza pasująca rola wygrywa (np. "bas" przed "inne"). */
-function roleColors(t: TimelineLabels): { match: RegExp; color: string; label: string }[] {
-  return [
-    { match: /vocal|voice|śpiew/i, color: "#d6392f", label: t.roleVocal },
-    { match: /guitar|gitar/i, color: "#5aa84f", label: t.roleGuitar },
-    { match: /bass|bas\b/i, color: "#5b8fd6", label: t.roleBass },
-    { match: /drum|perkus|percussion/i, color: "#e0913f", label: t.roleDrums },
-    { match: /key|piano|organ|synth/i, color: "#a071c9", label: t.roleKeys },
-  ];
+/**
+ * Kolor paska bierzemy z tej samej klasyfikacji, co filtr instrumentów
+ * (`instrumentGroup`), zamiast trzymać drugą listę wzorców.
+ *
+ * Powód z życia: tutaj gitara stała przed basem, a „bass guitar" pasuje do
+ * obu wzorców — przez co cały skład Morbid Angel wychodził na gitarzystów,
+ * a legenda w ogóle nie znała basu. Jedna lista, jedna kolejność, jeden błąd
+ * mniej do popełnienia dwa razy.
+ */
+const KOLORY: Record<InstrumentKey, string> = {
+  vocals: "#d6392f",
+  guitar: "#5aa84f",
+  bass: "#5b8fd6",
+  drums: "#e0913f",
+  keys: "#a071c9",
+  other: "#7c8296",
+};
+
+function etykietaGrupy(key: InstrumentKey, t: TimelineLabels): string {
+  switch (key) {
+    case "vocals":
+      return t.roleVocal;
+    case "guitar":
+      return t.roleGuitar;
+    case "bass":
+      return t.roleBass;
+    case "drums":
+      return t.roleDrums;
+    case "keys":
+      return t.roleKeys;
+    default:
+      return t.roleOther;
+  }
+}
+
+function roleColors(t: TimelineLabels): { key: InstrumentKey; color: string; label: string }[] {
+  return (["vocals", "bass", "guitar", "drums", "keys"] as const).map((key) => ({
+    key,
+    color: KOLORY[key],
+    label: etykietaGrupy(key, t),
+  }));
 }
 
 function roleStyle(roles: string[], t: TimelineLabels) {
   for (const r of roles) {
-    const hit = roleColors(t).find((c) => c.match.test(r));
-    if (hit) return hit;
+    const key = instrumentGroup(r);
+    if (key !== "other") return { color: KOLORY[key], label: etykietaGrupy(key, t) };
   }
-  return { color: "#7c8296", label: t.roleOther };
+  return { color: KOLORY.other, label: t.roleOther };
 }
 
 /** "1983-04-01" → 1983.25; null → domyślna wartość. */

@@ -11,6 +11,7 @@ import { PartFail } from "@/components/part-fail";
 import { currentUser } from "@/lib/auth";
 import { addLikedFromSearch } from "@/app/actions";
 import { localAlbums, localAlbumsBy } from "@/lib/local-search";
+import { deezerAlbumy, deezerArtysci } from "@/lib/deezer";
 import { i18n } from "@/lib/t";
 import { ScreenHelp } from "@/components/screen-help";
 import { fmt } from "@/lib/i18n";
@@ -119,6 +120,12 @@ export default async function SearchPage({
         <>
           {/* Baza portalu odpowiada od razu — i odpowiada nawet wtedy, gdy
               MusicBrainz milczy. Dlatego stoi wyżej niż wyniki z sieci. */}
+          {/* Najszybsze, co mamy: katalog Deezera odpowiada w kilkadziesiąt
+              milisekund, więc coś stoi na ekranie, zanim MusicBrainz w ogóle
+              zdąży odpowiedzieć. */}
+          <Suspense key={`od-reki-${klucz}`} fallback={null}>
+            <OdReki {...pytanie} />
+          </Suspense>
           {showMine && (
             <Suspense key={`u-nas-${klucz}`} fallback={null}>
               <UNas {...pytanie} />
@@ -139,6 +146,47 @@ export default async function SearchPage({
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Podpowiedzi z Deezera — jedyna część tego ekranu, która nie czeka na
+ * MusicBrainz. Nie mają MBID, więc kliknięcie prowadzi przez trasę /go/mb,
+ * która odnajduje pozycję w MusicBrainz i dopiero wtedy otwiera stronę.
+ */
+async function OdReki({ q, artistQ, titleQ, f }: Pytanie) {
+  const { t } = await i18n();
+  const narrowed = zawezone(artistQ, titleQ);
+  const fraza = narrowed ? [artistQ, titleQ].filter(Boolean).join(" ") : q;
+  const chceZespoly = f === "" || f === "zespoly" || f === "ludzie";
+  const chcePlyty = f === "" || f === "plyty";
+  const [artysci, albumy] = await Promise.all([
+    chceZespoly ? deezerArtysci(fraza, 5).catch(() => []) : Promise.resolve([]),
+    chcePlyty ? deezerAlbumy(fraza, 5).catch(() => []) : Promise.resolve([]),
+  ]);
+  if (!artysci.length && !albumy.length) return null;
+
+  const link = (nazwa: string, typ: "artist" | "album", artysta?: string) =>
+    `/go/mb?typ=${typ}&nazwa=${encodeURIComponent(nazwa)}${artysta ? `&artysta=${encodeURIComponent(artysta)}` : ""}`;
+
+  return (
+    <section className="mt-6 rounded-lg border border-rule bg-surface2/40 p-3">
+      <h2 className="label mb-2">{t.search.quickTitle}</h2>
+      <div className="flex flex-wrap gap-2">
+        {artysci.map((a) => (
+          <a key={`a${a.id}`} href={link(a.name, "artist")} className="chip">
+            {a.name}
+          </a>
+        ))}
+        {albumy.map((a) => (
+          <a key={`p${a.id}`} href={link(a.title, "album", a.artist)} className="chip">
+            {a.artist} — <em>{a.title}</em>
+            {a.year && <span className="ml-1 font-mono text-[10px] text-muted">{a.year}</span>}
+          </a>
+        ))}
+      </div>
+      <p className="mt-2 text-[10px] text-faint">{t.search.quickNote}</p>
+    </section>
   );
 }
 
