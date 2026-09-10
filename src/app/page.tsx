@@ -51,15 +51,24 @@ async function NowPlayingCard({ userId, t }: { userId: string; t: Dict }) {
           <div className="truncate text-xs text-muted">{teraz.artist}</div>
         </div>
       </div>
-      <SearchLink query={`${teraz.artist} ${teraz.album}`} label={t.home.nowPlayingFind} />
+      <SearchLink query={teraz.album} artysta={teraz.artist} label={t.home.nowPlayingFind} />
     </section>
   );
 }
 
-/** Skok z odtwarzanego utworu do tej płyty u nas — stąd zaczyna się grzebanie. */
-function SearchLink({ query, label }: { query: string; label: string }) {
+/**
+ * Skok z odtwarzanego utworu do tej płyty u nas — stąd zaczyna się grzebanie.
+ *
+ * Prowadzi przez trasę, która odnajduje płytę w MusicBrainz przy kliknięciu.
+ * Wyszukiwarka jest tu ostatecznością, a nie przystankiem: człowiek wie, czego
+ * chce, więc pokazywanie mu listy wyników to zabieranie kroku.
+ */
+function SearchLink({ query, label, artysta }: { query: string; label: string; artysta?: string }) {
   return (
-    <Link href={`/szukaj?q=${encodeURIComponent(query)}`} className="mt-2 block text-xs text-muted hover:text-accent2">
+    <Link
+      href={`/go/mb?typ=album&nazwa=${encodeURIComponent(query)}${artysta ? `&artysta=${encodeURIComponent(artysta)}` : ""}`}
+      className="mt-2 block text-xs text-muted hover:text-accent2"
+    >
       {label}
     </Link>
   );

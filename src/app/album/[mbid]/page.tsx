@@ -313,7 +313,7 @@ export default async function AlbumPage({
                       ) : (
                         // Nie znamy MBID — ale nazwisko i tak ma prowadzić dalej,
                         // więc kierujemy do wyszukiwarki portalu.
-                        <Link href={`/szukaj?q=${encodeURIComponent(line.name)}`} className="font-medium text-text2 decoration-dotted hover:text-accent2 hover:underline" title={t.album.searchInPortalTitle}>{line.name}</Link>
+                        <Link href={`/go/mb?typ=artist&nazwa=${encodeURIComponent(line.name)}`} className="font-medium text-text2 decoration-dotted hover:text-accent2 hover:underline" title={t.album.searchInPortalTitle}>{line.name}</Link>
                       )}
                       {line.roles && <span className="text-muted">{line.roles}</span>}
                     </li>

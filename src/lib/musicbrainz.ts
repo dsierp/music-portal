@@ -583,11 +583,19 @@ export async function searchArtists(
 export async function findAlbumMbid(artist: string, album: string): Promise<AlbumSummary | null> {
   const a = lucene(artist), t = lucene(album);
   if (!a || !t) return null;
-  const query = `releasegroup:"${t}" AND artist:"${a}"`;
-  const data = await cached(`mb:rg-find:${a}|${t}`, TTL.lookup, () =>
-    mbFetch<{ "release-groups": (MbReleaseGroup & { score?: number })[] }>("/release-group/", { query, limit: 5 }),
-  );
-  const best = data["release-groups"].find((rg) => (rg.score ?? 0) >= 80) ?? data["release-groups"][0];
+  const pytaj = async (query: string) => {
+    const data = await cached(`mb:rg-find:v2:${query}`, TTL.lookup, () =>
+      mbFetch<{ "release-groups": (MbReleaseGroup & { score?: number })[] }>("/release-group/", { query, limit: 5 }),
+    );
+    return data["release-groups"] ?? [];
+  };
+  // Najpierw po polach — precyzyjnie. Potem luźno, bo zapis po obu stronach bywa
+  // różny („LINDA" vs „Linda", myślniki, znaki diakrytyczne, dopiski wydawcy),
+  // a przy ścisłym zapytaniu takie drobiazgi dają zero trafień i człowiek
+  // zamiast płyty ląduje w wyszukiwarce.
+  let wyniki = await pytaj(`releasegroup:"${t}" AND artist:"${a}"`);
+  if (!wyniki.length) wyniki = await pytaj(`${t} AND artist:${a}`);
+  const best = wyniki.find((rg) => (rg.score ?? 0) >= 80) ?? wyniki[0];
   return best ? normReleaseGroup(best) : null;
 }
 

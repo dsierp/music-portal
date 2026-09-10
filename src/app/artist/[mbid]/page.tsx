@@ -90,7 +90,11 @@ function MemberList({
                 {m.mbid ? (
                   <Link href={`/artist/${m.mbid}`} className="font-medium hover:text-accent2 hover:underline">{m.name}</Link>
                 ) : (
-                  <Link href={`/szukaj?q=${encodeURIComponent(m.name)}`} className="font-medium hover:text-accent2 hover:underline">{m.name}</Link>
+                  // Bez MBID: zamiast wysyłać człowieka do wyszukiwarki,
+                  // odnajdujemy tę osobę w MusicBrainz w chwili kliknięcia
+                  // i prowadzimy prosto na jej stronę (a gdy się nie uda —
+                  // dopiero wtedy zostaje szukanie).
+                  <Link href={`/go/mb?typ=artist&nazwa=${encodeURIComponent(m.name)}`} className="font-medium hover:text-accent2 hover:underline">{m.name}</Link>
                 )}
                 {m.external && (
                   <span
