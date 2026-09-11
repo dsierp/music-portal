@@ -59,13 +59,36 @@ export const STYLES_FROM_MB_BY_CATEGORY = MAIN_CATEGORIES.filter((c) => !c.fromI
  */
 export const STYLES_FROM_MB = STYLES_FROM_MB_BY_CATEGORY.flatMap((c) => c.tags);
 
-/** Mapowanie stylu użytkownika → sekcje premier (db/prog/other/jazz) do personalizacji. */
-export function genreToSection(genre: string): "db" | "prog" | "other" | "jazz" | null {
+/**
+ * Mapowanie stylu użytkownika → kod gatunku w premierach.
+ *
+ * Kiedyś zwracało wyłącznie cztery kody metalowo-jazzowe, bo tylko tyle
+ * dostarczał artefakt. Od 11.09.2026 artefakt przysyła wszystkie dwanaście
+ * kategorii z `MAIN_CATEGORIES`, więc funkcja musi przepuszczać także punk,
+ * elektronikę, folk, country, klasykę, hip-hop i pop — inaczej ktoś, kto ma
+ * w profilu „pop", nie dostaje spersonalizowanej strony głównej, mimo że
+ * premiery popowe już w bazie są.
+ *
+ * Kolejność sprawdzeń ma znaczenie: „hardcore punk" i „crust" to punk, ale
+ * „metalcore" i „grindcore" to metal — dlatego wszystko z „metal" w nazwie
+ * rozstrzygamy przed punkiem.
+ */
+export function genreToSection(genre: string): string | null {
   const g = genre.toLowerCase();
+  // Profil trzyma dziś wprost slugi kategorii — te przechodzą bez zgadywania.
+  if (MAIN_BY_SLUG.has(g)) return g === "death" || g === "black" ? "db" : g;
   if (g.includes("death") || g.includes("black") || g.includes("bestial")) return "db";
   if (g.includes("prog") || g.includes("kraut") || g.includes("canterbury") || g.includes("rio") || g.includes("fusion") || g.includes("post-rock")) return "prog";
   if (g.includes("jazz") || g.includes("bop") || g.includes("ecm") || g.includes("big band")) return "jazz";
-  if (g.includes("metal") || g.includes("doom") || g.includes("sludge") || g.includes("grind") || g.includes("stoner") || g.includes("core") || g.includes("crust")) return "other";
+  if (g.includes("metal") || g.includes("doom") || g.includes("sludge") || g.includes("grind") || g.includes("stoner")) return "other";
+  if (g.includes("punk") || g.includes("hardcore") || g.includes("crust") || g.includes("d-beat") || g.includes("noise rock")) return "punk";
+  if (g.includes("core")) return "other";
+  if (g.includes("hip") || g.includes("rap")) return "hiphop";
+  if (g.includes("country") || g.includes("americana") || g.includes("bluegrass") || g.includes("honky")) return "country";
+  if (g.includes("classical") || g.includes("klasyk") || g.includes("contemporary")) return "classical";
+  if (g.includes("electronic") || g.includes("techno") || g.includes("ambient") || g.includes("industrial")) return "electronic";
+  if (g.includes("folk") || g.includes("singer-songwriter")) return "folk";
+  if (g.includes("pop")) return "pop";
   return null;
 }
 

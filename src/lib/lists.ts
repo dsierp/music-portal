@@ -12,7 +12,16 @@ export const GENRE_LABELS: Record<string, string> = {
   other: "Inne metal / ciężkie brzmienia",
   jazz: "Jazz",
 };
-export const GENRE_ORDER = ["death", "black", "db", "prog", "other", "jazz"];
+/**
+ * Kolejność zapasowa kategorii. Uwaga: o realnej kolejności sekcji decyduje
+ * popularność wśród użytkowników (`src/lib/popularity.ts` → FALLBACK_ORDER);
+ * ta lista została dla miejsc, które pytają wprost o porządek metalowy.
+ * Blok niemetalowy trzyma kolejność z artefaktu („Poza kanonem").
+ */
+export const GENRE_ORDER = [
+  "death", "black", "db", "prog", "other", "jazz",
+  "punk", "electronic", "folk", "country", "classical", "hiphop", "pop",
+];
 
 /**
  * Etykieta gatunku. Sekcje z importu PNS mają swoje nazwy (db/prog/other/jazz);
@@ -63,19 +72,43 @@ export function genreLabel(genre: string): string {
 export function sectionImage(genre: string): string | null {
   const names: Record<string, string[]> = {
     db: ["death-black-metal", "death metal", "black metal", "metal"],
+    death: ["death metal", "metal"],
+    black: ["black metal", "metal"],
     prog: ["prog", "progressive rock", "progressive metal"],
     other: ["inne metal", "metal"],
     jazz: ["jazz"],
+    // Blok „poza kanonem" — slug kategorii nie zawsze zgadza się z nazwą pliku
+    // (hiphop → hip-hop.jpg), więc każdy kod ma tu swoje zejście do szerszej nazwy.
+    punk: ["punk", "punk-hardcore", "punk rock"],
+    electronic: ["electronic"],
+    folk: ["folk", "singer-songwriter", "neofolk"],
+    country: ["country", "country-americana"],
+    classical: ["classical", "klasyka", "classical-contemporary"],
+    hiphop: ["hip-hop", "hip hop"],
+    pop: ["pop"],
   };
   const [first, ...rest] = names[genre] ?? [genre];
   return genreImage(first, ...rest);
 }
 export const FLAG_LABELS: Record<string, string> = { ep: "EP", comp: "kompilacja", reissue: "reedycja", live: "live", instr: "instrumental" };
 
+/**
+ * Najnowsze wydania zestawienia — domyślnie dwa: piątek i tydzień po nim.
+ *
+ * `limit` liczy TERMINY, nie sekcje. Od 11.09.2026 jeden termin ma dwie sekcje
+ * (metalowa + „poza kanonem"), więc dawne `.limit(2)` po wierszach pokazywało
+ * dwa bloki tego samego dnia i gubiło cały drugi tydzień. Bierzemy więc tyle
+ * najnowszych dat, ile poproszono, i wszystkie sekcje z tych dat — blok
+ * niemetalowy zawsze pod swoim piątkiem, nie zamiast niego.
+ */
 export async function latestSections(limit = 2) {
-  const secs = await db.select().from(schema.releaseSections).orderBy(desc(schema.releaseSections.sortDate), asc(schema.releaseSections.kind)).limit(limit);
-  // pokazujemy najnowszy piątek + tydzień po nim, w kolejności chronologicznej
-  return secs.sort((a, b) => a.sortDate.getTime() - b.sortDate.getTime());
+  const secs = await db.select().from(schema.releaseSections).orderBy(desc(schema.releaseSections.sortDate), asc(schema.releaseSections.kind));
+  const terminy = [...new Set(secs.map((s) => s.sortDate.getTime()))].slice(0, limit);
+  const wybrane = secs.filter((s) => terminy.includes(s.sortDate.getTime()));
+  // chronologicznie, a w obrębie jednego terminu: najpierw sekcja główna
+  return wybrane.sort(
+    (a, b) => a.sortDate.getTime() - b.sortDate.getTime() || Number(a.id.endsWith("-poza")) - Number(b.id.endsWith("-poza")),
+  );
 }
 
 export async function allSections() {

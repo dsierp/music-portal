@@ -65,9 +65,29 @@ function ghoulFor(genre: string, section: ReturnType<typeof genreToSection>): st
   return avatarImage(genre, wider);
 }
 
-/** Tło nagłówka sekcji premier — grafika gatunku sekcji (metal dostaje oprawę PNS). */
+/**
+ * Tło nagłówka sekcji premier — grafika gatunku sekcji (metal dostaje oprawę PNS).
+ *
+ * Do 11.09.2026 wszystko, co nie było metalem ani progiem, dostawało tło
+ * jazzowe — bo innych gatunków w premierach po prostu nie było. Odkąd artefakt
+ * przysyła blok „poza kanonem", klasyka z saksofonem w tle wyglądałaby głupio,
+ * więc każdy kod szuka własnej grafiki w public/img/genres.
+ */
+const HERO_NAMES: Record<string, string[]> = {
+  prog: ["prog", "progressive rock"],
+  jazz: ["jazz", "modern jazz"],
+  punk: ["punk", "punk-hardcore"],
+  electronic: ["electronic"],
+  folk: ["folk", "singer-songwriter"],
+  country: ["country", "country-americana"],
+  classical: ["classical", "klasyka"],
+  hiphop: ["hip-hop", "hip hop"],
+  pop: ["pop"],
+};
+
 export function sectionHeroArt(genre: string): string {
   if (genre === "db" || genre === "death") return "/img/pns/friday-red.jpg";
   if (genre === "black" || genre === "other") return "/img/pns/friday-morgue.jpg";
-  return genreImage(genre === "prog" ? "prog" : "jazz") ?? "/img/pns/friday-morgue.jpg";
+  const [first, ...rest] = HERO_NAMES[genre] ?? [genre];
+  return genreImage(first, ...rest) ?? "/img/pns/friday-morgue.jpg";
 }
