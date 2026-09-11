@@ -408,7 +408,9 @@ export async function podrozWNieznane(_prev: unknown, formData: FormData): Promi
     // jakiejkolwiek wskazówki, co ma poprawić.
     if (e instanceof AiError) return { blad: "model", szczegol: e.message };
     console.error("podrozWNieznane:", e);
-    return { blad: "nieznany" };
+    // Nawet gdy nie wiemy, co to było, człowiek dostaje zdanie z wyjątku.
+    // „Coś poszło nie tak" bez niczego więcej nie mówi ani jemu, ani nam.
+    return { blad: "nieznany", szczegol: e instanceof Error ? e.message : String(e) };
   }
   if (!wynik.przystanki.length) return { blad: wynik.awaria ? "mbAwaria" : "pusto" };
 
