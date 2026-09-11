@@ -21,8 +21,12 @@ export const dynamic = "force-dynamic";
  * składy. Tu piszesz, czego chcesz posłuchać, i dostajesz listę płyt do
  * sprawdzenia. Model proponuje, MusicBrainz potwierdza — patrz podroz-nieznane.ts.
  */
-export default async function NieznanePage() {
+export default async function NieznanePage({ searchParams }: { searchParams: Promise<{ opis?: string }> }) {
   const { t } = await i18n();
+  // Opis z adresu: wracając z gotowej podróży, człowiek dostaje swoje zdanie
+  // w polu i poprawia je, zamiast pisać od nowa. Bez tego „to nie to, czego
+  // chciałem" kończyło się przepisywaniem wszystkiego ręcznie.
+  const opis = (await searchParams).opis?.slice(0, 2000) ?? "";
   const user = await currentUser();
   const lead = leadStyle(user ? await getGenres(user.id) : []);
 
@@ -39,7 +43,7 @@ export default async function NieznanePage() {
             <p className="mt-2 font-mono text-xs text-faint">OPENROUTER_API_KEY albo ANTHROPIC_API_KEY</p>
           </div>
         ) : (
-          <FormularzNieznane t={t} />
+          <FormularzNieznane t={t} opis={opis} />
         )}
       </div>
     </>

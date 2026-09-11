@@ -56,6 +56,17 @@ export default async function ListPage({
   return (
     <div className="space-y-6">
       <header>
+        {/* Wyjscie z podrozy. Dotad to byl slepy zaulek: lista sie ulozyla,
+            a stad nie bylo ani drogi powrotnej, ani sposobu, zeby powiedziec
+            „to nie to". Teraz opis wraca do pola i poprawia sie jedno zdanie. */}
+        <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+          <Link href="/podroze" className="text-muted hover:text-accent2">← {t.nav.lists}</Link>
+          {moja && data.list.description && (
+            <Link href={`/podroze/nieznane?opis=${encodeURIComponent(data.list.description)}`} className="text-accent2 hover:text-accent">
+              {t.lists.tryAgain}
+            </Link>
+          )}
+        </div>
         <div className="label">{moja ? t.lists.myListsTitle : t.lists.listBy}</div>
         <h1 className="text-4xl">{data.list.title}</h1>
         {data.list.description && <p className="mt-2 max-w-2xl text-text2">{data.list.description}</p>}
