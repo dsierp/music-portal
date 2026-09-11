@@ -73,7 +73,7 @@ export default async function ListsPage() {
 
   return (
     <div className="space-y-8">
-      <Banner image="/img/winyl.jpg" title={t.lists.bannerTitle} position="center 60%">
+      <Banner image="/img/mapa.jpg" title={t.lists.bannerTitle} position="center 45%">
         <p className="mt-2 text-sm text-muted">
           {t.lists.bannerIntro}<Link href="/premiery" className="underline">{t.lists.weeklyReleasesLink}</Link>
           {fmt(t.lists.bannerConnected, { n: Number(resolved[0]?.n ?? 0) })}
@@ -81,11 +81,19 @@ export default async function ListsPage() {
         </p>
       </Banner>
       <ScreenHelp screen="podroze" />
-      {/* Wejście do podróży „w nieznane". Stoi wysoko, bo to jedyne miejsce
-          w portalu, gdzie nie trzeba wiedzieć, czego się szuka. */}
-      <Link href="/podroze/nieznane" className="card block transition-colors hover:border-accent">
-        <h2 className="text-xl">{t.unknown.title}</h2>
-        <p className="mt-1 text-sm text-muted">{t.unknown.lead}</p>
+      {/* Wejście do podróży „w nieznane".
+          Najpierw była to zwykła ramka z tekstem w środku strony — i okazała
+          się nie do znalezienia: dwa razy szukana, dwa razy przeoczona.
+          Dostaje więc własny baner na górze, z tym samym ciężarem co nagłówki
+          pozostałych ekranów. Sztorm pasuje: to jedyne miejsce w portalu,
+          gdzie wypływa się bez mapy. */}
+      <Link href="/podroze/nieznane" className="group block">
+        <Banner image="/img/statek.jpg" title={t.unknown.title} position="center 45%" compact>
+          <p className="mt-3 max-w-2xl text-text2">{t.unknown.lead}</p>
+          <p className="mt-4 inline-block rounded-full border border-accent/50 px-4 py-1 font-mono text-xs text-accent2 transition-colors group-hover:bg-accent/15">
+            {t.unknown.cta} →
+          </p>
+        </Banner>
       </Link>
       {/* Własne listy najpierw: rankingi portalu są ciekawe, ale to, co człowiek
           sam ułożył (i co dostał od kogoś), jest jego. */}
