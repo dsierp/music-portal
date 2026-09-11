@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { ARTWORK_ROLES, albumCrew, getArtist, getDiscography, getPlayedOn, getProduced, guessRoles, searchArtists, topAlbum, MbError, STRON_DOMYSLNIE } from "@/lib/musicbrainz";
-import { wikiBandMembers, wikiFromLinks, wikiLogo } from "@/lib/wikipedia";
+import { wikiBandMembers, wikiDiscography, wikiFromLinks, wikiLogo } from "@/lib/wikipedia";
 import { MbUnavailable } from "@/components/mb-unavailable";
 import { ScreenHelp } from "@/components/screen-help";
 import { LineupFilter } from "@/components/lineup-filter";
@@ -476,6 +476,23 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
   const nowe = tylkoNoweTytuly(zeSpotify, znaneTytuly);
   const noweWlasne = nowe.filter((a) => a.group === "album");
   const noweGoscinne = nowe.filter((a) => a.group === "appears_on");
+  /**
+   * Dorobek z Wikipedii — tylko wtedy, gdy MusicBrainz naprawdę nic nie ma.
+   *
+   * Powód jest twardy i sprawdzony na żywym API: MusicBrainz wiąże kredyty
+   * producenckie i sesyjne z NAGRANIAMI, a przeglądanie nagrań po artyście
+   * działa wyłącznie przez artist credit. Dla Scotta Burnsa zwraca zero
+   * nagrań, choć ma tam 1591 powiązań — i jedno powiązanie przy wydaniu,
+   * z reedycji z 2010. Tyle widział portal. Bill Andrews z Death nie ma nawet
+   * tego. Wikipedia w obu przypadkach ma listę spisaną ręcznie.
+   *
+   * Dwa zapytania do Wikipedii, bez kolejki po sekundzie na zapytanie, więc
+   * to praktycznie nic nie kosztuje — ale pytamy tylko przy chudej stronie,
+   * bo tam, gdzie MusicBrainz ma komplet, ta lista niczego nie dodaje.
+   */
+  const chudaStrona =
+    artist.isPerson && disco.length + played.length + produced.length + artist.sessionOn.length < 8;
+  const wikiDisco = chudaStrona ? await wikiDiscography(artist.links).catch(() => null) : null;
   const playedByBand = artist.isPerson ? groupByBand(played) : undefined;
   // Płyty pod oś czasu muzyka. NIE z „Grał(a) na płytach": to relacje przy
   // nagraniach, a MusicBrainz ma je tylko dla części zespołów (dla Atheist —
@@ -736,7 +753,36 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
         </section>
       )}
 
-      {!disco.length && !played.length && !produced.length && <p className="mt-8 text-sm text-muted">{t.artist.noReleases}</p>}
+      {wikiDisco && (
+        <section className="mt-8">
+          <h2 className="mb-1 text-2xl">
+            {t.artist.wikiDiscoHeading} <span className="font-mono text-sm text-muted">{wikiDisco.items.length}</span>
+          </h2>
+          <p className="mb-3 text-xs text-muted">{t.artist.wikiDiscoNote}</p>
+          <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
+            {wikiDisco.items.map((w, i) => (
+              <li key={`${w.band ?? ""}-${w.title}-${i}`} className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                {/* Rozwiązujemy MBID DOPIERO po kliknięciu — jedno zapytanie
+                    zamiast kilkudziesięciu przy każdym wejściu na stronę. */}
+                <Link
+                  href={`/go/mb?typ=album&artysta=${encodeURIComponent(w.band ?? artist.name)}&nazwa=${encodeURIComponent(w.title)}`}
+                  className="font-medium hover:text-accent2 hover:underline"
+                >
+                  {w.band ? `${w.band} – ` : ""}<i>{w.title}</i>
+                </Link>
+                {w.year && <span className="font-mono text-[10px] text-faint">{w.year}</span>}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2">
+            <a href={wikiDisco.url} target="_blank" rel="noopener" className="text-xs text-muted hover:text-accent2">
+              {t.artist.wikiDiscoSource}
+            </a>
+          </p>
+        </section>
+      )}
+
+      {!disco.length && !played.length && !produced.length && !wikiDisco && <p className="mt-8 text-sm text-muted">{t.artist.noReleases}</p>}
 
       {artist.workedOn.length > 0 && (
         <section className="mt-8">

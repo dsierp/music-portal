@@ -236,8 +236,9 @@ export async function zaproponujPlyty(opis: string, kontekst: {
     "- Różnicuj: nie więcej niż jedna płyta tego samego artysty.",
     "- `why` to JEDNO zdanie po polsku, konkretne — co w tej płycie odpowiada na opis. Bez przymiotników bez pokrycia.",
     "",
-    "Odpowiadasz WYŁĄCZNIE tablicą JSON, bez komentarza i bez bloku kodu:",
-    '[{"artist":"…","album":"…","why":"…"}]',
+    "Odpowiadasz WYŁĄCZNIE danymi JSON, bez komentarza i bez bloku kodu:",
+    '{"plyty":[{"artist":"…","album":"…","why":"…"}]}',
+    "Nic przed JSON-em i nic po nim.",
   ].join("\n");
 
   const czesci = [`Opis: ${opis.slice(0, 2000)}`];
@@ -268,35 +269,73 @@ function sprobuj(t: string): unknown {
  * ufać, że tym razem nie dopiszą, szukamy pierwszego nawiasu kwadratowego.
  */
 export function parsujPropozycje(tekst: string): Propozycja[] {
-  const start = tekst.indexOf("[");
-  if (start < 0) throw new AiError("Model nie zwrócił listy.", true);
-  const koniec = tekst.lastIndexOf("]");
-
-  let dane: unknown = null;
-  if (koniec > start) dane = sprobuj(tekst.slice(start, koniec + 1));
-
-  /**
-   * Ratowanie URWANEJ odpowiedzi.
-   *
-   * Słabsze modele potrafią zgubić domknięcie albo po prostu wyczerpać limit
-   * znaków w połowie listy — wtedy tekst kończy się w środku obiektu i cała
-   * odpowiedź leci do kosza, choć dziesięć pierwszych pozycji jest w porządku.
-   * Ucinamy więc do ostatniego kompletnego obiektu i domykamy nawias sami.
-   */
-  if (!dane) {
-    const ostatni = tekst.lastIndexOf("}");
-    if (ostatni > start) dane = sprobuj(`${tekst.slice(start, ostatni + 1)}]`);
-  }
-
-  // Nadal nic: to jest wina modelu, nie zapytania — warto spróbować innego.
-  if (!dane) throw new AiError("Odpowiedź modelu nie jest poprawnym JSON-em.", true);
-  if (!Array.isArray(dane)) throw new AiError("Model nie zwrócił listy.", true);
-  return dane
+  const dane = wyluskaj(tekst);
+  if (dane === null) throw new AiError("Odpowiedź modelu nie jest poprawnym JSON-em.", true);
+  const lista = pierwszaTablica(dane);
+  if (!lista) throw new AiError("Model nie zwrócił listy.", true);
+  return lista
     .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
     .map((x) => ({
-      artist: String(x.artist ?? "").trim(),
-      album: String(x.album ?? "").trim(),
-      why: String(x.why ?? "").trim().slice(0, 400),
+      artist: pole(x, ["artist", "artysta", "band", "zespol", "zespół", "wykonawca"]),
+      album: pole(x, ["album", "tytul", "tytuł", "title", "plyta", "płyta", "record"]),
+      why: pole(x, ["why", "dlaczego", "powod", "powód", "reason", "note"]).slice(0, 400),
     }))
     .filter((p) => p.artist && p.album);
+}
+
+/** Pierwsze niepuste z kilku możliwych nazw pola. Modele nie trzymają się jednej. */
+function pole(x: Record<string, unknown>, nazwy: string[]): string {
+  for (const n of nazwy) {
+    const v = x[n];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return "";
+}
+
+/**
+ * Wyłuskuje JSON z odpowiedzi — cokolwiek model dokleił dookoła.
+ *
+ * Kolejność prób jest od najczystszej do najbardziej desperackiej, bo słabsze
+ * modele psują to na trzy różne sposoby: opakowują w ```json, dopisują zdanie
+ * przed listą albo po prostu urywają się w połowie, gdy skończą im się znaki.
+ */
+function wyluskaj(tekst: string): unknown {
+  const czysty = tekst.replace(/^\s*```(?:json)?/i, "").replace(/```\s*$/, "").trim();
+  const caly = sprobuj(czysty);
+  if (caly !== null) return caly;
+
+  // Nawias klamrowy ALBO kwadratowy — model równie chętnie zwraca obiekt
+  // z listą w środku, co samą listę, a wcześniej szukaliśmy tylko listy.
+  for (const [o, z] of [["[", "]"], ["{", "}"]] as const) {
+    const start = czysty.indexOf(o);
+    const koniec = czysty.lastIndexOf(z);
+    if (start >= 0 && koniec > start) {
+      const d = sprobuj(czysty.slice(start, koniec + 1));
+      if (d !== null) return d;
+    }
+  }
+
+  /**
+   * Ratowanie URWANEJ odpowiedzi: ucinamy do ostatniego kompletnego obiektu
+   * i domykamy nawias sami. Dziesięć dobrych pozycji jest więcej warte niż
+   * komunikat o błędzie dlatego, że jedenasta się nie zmieściła.
+   */
+  const start = czysty.indexOf("[");
+  const ostatni = czysty.lastIndexOf("}");
+  if (start >= 0 && ostatni > start) {
+    const d = sprobuj(`${czysty.slice(start, ostatni + 1)}]`);
+    if (d !== null) return d;
+  }
+  return null;
+}
+
+/** Tablica z danych — wprost albo schowana w którymś polu obiektu. */
+function pierwszaTablica(dane: unknown): unknown[] | null {
+  if (Array.isArray(dane)) return dane;
+  if (dane && typeof dane === "object") {
+    for (const v of Object.values(dane as Record<string, unknown>)) {
+      if (Array.isArray(v)) return v;
+    }
+  }
+  return null;
 }

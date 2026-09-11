@@ -8,6 +8,8 @@ import { normalizeUserAgent } from "./musicbrainz";
 import { PERSONNEL_HEADING, cleanWikitext, splitPersonnelLine, parseRatingsTemplate } from "./wikitext";
 export { parseRatingsTemplate } from "./wikitext";
 import { parseInfoboxMembers, type InfoboxMembers } from "./wikitext";
+import { DISCOGRAPHY_HEADING, parseDiscographyLine, type DiscoLine } from "./wikitext";
+export type { DiscoLine } from "./wikitext";
 export type { InfoboxMembers };
 import type { PersonnelLine, WikiReview } from "./wikitext";
 export type { PersonnelLine, WikiReview } from "./wikitext";
@@ -185,4 +187,52 @@ export async function wikiBandMembers(links: Links, preferred: string[] = ["pl",
     if (out.current.length || out.past.length) return out;
   }
   return { current: [], past: [] };
+}
+
+/**
+ * Dorobek spisany ręcznie na Wikipedii — trzecie źródło, gdy MusicBrainz milczy.
+ *
+ * MusicBrainz wiąże kredyty producenckie i sesyjne z NAGRANIAMI, a przeglądanie
+ * nagrań po artyście idzie wyłącznie po artist credit. Dla kogoś, kto nigdy nie
+ * jest wykonawcą — producenta, realizatora, bębniarza sesyjnego — to zwraca
+ * zero. Sprawdzone na żywo: Scott Burns ma w MusicBrainz 1591 powiązań przy
+ * nagraniach i jedno przy wydaniu, więc jego strona pokazywała jedną płytę
+ * z 2010 roku. Wikipedia ma wtedy zwykłą listę: „Death – Leprosy (1988)".
+ *
+ * To KOSZTUJE TYLE CO NIC w porównaniu z MusicBrainz: dwa zapytania do
+ * Wikipedii (spis sekcji, potem jedna sekcja), bez kolejki po sekundzie na
+ * zapytanie, i wynik siedzi w buforze przez dwa tygodnie.
+ *
+ * Zwracamy z adresem artykułu, bo taka lista MUSI być podpisana źródłem —
+ * to nie są dane, które portal sam sprawdził.
+ */
+export async function wikiDiscography(
+  links: Links,
+  preferred: string[] = ["en", "pl"],
+): Promise<{ lang: string; title: string; url: string; items: DiscoLine[] } | null> {
+  const titles = await titlesFromLinks(links);
+  for (const lang of preferred) {
+    const title = titles[lang];
+    if (!title) continue;
+    const items = await cached(`wiki:disco:v1:${lang}:${title}`, TTL.wiki, async () => {
+      const sections = await getJson<{ parse?: { sections?: { index: string; line: string }[] } }>(
+        `https://${lang}.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}&prop=sections&format=json&formatversion=2`,
+      );
+      const section = sections?.parse?.sections?.find((s) => DISCOGRAPHY_HEADING.test(s.line.trim()));
+      if (!section) return [] as DiscoLine[];
+      const body = await getJson<{ parse?: { wikitext?: string } }>(
+        `https://${lang}.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}&section=${section.index}&prop=wikitext&format=json&formatversion=2`,
+      );
+      return (body?.parse?.wikitext ?? "")
+        .split("\n")
+        .filter((l) => /^\*/.test(l.trim()))
+        .map(parseDiscographyLine)
+        .filter((l): l is DiscoLine => !!l)
+        .slice(0, 80);
+    }).catch(() => [] as DiscoLine[]);
+    if (items.length) {
+      return { lang, title, url: `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}`, items };
+    }
+  }
+  return null;
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { cookies } from "next/headers";
@@ -362,71 +363,31 @@ export async function journeyFromReleases(formData: FormData) {
   redirect(`/podroz/${lista.id}`);
 }
 
+
 /**
- * „Podróż w nieznane": zdanie → lista płyt → zapisana podróż.
+ * „Podróż w nieznane": zdanie → zadanie w tle → ekran czekania.
  *
- * Model proponuje, MusicBrainz potwierdza, a do bazy trafia zwykła podróż —
- * ta sama tabela co wszystkie inne, więc od razu działa ocenianie, komentarze,
- * dziennik i wysłanie komuś. Uzasadnienie modelu zapisujemy przy pozycji
- * (`note`), a pierwotny opis przy liście (`description`): za tydzień nikt nie
- * pamięta, o co prosił, a to jest połowa wartości tej podróży.
- *
- * Bywa, że trwa to pół minuty — MusicBrainz przepuszcza jedno zapytanie na
- * sekundę, a sprawdzamy kilkanaście pozycji. To świadomy koszt: lepiej
- * poczekać, niż dostać listę płyt, których nie da się otworzyć.
+ * Tu dzieje się wyłącznie to, co szybkie: sprawdzenie opisu, klucza i limitu.
+ * Samo układanie (model + MusicBrainz, około pół minuty) idzie w tle, bo
+ * wcześniej ginęło przy każdym odejściu od ekranu — patrz podroz-zadanie.ts.
  */
 export async function podrozWNieznane(_prev: unknown, formData: FormData): Promise<{ blad?: string; szczegol?: string }> {
   const u = await requireUser();
   const opis = String(formData.get("opis") ?? "").trim().slice(0, 2000);
   if (opis.length < 10) return { blad: "krotki" };
 
-  const { aiSkonfigurowane, AiError } = await import("@/lib/ai");
+  const { aiSkonfigurowane } = await import("@/lib/ai");
   if (!aiSkonfigurowane()) return { blad: "brakKlucza" };
 
   // Limit dzienny. To jedyne miejsce w portalu, które kosztuje właściciela
   // pieniądze przy każdym kliknięciu — bez tego jedna osoba może wydać cudze
-  // saldo, klikając w kółko. Liczymy PRZED wywołaniem modelu; nieudana próba
-  // (np. brak środków u dostawcy) nie podbija licznika, bo podbijamy dopiero
-  // po udanym ułożeniu.
-  const { licznikDzienny, podbijLicznik } = await import("@/lib/cache");
+  // saldo, klikając w kółko.
+  const { licznikDzienny } = await import("@/lib/cache");
   const LIMIT = Number(process.env.PODROZE_DZIENNIE || 5);
   if ((await licznikDzienny(u.id, "nieznane")) >= LIMIT) return { blad: "limit", szczegol: String(LIMIT) };
 
-  const { ulozPodroz } = await import("@/lib/podroz-nieznane");
-  const style = (await ud.getGenres(u.id).catch(() => [])).map((g) => g.genre);
-  // Co już zna: ulubione i ocenione. Bez tego model proponuje rzeczy, które
-  // ten człowiek ma na półce od dwudziestu lat.
-  const zna = (await ud.getLikedAlbums(u.id).catch(() => [])).map((a) => `${a.artistName} – ${a.title}`);
-
-  let wynik;
-  try {
-    wynik = await ulozPodroz(opis, { style, zna });
-  } catch (e) {
-    // Szczegół idzie NA EKRAN, a nie tylko do logów. Komunikaty z ai.ts mówią
-    // wprost, co jest nie tak (odrzucony klucz, brak środków, zły model) —
-    // zwijanie ich do „model nie odpowiedział" zostawiało człowieka bez
-    // jakiejkolwiek wskazówki, co ma poprawić.
-    if (e instanceof AiError) return { blad: "model", szczegol: e.message };
-    console.error("podrozWNieznane:", e);
-    // Nawet gdy nie wiemy, co to było, człowiek dostaje zdanie z wyjątku.
-    // „Coś poszło nie tak" bez niczego więcej nie mówi ani jemu, ani nam.
-    return { blad: "nieznany", szczegol: e instanceof Error ? e.message : String(e) };
-  }
-  if (!wynik.przystanki.length) return { blad: wynik.awaria ? "mbAwaria" : "pusto" };
-
-  await podbijLicznik(u.id, "nieznane");
-  const tytul = opis.length > 60 ? `${opis.slice(0, 57)}…` : opis;
-  const lista = await ud.createList(u.id, tytul, opis);
-  for (const p of wynik.przystanki) {
-    await ud
-      .addToList(u.id, lista.id, {
-        targetType: "ALBUM",
-        targetMbid: p.album.mbid,
-        label: `${p.album.artistText} – ${p.album.title}`.trim(),
-        note: p.why || null,
-      })
-      .catch(() => {});
-  }
-  revalidatePath("/podroze");
-  redirect(`/podroz/${lista.id}`);
+  const { zacznijPodroz } = await import("@/lib/podroz-zadanie");
+  const id = await zacznijPodroz(u.id, opis);
+  redirect(`/podroze/nieznane/${id}`);
 }
+

@@ -193,3 +193,31 @@ export async function podbijLicznik(kto: string, co: string): Promise<number> {
   }
   return teraz;
 }
+
+/**
+ * Zwykły zapis i odczyt pod kluczem — ten sam bufor, bez wywoływania czegokolwiek.
+ *
+ * Po co osobno od `cached`: stan układanej podróży nie jest odpowiedzią żadnego
+ * API, tylko notatką „robię / gotowe / poszło źle", którą pisze jedno żądanie,
+ * a czyta drugie. Bufor pasuje, bo taka notatka MA zniknąć sama — po dobie
+ * nikogo nie obchodzi podróż, której nie doczekał.
+ */
+export async function kvSet(key: string, value: unknown) {
+  try {
+    await db
+      .insert(schema.apiCache)
+      .values({ key, json: value as object, fetchedAt: new Date() })
+      .onConflictDoUpdate({ target: schema.apiCache.key, set: { json: value as object, fetchedAt: new Date() } });
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function kvGet<T>(key: string): Promise<T | null> {
+  try {
+    const hit = await db.query.apiCache.findFirst({ where: eq(schema.apiCache.key, key) });
+    return (hit?.json as T) ?? null;
+  } catch {
+    return null;
+  }
+}

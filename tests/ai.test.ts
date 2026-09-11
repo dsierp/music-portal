@@ -34,3 +34,13 @@ test("niedajaca sie odczytac odpowiedz prosi o inny model", () => {
     assert.equal((e as AiError).doPodmiany, true);
   }
 });
+
+test("bierze liste schowana w obiekcie", () => {
+  const p = parsujPropozycje('Prosze bardzo:\n```json\n{"plyty":[{"artist":"Coroner","album":"Mental Vortex","why":"a"}]}\n```');
+  assert.deepEqual(p.map((x) => x.album), ["Mental Vortex"]);
+});
+
+test("rozumie polskie nazwy pol", () => {
+  const p = parsujPropozycje('[{"artysta":"Voivod","tytul":"Nothingface","dlaczego":"b"}]');
+  assert.deepEqual(p, [{ artist: "Voivod", album: "Nothingface", why: "b" }]);
+});

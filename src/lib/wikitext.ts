@@ -173,3 +173,55 @@ export function parseInfoboxMembers(wikitext: string): InfoboxMembers {
   };
   return { current: osoby(znajdz(POLA_OBECNI)), past: osoby(znajdz(POLA_DAWNI)) };
 }
+
+// ---------- dyskografia z Wikipedii ----------
+
+/**
+ * Nagłówek sekcji z dorobkiem.
+ *
+ * DLACZEGO TO W OGÓLE ISTNIEJE: MusicBrainz wiąże kredyty produkcyjne
+ * i sesyjne z NAGRANIAMI, a przeglądanie nagrań po artyście działa wyłącznie
+ * przez artist credit — czyli dla producenta i dla muzyka sesyjnego zwraca
+ * pustkę. Scott Burns ma tam 1591 powiązań przy nagraniach i dokładnie JEDNO
+ * przy wydaniu, więc portal pokazywał jedną płytę. Bill Andrews (Death) nie ma
+ * żadnego. Wikipedia w obu przypadkach ma zwykłą, ręcznie spisaną listę płyt.
+ */
+export const DISCOGRAPHY_HEADING = /^(dyskografia|discography|selected discography|production credits|credits|albums? produced|production discography)/i;
+
+export interface DiscoLine {
+  /** Zespół, jeśli linia go podaje ("Death – Leprosy"). */
+  band: string | null;
+  title: string;
+  year: string | null;
+}
+
+/** Ogonek w rodzaju „EP", „(reissue)", przecinkowe dopiski — do odcięcia z tytułu. */
+const OGON = /\s+(EP|LP|demo|single|kompilacja|compilation)\.?$/i;
+
+/**
+ * „Death – ''Leprosy'' (1988)" → {band, title, year}.
+ *
+ * Rok jest jedynym twardym warunkiem. Bez niego w listę wpadają zdania
+ * wprowadzające, nagłówki wytwórni i przypisy — a wtedy sekcja przestaje być
+ * dyskografią i robi się śmietnikiem.
+ */
+export function parseDiscographyLine(surowa: string): DiscoLine | null {
+  const linia = cleanWikitext(surowa.replace(/^\*+/, "")).trim();
+  if (linia.length < 4 || linia.length > 200) return null;
+  const rok = linia.match(/\((\d{4})(?:[^)]*)\)\s*$/) ?? linia.match(/\b(19\d{2}|20\d{2})\b/);
+  if (!rok) return null;
+  let reszta = linia.replace(/\s*\((\d{4})[^)]*\)\s*$/, "").trim();
+  // Wariant „1988 – Death – Leprosy": rok z przodu.
+  reszta = reszta.replace(/^(19\d{2}|20\d{2})\s*[–—:-]\s*/, "").trim();
+  const czesci = reszta.split(/\s+[–—]\s+|\s+-\s+/);
+  let band: string | null = null;
+  let title = reszta;
+  if (czesci.length >= 2) {
+    band = czesci[0].trim();
+    title = czesci.slice(1).join(" – ").trim();
+  }
+  title = title.replace(OGON, "").replace(/^["„”']|["„”']$/g, "").trim();
+  if (!title || title.length > 120) return null;
+  if (band && (band.length > 60 || band.split(/\s+/).length > 6)) return null;
+  return { band, title, year: rok[1] };
+}
