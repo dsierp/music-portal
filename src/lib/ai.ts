@@ -22,6 +22,26 @@
 /** Model do zmiany bez ruszania kodu — inny dla każdego dostawcy. */
 const MODEL_ANTHROPIC = process.env.ANTHROPIC_MODEL || "claude-3-5-haiku-latest";
 const MODEL_OPENROUTER = process.env.OPENROUTER_MODEL || "anthropic/claude-3.5-haiku";
+
+/**
+ * Modele awaryjne u OpenRoutera — próbowane po kolei, gdy ten właściwy odmówi
+ * z powodu PIENIĘDZY albo NIEISTNIENIA (402 / 404).
+ *
+ * Po co: konto bez doładowania dostaje 402 na każdym płatnym modelu i ekran
+ * jest martwy, choć klucz jest dobry. Modele z końcówką `:free` nic nie
+ * kosztują (mają za to dzienny limit), więc portal ma czym oddychać, zanim
+ * ktokolwiek cokolwiek doładuje. Lista jest kilkuelementowa świadomie —
+ * identyfikatory u OpenRoutera bywają wycofywane i wtedy 404 zdejmuje jeden,
+ * a nie całą funkcję.
+ *
+ * Do niszowej muzyki te modele są słabsze niż Haiku. To jest rozruch, nie cel.
+ */
+const MODELE_ZAPASOWE = [
+  "meta-llama/llama-3.3-70b-instruct:free",
+  "google/gemini-2.0-flash-exp:free",
+  "qwen/qwen-2.5-72b-instruct:free",
+  "mistralai/mistral-small-3.1-24b-instruct:free",
+];
 const API_ANTHROPIC = "https://api.anthropic.com/v1/messages";
 const API_OPENROUTER = "https://openrouter.ai/api/v1/chat/completions";
 
@@ -52,7 +72,31 @@ async function zapytaj(system: string, tresc: string): Promise<string> {
   const ant = process.env.ANTHROPIC_API_KEY;
   if (!or && !ant) throw new AiError("Brak klucza do modelu (OPENROUTER_API_KEY albo ANTHROPIC_API_KEY).");
 
-  const [url, naglowki, body, model] = or
+  // U Anthropic nie ma czego podmieniać — jeden model, jeden strzał.
+  if (!or) return jedenStrzal(system, tresc, MODEL_ANTHROPIC);
+
+  // U OpenRoutera: najpierw model właściwy, potem darmowe, gdy odmówi
+  // z powodu pieniędzy albo nieistnienia. Każdy inny błąd przerywa od razu —
+  // przy odrzuconym kluczu (401) ponawianie na innym modelu nic nie da.
+  const doProbowania = [MODEL_OPENROUTER, ...MODELE_ZAPASOWE.filter((m) => m !== MODEL_OPENROUTER)];
+  let ostatni: AiError | null = null;
+  for (const m of doProbowania) {
+    try {
+      return await jedenStrzal(system, tresc, m);
+    } catch (e) {
+      if (!(e instanceof AiError) || !e.doPodmiany) throw e;
+      ostatni = e;
+    }
+  }
+  throw ostatni ?? new AiError("Żaden model nie odpowiedział.");
+}
+
+/** Jedno podejście do konkretnego modelu. */
+async function jedenStrzal(system: string, tresc: string, model: string): Promise<string> {
+  const or = process.env.OPENROUTER_API_KEY;
+  const ant = process.env.ANTHROPIC_API_KEY;
+
+  const [url, naglowki, body] = or
     ? [
         API_OPENROUTER,
         {
@@ -62,14 +106,13 @@ async function zapytaj(system: string, tresc: string): Promise<string> {
           "X-Title": "Pure New Shit",
         },
         {
-          model: MODEL_OPENROUTER,
+          model,
           max_tokens: 2000,
           messages: [
             { role: "system", content: system },
             { role: "user", content: tresc },
           ],
         },
-        MODEL_OPENROUTER,
       ]
     : [
         API_ANTHROPIC,
@@ -79,12 +122,11 @@ async function zapytaj(system: string, tresc: string): Promise<string> {
           "anthropic-version": "2023-06-01",
         },
         {
-          model: MODEL_ANTHROPIC,
+          model,
           max_tokens: 2000,
           system,
           messages: [{ role: "user", content: tresc }],
         },
-        MODEL_ANTHROPIC,
       ];
 
   const res = await fetch(url, {
@@ -101,8 +143,9 @@ async function zapytaj(system: string, tresc: string): Promise<string> {
     // 404 na modelu to najczęściej literówka albo model niedostępny dla konta;
     // 402 u OpenRoutera to pusty portfel. Mówimy to wprost, bo inaczej jedno
     // i drugie wygląda jak awaria portalu.
-    if (res.status === 404) throw new AiError(`Model „${model}" jest niedostępny dla tego klucza.`);
-    if (res.status === 402) throw new AiError("Konto u dostawcy modelu nie ma środków.");
+    if (res.status === 404) throw new AiError(`Model „${model}" jest niedostępny dla tego klucza.`, true);
+    if (res.status === 402) throw new AiError(`Konto nie ma środków na model „${model}".`, true);
+    if (res.status === 429) throw new AiError(`Model „${model}" ma wyczerpany limit.`, true);
     if (res.status === 401) throw new AiError("Klucz do modelu został odrzucony.");
     throw new AiError(`Model odpowiedział błędem ${res.status}. ${tekst.slice(0, 200)}`);
   }
@@ -115,7 +158,14 @@ async function zapytaj(system: string, tresc: string): Promise<string> {
   return (dane.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("");
 }
 
-export class AiError extends Error {}
+export class AiError extends Error {
+  /** czy warto spróbować innego modelu — brak środków, brak modelu, limit */
+  readonly doPodmiany: boolean;
+  constructor(message: string, doPodmiany = false) {
+    super(message);
+    this.doPodmiany = doPodmiany;
+  }
+}
 
 /** Jedna propozycja od modelu — jeszcze NIEPOTWIERDZONA. */
 export interface Propozycja {
