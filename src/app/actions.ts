@@ -375,7 +375,7 @@ export async function journeyFromReleases(formData: FormData) {
  * sekundę, a sprawdzamy kilkanaście pozycji. To świadomy koszt: lepiej
  * poczekać, niż dostać listę płyt, których nie da się otworzyć.
  */
-export async function podrozWNieznane(_prev: unknown, formData: FormData): Promise<{ blad?: string }> {
+export async function podrozWNieznane(_prev: unknown, formData: FormData): Promise<{ blad?: string; szczegol?: string }> {
   const u = await requireUser();
   const opis = String(formData.get("opis") ?? "").trim().slice(0, 2000);
   if (opis.length < 10) return { blad: "krotki" };
@@ -393,7 +393,12 @@ export async function podrozWNieznane(_prev: unknown, formData: FormData): Promi
   try {
     wynik = await ulozPodroz(opis, { style, zna });
   } catch (e) {
-    if (e instanceof AiError) return { blad: "model" };
+    // Szczegół idzie NA EKRAN, a nie tylko do logów. Komunikaty z ai.ts mówią
+    // wprost, co jest nie tak (odrzucony klucz, brak środków, zły model) —
+    // zwijanie ich do „model nie odpowiedział" zostawiało człowieka bez
+    // jakiejkolwiek wskazówki, co ma poprawić.
+    if (e instanceof AiError) return { blad: "model", szczegol: e.message };
+    console.error("podrozWNieznane:", e);
     return { blad: "nieznany" };
   }
   if (!wynik.przystanki.length) return { blad: wynik.awaria ? "mbAwaria" : "pusto" };

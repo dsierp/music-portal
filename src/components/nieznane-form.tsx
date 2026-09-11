@@ -25,7 +25,7 @@ function Przycisk({ t }: { t: Dict }) {
 }
 
 export function FormularzNieznane({ t }: { t: Dict }) {
-  const [stan, akcja] = useActionState(podrozWNieznane, {} as { blad?: string });
+  const [stan, akcja] = useActionState(podrozWNieznane, {} as { blad?: string; szczegol?: string });
   const bledy = t.unknown.errors as Record<string, string>;
 
   return (
@@ -43,7 +43,15 @@ export function FormularzNieznane({ t }: { t: Dict }) {
         <Przycisk t={t} />
         <span className="text-xs text-faint">{t.unknown.slowNote}</span>
       </div>
-      {stan?.blad && <p className="text-sm text-warn">{bledy[stan.blad] ?? bledy.nieznany}</p>}
+      {stan?.blad && (
+        <div className="text-sm text-warn">
+          <p>{bledy[stan.blad] ?? bledy.nieznany}</p>
+          {/* Bez tego każdy problem z modelem wygląda tak samo — a różnica
+              między „zły klucz" a „brak środków" to różnica między dwiema
+              zupełnie innymi rzeczami do zrobienia. */}
+          {stan.szczegol && <p className="mt-1 font-mono text-xs text-faint">{stan.szczegol}</p>}
+        </div>
+      )}
 
       <div className="pt-4">
         <p className="label mb-2">{t.unknown.examplesLabel}</p>
