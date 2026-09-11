@@ -153,3 +153,43 @@ export const TTL = {
   lookup: 60 * 60 * 24 * 7, // 7 dni
   wiki: 60 * 60 * 24 * 14,
 };
+
+/**
+ * Licznik dzienny — ile razy ktoś skorzystał z czegoś płatnego.
+ *
+ * Po co: „podróż w nieznane" woła model językowy, a to kosztuje właściciela
+ * portalu przy każdym kliknięciu. Bez limitu jedna osoba (albo jeden bot na
+ * czyimś koncie) może wydać cudze pieniądze, klikając w kółko.
+ *
+ * Siedzi w tym samym buforze co reszta, bo to dane, które MAJĄ wygasnąć —
+ * klucz zawiera datę, więc wczorajszy licznik nikogo nie obchodzi i zniknie
+ * przy najbliższym sprzątaniu. Awaria bazy przepuszcza (zwraca 0): lepiej
+ * pozwolić na jedno zapytanie za dużo niż zablokować ekran przez kłopot,
+ * który nie ma z nim nic wspólnego.
+ */
+export async function licznikDzienny(kto: string, co: string): Promise<number> {
+  const dzis = new Date().toISOString().slice(0, 10);
+  const key = `limit:${co}:${dzis}:${kto}`;
+  try {
+    const hit = await db.query.apiCache.findFirst({ where: eq(schema.apiCache.key, key) });
+    return Number((hit?.json as { n?: number })?.n ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
+/** Podbija licznik z `licznikDzienny` i zwraca nową wartość. */
+export async function podbijLicznik(kto: string, co: string): Promise<number> {
+  const dzis = new Date().toISOString().slice(0, 10);
+  const key = `limit:${co}:${dzis}:${kto}`;
+  const teraz = (await licznikDzienny(kto, co)) + 1;
+  try {
+    await db
+      .insert(schema.apiCache)
+      .values({ key, json: { n: teraz } as object, fetchedAt: new Date() })
+      .onConflictDoUpdate({ target: schema.apiCache.key, set: { json: { n: teraz } as object, fetchedAt: new Date() } });
+  } catch {
+    /* ignore */
+  }
+  return teraz;
+}

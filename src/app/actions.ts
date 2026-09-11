@@ -383,6 +383,15 @@ export async function podrozWNieznane(_prev: unknown, formData: FormData): Promi
   const { aiSkonfigurowane, AiError } = await import("@/lib/ai");
   if (!aiSkonfigurowane()) return { blad: "brakKlucza" };
 
+  // Limit dzienny. To jedyne miejsce w portalu, które kosztuje właściciela
+  // pieniądze przy każdym kliknięciu — bez tego jedna osoba może wydać cudze
+  // saldo, klikając w kółko. Liczymy PRZED wywołaniem modelu; nieudana próba
+  // (np. brak środków u dostawcy) nie podbija licznika, bo podbijamy dopiero
+  // po udanym ułożeniu.
+  const { licznikDzienny, podbijLicznik } = await import("@/lib/cache");
+  const LIMIT = Number(process.env.PODROZE_DZIENNIE || 5);
+  if ((await licznikDzienny(u.id, "nieznane")) >= LIMIT) return { blad: "limit", szczegol: String(LIMIT) };
+
   const { ulozPodroz } = await import("@/lib/podroz-nieznane");
   const style = (await ud.getGenres(u.id).catch(() => [])).map((g) => g.genre);
   // Co już zna: ulubione i ocenione. Bez tego model proponuje rzeczy, które
@@ -403,6 +412,7 @@ export async function podrozWNieznane(_prev: unknown, formData: FormData): Promi
   }
   if (!wynik.przystanki.length) return { blad: wynik.awaria ? "mbAwaria" : "pusto" };
 
+  await podbijLicznik(u.id, "nieznane");
   const tytul = opis.length > 60 ? `${opis.slice(0, 57)}…` : opis;
   const lista = await ud.createList(u.id, tytul, opis);
   for (const p of wynik.przystanki) {

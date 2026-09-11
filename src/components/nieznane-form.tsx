@@ -45,11 +45,11 @@ export function FormularzNieznane({ t }: { t: Dict }) {
       </div>
       {stan?.blad && (
         <div className="text-sm text-warn">
-          <p>{bledy[stan.blad] ?? bledy.nieznany}</p>
+          <p>{(bledy[stan.blad] ?? bledy.nieznany).replace("{n}", stan.szczegol ?? "")}</p>
           {/* Bez tego każdy problem z modelem wygląda tak samo — a różnica
               między „zły klucz" a „brak środków" to różnica między dwiema
               zupełnie innymi rzeczami do zrobienia. */}
-          {stan.szczegol && <p className="mt-1 font-mono text-xs text-faint">{stan.szczegol}</p>}
+          {stan.szczegol && stan.blad !== "limit" && <p className="mt-1 font-mono text-xs text-faint">{stan.szczegol}</p>}
         </div>
       )}
 

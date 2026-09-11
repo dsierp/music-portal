@@ -26,6 +26,7 @@ const pl = {
   noKey: "Ten ekran potrzebuje klucza do modelu językowego. Bez niego reszta portalu działa normalnie.",
   errors: {
     krotki: "Napisz trochę więcej — z dwóch słów nic nie ułożę.",
+    limit: "Na dziś koniec — możesz ułożyć {n} podróży dziennie. Każda woła model językowy, a to kosztuje. Wróć jutro.",
     brakKlucza: "Model nie jest skonfigurowany.",
     model: "Model nie odpowiedział. Spróbuj jeszcze raz za chwilę.",
     mbAwaria: "MusicBrainz chwilowo nie odpowiada, więc nie mam czym potwierdzić propozycji. Spróbuj za chwilę.",
@@ -53,6 +54,7 @@ const en: T = {
   noKey: "This screen needs a language-model key. Without it the rest of the portal works as usual.",
   errors: {
     krotki: "Write a bit more — two words aren't enough to go on.",
+    limit: "That's it for today — {n} journeys a day. Each one calls a language model, and that costs money. Come back tomorrow.",
     brakKlucza: "The model isn't configured.",
     model: "The model didn't answer. Try again in a moment.",
     mbAwaria: "MusicBrainz isn't answering, so there's nothing to confirm the suggestions against. Try again shortly.",
@@ -79,6 +81,7 @@ const es: T = {
   noKey: "Esta pantalla necesita una clave de modelo de lenguaje. Sin ella el resto del portal funciona igual.",
   errors: {
     krotki: "Escribe un poco más: con dos palabras no puedo armar nada.",
+    limit: "Por hoy basta: {n} viajes al día. Cada uno llama a un modelo de lenguaje y eso cuesta. Vuelve mañana.",
     brakKlucza: "El modelo no está configurado.",
     model: "El modelo no respondió. Inténtalo de nuevo en un momento.",
     mbAwaria: "MusicBrainz no responde, así que no tengo con qué confirmar las propuestas. Inténtalo en un rato.",
@@ -105,6 +108,7 @@ const de: T = {
   noKey: "Dieser Bildschirm braucht einen Schlüssel für das Sprachmodell. Ohne ihn läuft der Rest des Portals wie gewohnt.",
   errors: {
     krotki: "Schreib etwas mehr — aus zwei Wörtern lässt sich nichts bauen.",
+    limit: "Für heute Schluss — {n} Reisen pro Tag. Jede ruft ein Sprachmodell auf, und das kostet. Komm morgen wieder.",
     brakKlucza: "Das Modell ist nicht konfiguriert.",
     model: "Das Modell hat nicht geantwortet. Versuch es gleich noch einmal.",
     mbAwaria: "MusicBrainz antwortet gerade nicht, also fehlt die Bestätigung für die Vorschläge. Versuch es später.",
