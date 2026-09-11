@@ -176,11 +176,16 @@ export default async function Home() {
       </Banner>
       <ScreenHelp screen="start" />
 
+      {/* Lewa kolumna to jedno pudełko, a nie trzy komórki siatki.
+          Dotad "zmiany w skladach", premiery i pasek boczny byly trzema
+          dziecmi tej samej siatki — dopoki zmiany zwracaly null, premiery
+          wskakiwaly w szeroka kolumne i wszystko wygladalo dobrze. Gdy zmiany
+          zaczely renderowac sie zawsze (takze puste), zajely szeroka kolumne
+          i zepchnely premiery do paska 320 px: tytuly lamaly sie po jednym
+          slowie, a przyciski wchodzily na tekst. Teraz kolejnosc w kolumnie
+          nie rusza szerokosci. */}
       <div className="grid gap-10 lg:grid-cols-[1fr_320px]">
-        <Suspense fallback={<p className="font-mono text-xs text-muted">{t.home.lineupLoading}</p>}>
-          <LineupNews bands={newsBands} favorites={favMbids} zalogowany={!!user} t={t.home} />
-        </Suspense>
-
+        <div className="space-y-10">
         <section>
           <div className="flex items-baseline justify-between">
             <h2 className="text-3xl">{prefSections ? t.home.releasesForYou : t.home.releasesThisWeek}</h2>
@@ -212,6 +217,13 @@ export default async function Home() {
           })}
           {!stars.length && <p className="mt-3 text-sm text-muted">{t.home.noReleasesBefore}<code>npm run import:pns</code>{t.home.noReleasesAfter}</p>}
         </section>
+
+        {/* Zmiany skladow POD premierami: to jest powod, zeby wrocic, ale nie
+            pierwsza rzecz, po ktora sie tu przychodzi. */}
+        <Suspense fallback={<p className="font-mono text-xs text-muted">{t.home.lineupLoading}</p>}>
+          <LineupNews bands={newsBands} favorites={favMbids} zalogowany={!!user} t={t.home} />
+        </Suspense>
+        </div>
 
         <aside className="space-y-6">
           {user && spotifyConfigured() && (
