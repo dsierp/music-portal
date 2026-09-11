@@ -7,17 +7,112 @@
  * bez przejścia przez `findAlbumMbid`. Portal z założenia nie buduje własnej
  * bazy wiedzy; tu też nie zaczynamy.
  *
- * Klucz siedzi w ANTHROPIC_API_KEY (Vercel → Settings → Environment Variables
- * albo .env.local na maszynie). Bez klucza portal działa normalnie — ekran
- * „w nieznane" po prostu mówi, że jest nieskonfigurowany, zamiast się wywalać.
+ * DWAJ DOSTAWCY, JEDEN INTERFEJS. Portal umie gadać albo wprost z Anthropic,
+ * albo przez OpenRouter — ten drugi daje jeden klucz do wielu modeli, więc da
+ * się przełączać model samą zmienną środowiskową, bez ruszania kodu. Wybiera
+ * ten, na który jest klucz; gdy są oba, wygrywa OpenRouter (ustawiono go
+ * świadomie, a ANTHROPIC_API_KEY bywa w środowisku z innych powodów).
+ *
+ * Klucze: OPENROUTER_API_KEY albo ANTHROPIC_API_KEY (Vercel → Settings →
+ * Environment Variables, albo .env.local na maszynie). Bez żadnego portal
+ * działa normalnie — ekran „w nieznane" mówi, że jest nieskonfigurowany,
+ * zamiast się wywalać.
  */
 
-/** Model do zmiany bez ruszania kodu — gdyby konto nie miało akurat tego. */
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-3-5-haiku-latest";
-const API = "https://api.anthropic.com/v1/messages";
+/** Model do zmiany bez ruszania kodu — inny dla każdego dostawcy. */
+const MODEL_ANTHROPIC = process.env.ANTHROPIC_MODEL || "claude-3-5-haiku-latest";
+const MODEL_OPENROUTER = process.env.OPENROUTER_MODEL || "anthropic/claude-3.5-haiku";
+const API_ANTHROPIC = "https://api.anthropic.com/v1/messages";
+const API_OPENROUTER = "https://openrouter.ai/api/v1/chat/completions";
+
+/** Adres portalu — OpenRouter prosi o niego w nagłówkach, do statystyk. */
+const SKAD = process.env.NEXT_PUBLIC_SITE_URL || "https://music-travel.app";
 
 export function aiSkonfigurowane(): boolean {
-  return !!process.env.ANTHROPIC_API_KEY;
+  return !!(process.env.OPENROUTER_API_KEY || process.env.ANTHROPIC_API_KEY);
+}
+
+/** Który dostawca obsłuży zapytanie — do pokazania w logach i diagnostyce. */
+export function ktoryModel(): string | null {
+  if (process.env.OPENROUTER_API_KEY) return `openrouter:${MODEL_OPENROUTER}`;
+  if (process.env.ANTHROPIC_API_KEY) return `anthropic:${MODEL_ANTHROPIC}`;
+  return null;
+}
+
+/**
+ * Jedno zapytanie do modelu. Zwraca goły tekst odpowiedzi.
+ *
+ * Cała różnica między dostawcami siedzi tutaj: Anthropic ma osobne pole
+ * `system` i treść w `content[]`, OpenRouter (zgodny z OpenAI) wkłada rolę
+ * systemową jako pierwszą wiadomość i zwraca `choices[0].message.content`.
+ * Wyżej nikt już o tym nie wie.
+ */
+async function zapytaj(system: string, tresc: string): Promise<string> {
+  const or = process.env.OPENROUTER_API_KEY;
+  const ant = process.env.ANTHROPIC_API_KEY;
+  if (!or && !ant) throw new AiError("Brak klucza do modelu (OPENROUTER_API_KEY albo ANTHROPIC_API_KEY).");
+
+  const [url, naglowki, body, model] = or
+    ? [
+        API_OPENROUTER,
+        {
+          "content-type": "application/json",
+          authorization: `Bearer ${or}`,
+          "HTTP-Referer": SKAD,
+          "X-Title": "Pure New Shit",
+        },
+        {
+          model: MODEL_OPENROUTER,
+          max_tokens: 2000,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: tresc },
+          ],
+        },
+        MODEL_OPENROUTER,
+      ]
+    : [
+        API_ANTHROPIC,
+        {
+          "content-type": "application/json",
+          "x-api-key": ant!,
+          "anthropic-version": "2023-06-01",
+        },
+        {
+          model: MODEL_ANTHROPIC,
+          max_tokens: 2000,
+          system,
+          messages: [{ role: "user", content: tresc }],
+        },
+        MODEL_ANTHROPIC,
+      ];
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: naglowki as Record<string, string>,
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(60_000),
+  }).catch((e) => {
+    throw new AiError(`Nie udało się połączyć z modelem: ${e instanceof Error ? e.message : e}`);
+  });
+
+  if (!res.ok) {
+    const tekst = await res.text().catch(() => "");
+    // 404 na modelu to najczęściej literówka albo model niedostępny dla konta;
+    // 402 u OpenRoutera to pusty portfel. Mówimy to wprost, bo inaczej jedno
+    // i drugie wygląda jak awaria portalu.
+    if (res.status === 404) throw new AiError(`Model „${model}" jest niedostępny dla tego klucza.`);
+    if (res.status === 402) throw new AiError("Konto u dostawcy modelu nie ma środków.");
+    if (res.status === 401) throw new AiError("Klucz do modelu został odrzucony.");
+    throw new AiError(`Model odpowiedział błędem ${res.status}. ${tekst.slice(0, 200)}`);
+  }
+
+  const dane = (await res.json()) as {
+    content?: { type: string; text?: string }[];
+    choices?: { message?: { content?: string } }[];
+  };
+  if (dane.choices) return dane.choices[0]?.message?.content ?? "";
+  return (dane.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("");
 }
 
 export class AiError extends Error {}
@@ -43,9 +138,6 @@ export async function zaproponujPlyty(opis: string, kontekst: {
   /** ile pozycji poprosić — bierzemy z zapasem, bo część nie przejdzie weryfikacji */
   ile?: number;
 }): Promise<Propozycja[]> {
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) throw new AiError("Brak ANTHROPIC_API_KEY.");
-
   const ile = kontekst.ile ?? 15;
   const system = [
     "Jesteś doradcą muzycznym w portalu dla ludzi słuchających metalu, proga i jazzu.",
@@ -66,37 +158,7 @@ export async function zaproponujPlyty(opis: string, kontekst: {
   if (kontekst.zna?.length) czesci.push(`To już zna — NIE proponuj tego: ${kontekst.zna.slice(0, 60).join("; ")}`);
   czesci.push(`Podaj ${ile} pozycji.`);
 
-  const res = await fetch(API, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": key,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 2000,
-      system,
-      messages: [{ role: "user", content: czesci.join("\n\n") }],
-    }),
-    signal: AbortSignal.timeout(60_000),
-  }).catch((e) => {
-    throw new AiError(`Nie udało się połączyć z modelem: ${e instanceof Error ? e.message : e}`);
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    // 404 na modelu to najczęściej literówka albo model niedostępny dla konta —
-    // mówimy to wprost, bo inaczej wygląda jak awaria portalu.
-    throw new AiError(
-      res.status === 404
-        ? `Model „${MODEL}" jest niedostępny dla tego klucza. Ustaw ANTHROPIC_MODEL na inny.`
-        : `Model odpowiedział błędem ${res.status}. ${body.slice(0, 200)}`,
-    );
-  }
-
-  const dane = (await res.json()) as { content?: { type: string; text?: string }[] };
-  const tekst = (dane.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("");
+  const tekst = await zapytaj(system, czesci.join("\n\n"));
   return parsujPropozycje(tekst);
 }
 

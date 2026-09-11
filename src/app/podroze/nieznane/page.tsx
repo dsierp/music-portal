@@ -36,7 +36,7 @@ export default async function NieznanePage() {
           /* Bez klucza ekran nie udaje, że działa — mówi, czego brakuje. */
           <div className="card">
             <p className="text-sm text-warn">{t.unknown.noKey}</p>
-            <p className="mt-2 font-mono text-xs text-faint">ANTHROPIC_API_KEY</p>
+            <p className="mt-2 font-mono text-xs text-faint">OPENROUTER_API_KEY albo ANTHROPIC_API_KEY</p>
           </div>
         ) : (
           <FormularzNieznane t={t} />
