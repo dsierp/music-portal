@@ -67,6 +67,42 @@ export function ktoryModel(): string | null {
  * systemową jako pierwszą wiadomość i zwraca `choices[0].message.content`.
  * Wyżej nikt już o tym nie wie.
  */
+/**
+ * Darmowe modele PROSTO OD OPENROUTERA, zamiast zgadywania identyfikatorów.
+ *
+ * Lista `MODELE_ZAPASOWE` była wpisana z pamięci i cała poszła na 404 —
+ * identyfikatory u OpenRoutera powstają i znikają, więc każda taka lista
+ * starzeje się od dnia zapisania. Katalog modeli jest publiczny i nie wymaga
+ * klucza, więc pytamy o niego i bierzemy te z zerową ceną.
+ *
+ * Wynik trzymamy w buforze na dobę: katalog ma ponad trzysta pozycji i nie ma
+ * powodu ciągnąć go przy każdej podróży.
+ */
+async function darmoweModele(): Promise<string[]> {
+  try {
+    const { cached, TTL } = await import("./cache");
+    return await cached("openrouter:free-models:v1", TTL.lookup, async () => {
+      const res = await fetch("https://openrouter.ai/api/v1/models", { signal: AbortSignal.timeout(15_000) });
+      if (!res.ok) return [];
+      const dane = (await res.json()) as { data?: { id: string; pricing?: { prompt?: string; completion?: string } }[] };
+      return (dane.data ?? [])
+        .filter((m) => Number(m.pricing?.prompt ?? 1) === 0 && Number(m.pricing?.completion ?? 1) === 0)
+        // Większe modele najpierw — przy niszowej muzyce mniejsze zwyczajnie
+        // nie mają czego zaproponować.
+        .map((m) => m.id)
+        .sort((a, b) => rozmiar(b) - rozmiar(a))
+        .slice(0, 6);
+    });
+  } catch {
+    return [];
+  }
+}
+
+/** Liczba miliardów parametrów z nazwy modelu; 0, gdy nazwa nic nie mówi. */
+function rozmiar(id: string): number {
+  return Number(id.match(/(\d+)b\b/i)?.[1] ?? 0);
+}
+
 async function zapytaj(system: string, tresc: string): Promise<string> {
   const or = process.env.OPENROUTER_API_KEY;
   const ant = process.env.ANTHROPIC_API_KEY;
@@ -78,7 +114,8 @@ async function zapytaj(system: string, tresc: string): Promise<string> {
   // U OpenRoutera: najpierw model właściwy, potem darmowe, gdy odmówi
   // z powodu pieniędzy albo nieistnienia. Każdy inny błąd przerywa od razu —
   // przy odrzuconym kluczu (401) ponawianie na innym modelu nic nie da.
-  const doProbowania = [MODEL_OPENROUTER, ...MODELE_ZAPASOWE.filter((m) => m !== MODEL_OPENROUTER)];
+  const zKatalogu = await darmoweModele();
+  const doProbowania = [...new Set([MODEL_OPENROUTER, ...zKatalogu, ...MODELE_ZAPASOWE])];
   let ostatni: AiError | null = null;
   for (const m of doProbowania) {
     try {
@@ -143,7 +180,7 @@ async function jedenStrzal(system: string, tresc: string, model: string): Promis
     // 404 na modelu to najczęściej literówka albo model niedostępny dla konta;
     // 402 u OpenRoutera to pusty portfel. Mówimy to wprost, bo inaczej jedno
     // i drugie wygląda jak awaria portalu.
-    if (res.status === 404) throw new AiError(`Model „${model}" jest niedostępny dla tego klucza.`, true);
+    if (res.status === 404) throw new AiError(`Model „${model}" odrzucony: ${tekst.slice(0, 300) || "bez wyjaśnienia"}`, true);
     if (res.status === 402) throw new AiError(`Konto nie ma środków na model „${model}".`, true);
     if (res.status === 429) throw new AiError(`Model „${model}" ma wyczerpany limit.`, true);
     if (res.status === 401) throw new AiError("Klucz do modelu został odrzucony.");
