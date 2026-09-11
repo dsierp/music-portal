@@ -11,6 +11,7 @@ import { album } from "./album";
 import { artist } from "./artist";
 import { auth } from "./auth";
 import { common } from "./common";
+import { unknown } from "./unknown";
 import { concerts } from "./concerts";
 import { genres } from "./genres";
 import { help } from "./help";
@@ -28,6 +29,7 @@ export function dict(locale: Locale) {
     artist: artist[locale],
     auth: auth[locale],
     common: common[locale],
+    unknown: unknown[locale],
     concerts: concerts[locale],
     genres: genres[locale],
     help: help[locale],

@@ -81,6 +81,12 @@ export default async function ListsPage() {
         </p>
       </Banner>
       <ScreenHelp screen="podroze" />
+      {/* Wejście do podróży „w nieznane". Stoi wysoko, bo to jedyne miejsce
+          w portalu, gdzie nie trzeba wiedzieć, czego się szuka. */}
+      <Link href="/podroze/nieznane" className="card block transition-colors hover:border-accent">
+        <h2 className="text-xl">{t.unknown.title}</h2>
+        <p className="mt-1 text-sm text-muted">{t.unknown.lead}</p>
+      </Link>
       {/* Własne listy najpierw: rankingi portalu są ciekawe, ale to, co człowiek
           sam ułożył (i co dostał od kogoś), jest jego. */}
       {user && (
