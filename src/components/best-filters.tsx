@@ -10,6 +10,7 @@
  */
 import { useState, type ReactNode } from "react";
 import { SectionHead } from "./masthead";
+import { KategorieFiltru } from "./filter-list";
 
 export interface KategoriaBest {
   slug: string;
@@ -22,50 +23,46 @@ export interface KategoriaBest {
 
 export function BestFilters({
   cats,
+  domyslne,
   year,
   label,
+  teksty,
   children,
 }: {
   cats: KategoriaBest[];
+  /** kategorie z profilu — zaznaczone na starcie */
+  domyslne: string[];
   year: string;
-  /** nagłówek listy chipów */
+  /** nagłówek listy kategorii */
   label: string;
+  teksty: { all: string; none: string; mine: string; jump: string };
   /** przełącznik roczników — zostaje linkiem, bo to inne dane z bazy */
   children: ReactNode;
 }) {
-  const [wylaczone, setWylaczone] = useState<Set<string>>(new Set());
-  const widoczne = cats.filter((c) => !wylaczone.has(c.slug));
+  const slugi = cats.map((c) => c.slug);
+  const [wybrane, setWybrane] = useState<Set<string>>(() => new Set(domyslne.length ? domyslne : slugi));
+  const widoczne = cats.filter((c) => wybrane.has(c.slug));
 
   return (
-    <div className="mt-8 grid gap-8 md:grid-cols-[220px_1fr]">
+    <div className="mt-8 grid gap-8 md:grid-cols-[240px_1fr]">
       <aside className="md:sticky md:top-20 md:self-start">
         {children}
-        <div className="label mt-5 mb-2">{label}</div>
-        <div className="flex flex-col gap-1.5">
-          {cats.map((c) => (
-            <button
-              key={c.slug}
-              type="button"
-              aria-pressed={!wylaczone.has(c.slug)}
-              onClick={() =>
-                setWylaczone((stare) => {
-                  const nowe = new Set(stare);
-                  if (nowe.has(c.slug)) nowe.delete(c.slug);
-                  else nowe.add(c.slug);
-                  return nowe;
-                })
-              }
-              className={`chip ${wylaczone.has(c.slug) ? "" : "chip-on"}`}
-            >
-              {c.label}
-              <span className="ml-1.5 font-mono text-[10px] text-faint">{c.ile}</span>
-            </button>
-          ))}
+        <div className="mt-5">
+          <KategorieFiltru
+            cats={slugi}
+            catLabels={Object.fromEntries(cats.map((c) => [c.slug, c.label]))}
+            liczniki={Object.fromEntries(cats.map((c) => [c.slug, c.ile]))}
+            wybrane={wybrane}
+            setWybrane={setWybrane}
+            domyslne={domyslne}
+            label={label}
+            teksty={teksty}
+          />
         </div>
       </aside>
       <div>
         {widoczne.map((c) => (
-          <section key={c.slug} className="mb-12">
+          <section key={c.slug} data-kat={c.slug} className="mb-12 scroll-mt-24">
             <SectionHead
               image={c.image}
               title={c.label}

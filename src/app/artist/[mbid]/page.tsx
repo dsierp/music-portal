@@ -715,7 +715,14 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
                 key={p.album.mbid}
                 album={p.album}
                 rating={ratings.get(p.album.mbid)}
-                extra={<div className="text-xs text-accent2">{p.roles.join(", ")}</div>}
+                extra={
+                  <div className="text-xs text-accent2">
+                    {p.roles.join(", ")}
+                    {/* Kredyt wpisany przy nagraniach, nie przy całej płycie — warto
+                        wiedzieć, czy nagrał cały album, czy jeden kawałek z kompilacji. */}
+                    {!!p.trackCount && <span className="ml-2 font-mono text-[10px] text-faint">{fmt(t.artist.producedTracks, { n: p.trackCount })}</span>}
+                  </div>
+                }
               />
             ))}
           </div>

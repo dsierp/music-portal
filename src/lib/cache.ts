@@ -46,7 +46,27 @@ export async function cacheSweep(): Promise<number> {
     return 0;
   }
 }
+/**
+ * Pobrania, które właśnie trwają.
+ *
+ * Bez tego dwie sekcje strony artysty pytające o to samo (grał na / produkował
+ * czytają tę samą paczkę nagrań) startują równolegle, obie trafiają w pustą
+ * bazę i obie jadą do MusicBrainz. A że mbFetch stoi w kolejce po sekundzie na
+ * zapytanie, to dosłownie podwojony czas ładowania. Dochodzi drugi przypadek:
+ * odpowiedzi grubsze niż MAX_BAJTOW w ogóle nie trafiają do bufora, więc dla
+ * nich to jedyna ochrona przed podwójnym pobraniem.
+ */
+const wTrakcie = new Map<string, Promise<unknown>>();
+
 export async function cached<T>(key: string, ttlSeconds: number, fetcher: () => Promise<T>): Promise<T> {
+  const trwa = wTrakcie.get(key);
+  if (trwa) return trwa as Promise<T>;
+  const moje = cachedWewn(key, ttlSeconds, fetcher).finally(() => wTrakcie.delete(key));
+  wTrakcie.set(key, moje);
+  return moje;
+}
+
+async function cachedWewn<T>(key: string, ttlSeconds: number, fetcher: () => Promise<T>): Promise<T> {
   // Tryb testowy (MB_FIXTURES) omija cache całkowicie. Bez tego test na maszynie
   // z działającym .env czytał PRAWDZIWE, zapisane w dev-bazie odpowiedzi
   // MusicBrainz zamiast fixture — i „przechodził" albo wywalał się zależnie od

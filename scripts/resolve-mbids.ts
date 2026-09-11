@@ -11,8 +11,14 @@
  * pozycji to około minuty. Dopasowania i nieudane próby zapisuje ta sama funkcja
  * co przy kliknięciu (resolve.ts), więc nic się nie rozjeżdża.
  *
- *   npm run resolve:mbids          → wszystko, czego jeszcze nie próbowano
- *   npm run resolve:mbids -- --all → także pozycje, przy których próba się nie udała
+ *   npm run resolve:mbids             → wszystko, czego jeszcze nie próbowano
+ *   npm run resolve:mbids -- --all    → także pozycje, przy których próba się nie udała
+ *   npm run resolve:mbids -- --minuty=5 → przerwij po pięciu minutach
+ *
+ * `--minuty` jest po to, żeby dało się to wołać z post-deploy: budowanie nie
+ * może stać dziesięć minut, a i tak najważniejsze jest, żeby premiery z tego
+ * tygodnia miały MBID zanim ktokolwiek w nie kliknie. Reszta dowiąże się przy
+ * kliknięciu, tak jak dotąd.
  */
 import "dotenv/config";
 import { config } from "dotenv";
@@ -39,6 +45,9 @@ async function main() {
   const { resolveRelease, resolveBestOf } = await import("../src/lib/resolve");
 
   const all = process.argv.includes("--all");
+  const limitArg = process.argv.find((a) => a.startsWith("--minuty="));
+  const koniec = limitArg ? Date.now() + Number(limitArg.split("=")[1]) * 60_000 : Infinity;
+  const czasMinal = () => Date.now() > koniec;
   // Domyślnie bierzemy to, czego jeszcze nie próbowano; z --all także dawne nieudane próby.
   const weekAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000);
   const staleTry = all ? or(isNull(schema.releases.mbidTriedAt), lt(schema.releases.mbidTriedAt, weekAgo)) : isNull(schema.releases.mbidTriedAt);
@@ -66,17 +75,23 @@ async function main() {
   console.log(`MusicBrainz: 1 zapytanie/s, więc potrwa ~${Math.ceil(total * 1.2 / 60)} min.\n`);
 
   let ok = 0;
+  let pominiete = 0;
+  // Premiery przed best of: świeże zestawienie jest tym, w co ludzie klikają
+  // w piątek, a rankingi roczne poczekają.
   for (const [i, r] of releases.entries()) {
+    if (czasMinal()) { pominiete = releases.length - i + best.length; break; }
     const mbid = await resolveRelease(r.id).catch(() => null);
     if (mbid) ok++;
     console.log(`  [${i + 1}/${releases.length}] ${r.artist} – ${r.album}: ${mbid ?? "nie znaleziono"}`);
   }
   for (const [i, r] of best.entries()) {
+    if (czasMinal()) { pominiete = best.length - i; break; }
     const mbid = await resolveBestOf(r.id).catch(() => null);
     if (mbid) ok++;
     console.log(`  best [${i + 1}/${best.length}] ${r.artist} – ${r.album}: ${mbid ?? "nie znaleziono"}`);
   }
   console.log(`\nDowiązano ${ok} z ${total}. Reszta zwykle dlatego, że MusicBrainz nie ma jeszcze tej płyty.`);
+  if (pominiete) console.log(`Skończył się czas — ${pominiete} pozycji zostało na potem (dowiążą się przy kliknięciu).`);
 }
 
 main()

@@ -59,7 +59,13 @@ export default async function BestOfPage({ searchParams }: { searchParams: Promi
         title="Pure New Shit"
         meta={y?.sub ? <span>{y.sub}</span> : undefined}
       />
-      <BestFilters cats={cats} year={year} label={t.lists.categoriesLabel}>
+      <BestFilters
+        cats={cats}
+        domyslne={moje}
+        year={year}
+        label={t.lists.categoriesLabel}
+        teksty={{ all: t.common.selectAll, none: t.common.selectNone, mine: t.common.selectMine, jump: t.common.jumpTo }}
+      >
         <div className="label mb-2">{t.lists.yearLabel}</div>
         <div className="flex gap-1.5">
           {years.map((yy) => (

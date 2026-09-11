@@ -94,6 +94,7 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
         <ReleaseFilters
           cats={cats}
           catLabels={catLabels}
+          domyslne={mine.filter((g) => cats.includes(g))}
           sections={sekcje}
           items={items}
           heroArt={heroArtMap}
@@ -108,6 +109,10 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
             noMatch: t.releases.noMatch,
             journey: t.releases.journeyFromReleases,
             journeyNote: t.releases.journeyFromReleasesNote,
+            all: t.common.selectAll,
+            none: t.common.selectNone,
+            mine: t.common.selectMine,
+            jump: t.common.jumpTo,
           }}
         />
       ) : (

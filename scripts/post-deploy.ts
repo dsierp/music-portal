@@ -56,4 +56,30 @@ if (r.status !== 0) {
   process.exit(r.status ?? 1);
 }
 
-console.log("post-deploy: gotowe, premiery są w bazie.");
+console.log("post-deploy: premiery są w bazie. Dowiązuję MBID…");
+
+/**
+ * Dowiązanie do MusicBrainz OD RAZU, a nie przy pierwszym kliknięciu.
+ *
+ * Bez tego świeżo zaimportowane pozycje mają puste `mbid`, więc kliknięcie
+ * w tytuł uruchamia pytanie do MusicBrainz w locie. MusicBrainz przepuszcza
+ * jedno zapytanie na sekundę, a przy nieudanej próbie link leci do
+ * wyszukiwarki — i to jest dokładnie to, co widać jako „wchodzę w płytę,
+ * a ląduję w szukajce".
+ *
+ * Budżet czasowy, bo build nie może stać dziesięciu minut: premiery idą
+ * pierwsze, best of dostaje resztę czasu, a czego nie zdążymy — dowiąże się
+ * przy kliknięciu, jak dotąd.
+ *
+ * Ten krok NIE przerywa builda. Nieudane dowiązanie to gorsze linki, a nie
+ * zepsuta strona; import premier już się udał i to on jest tu istotny.
+ */
+const d = spawnSync("npm", ["run", "resolve:mbids", "--", "--minuty=6"], {
+  stdio: "inherit",
+  shell: process.platform === "win32",
+});
+if (d.status !== 0) {
+  console.warn("post-deploy: dowiązywanie MBID się nie udało — linki dowiążą się przy kliknięciu. Build leci dalej.");
+}
+
+console.log("post-deploy: gotowe.");

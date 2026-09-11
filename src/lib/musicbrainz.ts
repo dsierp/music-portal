@@ -830,16 +830,13 @@ export async function getDiscography(mbid: string): Promise<AlbumSummary[]> {
 }
 
 /**
- * Płyty, na których muzyk grał (relacje wykonawca↔nagranie), a nie jest głównym wykonawcą.
- * To jest silnik "podróży": z płyty do muzyka, z muzyka do innych płyt.
+ * Nagrania powiązane z artystą — i przez artist credit, i przez relacje.
+ *
+ * Wspólne dla „grał na" i „produkował", bo to dokładnie ta sama paczka danych.
+ * Klucz bufora jest jeden, więc druga sekcja strony dostaje ją za darmo.
  */
-export async function getPlayedOn(
-  mbid: string,
-  bands: Membership[] = [],
-  stron = STRON_DOMYSLNIE,
-): Promise<{ items: PlayedOn[]; wiecej: boolean }> {
-  const bandNames = new Map(bands.map((b) => [b.mbid, b.name]));
-  const recs = await cached(`mb:rec-browse:v2:${mbid}:${stron}`, TTL.lookup, async () => {
+async function browseRecordingsOf(mbid: string, stron = STRON_DOMYSLNIE): Promise<MbRecording[]> {
+  return cached(`mb:rec-browse:v2:${mbid}:${stron}`, TTL.lookup, async () => {
     const out: MbRecording[] = [];
     for (let offset = 0; offset < stron * 100; offset += 100) {
       const page = await mbFetch<{ recordings: MbRecording[]; "recording-count": number }>("/recording/", {
@@ -850,6 +847,19 @@ export async function getPlayedOn(
     }
     return out;
   });
+}
+
+/**
+ * Płyty, na których muzyk grał (relacje wykonawca↔nagranie), a nie jest głównym wykonawcą.
+ * To jest silnik "podróży": z płyty do muzyka, z muzyka do innych płyt.
+ */
+export async function getPlayedOn(
+  mbid: string,
+  bands: Membership[] = [],
+  stron = STRON_DOMYSLNIE,
+): Promise<{ items: PlayedOn[]; wiecej: boolean }> {
+  const bandNames = new Map(bands.map((b) => [b.mbid, b.name]));
+  const recs = await browseRecordingsOf(mbid, stron);
   const groups = new Map<string, PlayedOn>();
 
   /**
@@ -1013,6 +1023,8 @@ export const STRON_DOMYSLNIE = 4;
 export interface ProducedAlbum {
   album: AlbumSummary;
   roles: string[];
+  /** ile nagrań z tej płyty ma jego kredyt; 0 = kredyt wpisany przy całym wydaniu */
+  trackCount?: number;
 }
 
 /**
@@ -1040,10 +1052,33 @@ async function browseReleasesOf(mbid: string, stron = STRON_DOMYSLNIE): Promise<
   });
 }
 
+/**
+ * Płyty, które ktoś wyprodukował, nagrał albo zmiksował.
+ *
+ * DLACZEGO TO PATRZY W DWA MIEJSCA: MusicBrainz trzyma kredyty produkcyjne raz
+ * przy WYDANIU („producer" na całej płycie), a raz przy KAŻDYM NAGRANIU osobno
+ * („engineer" przy dwunastu kawałkach). Redaktorzy robią to jak im wygodniej
+ * i oba zapisy są poprawne.
+ *
+ * Do niedawna przeglądaliśmy wyłącznie wydania — i tak wygląda mniejszość
+ * kredytów studyjnych. Scott Burns ma w MusicBrainz ponad półtora tysiąca
+ * powiązań, prawie wszystkie wpisane przy nagraniach, więc jego strona
+ * pokazywała jedną płytę. Człowiek, który nagrał „Cause of Death", „Effigy of
+ * the Forgotten" i pół kanonu death metalu, wyglądał u nas na kogoś, kto raz
+ * pomógł przy jednej sesji.
+ *
+ * Nagrania grupujemy do release-group i liczymy kawałki: „engineer (14 utworów)"
+ * to inna informacja niż „engineer na jednym kawałku z kompilacji".
+ */
 export async function getProduced(mbid: string, stron = STRON_DOMYSLNIE): Promise<{ items: ProducedAlbum[]; wiecej: boolean }> {
-  const releases = await browseReleasesOf(mbid, stron);
+  const [releases, recs] = await Promise.all([
+    browseReleasesOf(mbid, stron).catch(() => []),
+    browseRecordingsOf(mbid, stron).catch(() => []),
+  ]);
 
   const groups = new Map<string, ProducedAlbum>();
+
+  // 1. Kredyt przy całym wydaniu.
   for (const rel of releases) {
     const roles = (rel.relations ?? [])
       .filter((r) => r.artist?.id === mbid)
@@ -1052,17 +1087,40 @@ export async function getProduced(mbid: string, stron = STRON_DOMYSLNIE): Promis
     if (!roles.length) continue;
     const rg = rel["release-group"];
     if (!rg) continue;
-    const e = groups.get(rg.id) ?? { album: normReleaseGroup(rg, rel["artist-credit"]), roles: [] };
+    const e = groups.get(rg.id) ?? { album: normReleaseGroup(rg, rel["artist-credit"]), roles: [], trackCount: 0 };
     for (const role of roles) if (!e.roles.includes(role)) e.roles.push(role);
     groups.set(rg.id, e);
   }
+
+  // 2. Kredyt przy pojedynczych nagraniach — to jest ta brakująca większość.
+  for (const rec of recs) {
+    const roles = (rec.relations ?? [])
+      .filter((r) => r.artist?.id === mbid)
+      .flatMap(rolesOf)
+      .filter(isCrewRole);
+    if (!roles.length) continue;
+    // Jedno nagranie wisi przy wielu wydaniach tej samej płyty (CD, winyl,
+    // reedycja) — liczymy je raz na release-group, inaczej „12 utworów" robi
+    // się „48 utworów".
+    const widziane = new Set<string>();
+    for (const rel of rec.releases ?? []) {
+      const rg = rel["release-group"];
+      if (!rg || widziane.has(rg.id)) continue;
+      widziane.add(rg.id);
+      const e = groups.get(rg.id) ?? { album: normReleaseGroup(rg, rel["artist-credit"]), roles: [], trackCount: 0 };
+      e.trackCount = (e.trackCount ?? 0) + 1;
+      for (const role of roles) if (!e.roles.includes(role)) e.roles.push(role);
+      groups.set(rg.id, e);
+    }
+  }
+
   return {
     items: [...groups.values()].sort((x, y) =>
       (y.album.firstReleaseDate ?? "").localeCompare(x.album.firstReleaseDate ?? ""),
     ),
     // Pełna paczka = najpewniej jest jeszcze coś dalej. Nie zgadujemy więcej:
     // MusicBrainz podaje licznik, ale przy relacjach bywa mylący.
-    wiecej: releases.length >= stron * 100,
+    wiecej: releases.length >= stron * 100 || recs.length >= stron * 100,
   };
 }
 
