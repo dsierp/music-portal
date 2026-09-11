@@ -144,7 +144,7 @@ async function jedenStrzal(system: string, tresc: string, model: string): Promis
         },
         {
           model,
-          max_tokens: 2000,
+          max_tokens: 4000,
           messages: [
             { role: "system", content: system },
             { role: "user", content: tresc },
@@ -160,7 +160,7 @@ async function jedenStrzal(system: string, tresc: string, model: string): Promis
         },
         {
           model,
-          max_tokens: 2000,
+          max_tokens: 4000,
           system,
           messages: [{ role: "user", content: tresc }],
         },
@@ -246,7 +246,19 @@ export async function zaproponujPlyty(opis: string, kontekst: {
   czesci.push(`Podaj ${ile} pozycji.`);
 
   const tekst = await zapytaj(system, czesci.join("\n\n"));
-  return parsujPropozycje(tekst);
+  const wynik = parsujPropozycje(tekst);
+  // Zero pozycji to nie jest odpowiedź — to model, który nie zrozumiał zadania.
+  if (!wynik.length) throw new AiError("Model nie podał ani jednej płyty.", true);
+  return wynik;
+}
+
+/** JSON.parse, który zamiast rzucać zwraca null. */
+function sprobuj(t: string): unknown {
+  try {
+    return JSON.parse(t);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -257,15 +269,28 @@ export async function zaproponujPlyty(opis: string, kontekst: {
  */
 export function parsujPropozycje(tekst: string): Propozycja[] {
   const start = tekst.indexOf("[");
+  if (start < 0) throw new AiError("Model nie zwrócił listy.", true);
   const koniec = tekst.lastIndexOf("]");
-  if (start < 0 || koniec < start) throw new AiError("Model nie zwrócił listy.");
-  let dane: unknown;
-  try {
-    dane = JSON.parse(tekst.slice(start, koniec + 1));
-  } catch {
-    throw new AiError("Odpowiedź modelu nie jest poprawnym JSON-em.");
+
+  let dane: unknown = null;
+  if (koniec > start) dane = sprobuj(tekst.slice(start, koniec + 1));
+
+  /**
+   * Ratowanie URWANEJ odpowiedzi.
+   *
+   * Słabsze modele potrafią zgubić domknięcie albo po prostu wyczerpać limit
+   * znaków w połowie listy — wtedy tekst kończy się w środku obiektu i cała
+   * odpowiedź leci do kosza, choć dziesięć pierwszych pozycji jest w porządku.
+   * Ucinamy więc do ostatniego kompletnego obiektu i domykamy nawias sami.
+   */
+  if (!dane) {
+    const ostatni = tekst.lastIndexOf("}");
+    if (ostatni > start) dane = sprobuj(`${tekst.slice(start, ostatni + 1)}]`);
   }
-  if (!Array.isArray(dane)) throw new AiError("Model nie zwrócił listy.");
+
+  // Nadal nic: to jest wina modelu, nie zapytania — warto spróbować innego.
+  if (!dane) throw new AiError("Odpowiedź modelu nie jest poprawnym JSON-em.", true);
+  if (!Array.isArray(dane)) throw new AiError("Model nie zwrócił listy.", true);
   return dane
     .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
     .map((x) => ({
