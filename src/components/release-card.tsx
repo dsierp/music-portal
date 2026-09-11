@@ -5,6 +5,7 @@ import { searchLinks } from "./links";
 import { genreLabel as genreLabelFallback } from "@/lib/lists";
 import { genreLabel } from "@/lib/dict";
 import type { Dict } from "@/lib/dict";
+import { fmt } from "@/lib/i18n";
 
 type Release = InferSelectModel<typeof schema.releases>;
 
@@ -17,7 +18,7 @@ type Release = InferSelectModel<typeof schema.releases>;
  */
 const CAA = (mbid: string, px: 250 | 500) => `https://coverartarchive.org/release-group/${mbid}/front-${px}`;
 
-export function PickCard({ r, t }: { r: Release; t: Dict }) {
+export function PickCard({ r, t, odKiedy }: { r: Release; t: Dict; odKiedy?: string | null }) {
   const links = searchLinks(r.artist ?? "", r.album ?? "");
   const href = `/go/release/${encodeURIComponent(r.id)}`;
   return (
@@ -45,7 +46,7 @@ export function PickCard({ r, t }: { r: Release; t: Dict }) {
           </p>
         )}
         <div className="row">
-          <Actions links={links} href={href} t={t} />
+          <Actions links={links} href={href} t={t} odKiedy={odKiedy} />
         </div>
       </div>
     </article>
@@ -55,7 +56,7 @@ export function PickCard({ r, t }: { r: Release; t: Dict }) {
 /** Etykiety flag (EP, reedycja…) — tłumaczone tu, bo lista wartości w schemacie zostaje po polsku. */
 const FLAG_KEYS: Record<string, keyof Dict["releases"]> = { ep: "flagEp", comp: "flagComp", reissue: "flagReissue", live: "flagLive", instr: "flagInstr" };
 
-export function ReleaseCard({ r, t }: { r: Release; t: Dict }) {
+export function ReleaseCard({ r, t, odKiedy }: { r: Release; t: Dict; odKiedy?: string | null }) {
   if (r.star === -1) {
     return (
       <li className="rel">
@@ -91,18 +92,33 @@ export function ReleaseCard({ r, t }: { r: Release; t: Dict }) {
         )}
       </div>
       <div className="side">
-        <Actions links={links} href={href} t={t} small />
+        <Actions links={links} href={href} t={t} small odKiedy={odKiedy} />
       </div>
     </li>
   );
 }
 
-function Actions({ links, href, t, small = false }: { links: { spotify: string; tidal: string }; href: string; t: Dict; small?: boolean }) {
+/**
+ * Przyciski przy pozycji.
+ *
+ * `odKiedy` to data premiery, gdy płyta JESZCZE NIE WYSZŁA. Zestawienie obejmuje
+ * też nadchodzący tydzień, więc połowa listy to rzeczy, których na Spotify
+ * i Tidalu po prostu nie ma — przycisk prowadził w pustkę albo w przypadkowy
+ * wynik wyszukiwania. Zamiast niego mówimy wprost, od kiedy będzie czego słuchać;
+ * „podróż" zostaje, bo strona płyty i skład działają niezależnie od wydania.
+ */
+function Actions({ links, href, t, small = false, odKiedy }: { links: { spotify: string; tidal: string }; href: string; t: Dict; small?: boolean; odKiedy?: string | null }) {
   const pill = "rounded-full border px-3 py-1 font-mono transition-colors";
   return (
     <div className={`flex flex-wrap items-center gap-2 ${small ? "text-[11px]" : "text-xs"}`}>
-      <a href={links.spotify} target="_blank" rel="noopener" className={`${pill} border-spotify/40 text-spotify hover:bg-spotify/10`}>▶ Spotify</a>
-      <a href={links.tidal} target="_blank" rel="noopener" className={`${pill} border-tidal/40 text-tidal hover:bg-tidal/10`}>▶ Tidal</a>
+      {odKiedy ? (
+        <span className={`${pill} border-rule text-faint`}>{fmt(t.releases.outOn, { date: odKiedy })}</span>
+      ) : (
+        <>
+          <a href={links.spotify} target="_blank" rel="noopener" className={`${pill} border-spotify/40 text-spotify hover:bg-spotify/10`}>▶ Spotify</a>
+          <a href={links.tidal} target="_blank" rel="noopener" className={`${pill} border-tidal/40 text-tidal hover:bg-tidal/10`}>▶ Tidal</a>
+        </>
+      )}
       <Link href={href} className={`${pill} border-rule text-muted hover:border-accent2 hover:text-accent2`}>{t.releases.travelCta}</Link>
     </div>
   );

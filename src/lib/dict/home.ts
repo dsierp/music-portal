@@ -4,6 +4,8 @@ import type { Locale } from "@/lib/i18n";
 const pl = {
   lineupTitle: "Zmiany w składach",
   lineupNote: "Z dat członkostwa w MusicBrainz — ostatnie półtora roku. ★ to Twoje ulubione zespoły.",
+  lineupEmpty: "Nie masz jeszcze ulubionych zespołów. Postaw gwiazdkę na stronie dowolnego zespołu, a tutaj zobaczysz, kto do niego wszedł i kto z niego odszedł.",
+  lineupNoNews: "W Twoich ulubionych zespołach nic się ostatnio nie zmieniło — przynajmniej nic, co trafiło do MusicBrainz.",
   joined: "dołączył(a) do",
   left: "odszedł(-ła) z",
   lineupLoading: "Sprawdzam zmiany w składach…",
@@ -31,6 +33,8 @@ type T = typeof pl;
 const en: T = {
   lineupTitle: "Lineup changes",
   lineupNote: "From MusicBrainz membership dates — the last year and a half. ★ marks your favourite bands.",
+  lineupEmpty: "You have no favourite bands yet. Star any band on its page and you'll see here who joined it and who left.",
+  lineupNoNews: "Nothing has changed lately in your favourite bands — at least nothing that made it into MusicBrainz.",
   joined: "joined",
   left: "left",
   lineupLoading: "Checking for lineup changes…",
@@ -57,6 +61,8 @@ const en: T = {
 const es: T = {
   lineupTitle: "Cambios de formación",
   lineupNote: "Según las fechas de pertenencia en MusicBrainz — el último año y medio. ★ marca tus bandas favoritas.",
+  lineupEmpty: "Todavía no tienes bandas favoritas. Marca cualquier banda con una estrella en su página y aquí verás quién entró y quién se fue.",
+  lineupNoNews: "Últimamente no ha cambiado nada en tus bandas favoritas — al menos nada que haya llegado a MusicBrainz.",
   joined: "se unió a",
   left: "dejó",
   lineupLoading: "Comprobando cambios de formación…",
@@ -83,6 +89,8 @@ const es: T = {
 const de: T = {
   lineupTitle: "Besetzungswechsel",
   lineupNote: "Aus den Mitgliedschaftsdaten von MusicBrainz — die letzten anderthalb Jahre. ★ markiert deine Lieblingsbands.",
+  lineupEmpty: "Du hast noch keine Lieblingsbands. Setz auf einer Bandseite einen Stern, dann siehst du hier, wer dazugekommen und wer gegangen ist.",
+  lineupNoNews: "In deinen Lieblingsbands hat sich zuletzt nichts geändert — jedenfalls nichts, was in MusicBrainz gelandet ist.",
   joined: "wechselte zu",
   left: "verließ",
   lineupLoading: "Prüfe Besetzungswechsel…",

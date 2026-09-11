@@ -74,10 +74,27 @@ function SearchLink({ query, label, artysta }: { query: string; label: string; a
   );
 }
 
-async function LineupNews({ bands, favorites, t }: { bands: { mbid: string; name: string }[]; favorites: Set<string>; t: Dict["home"] }) {
-  if (!bands.length) return null;
-  const news = await lineupNews(bands, favorites).catch(() => []);
-  if (!news.length) return null;
+/**
+ * Zmiany w składach ulubionych zespołów.
+ *
+ * Ta sekcja znikała bez słowa, gdy ktoś nie miał jeszcze ani jednego zespołu
+ * z gwiazdką — a przewodnik „jak się tu poruszać" obiecywał ją bezwarunkowo.
+ * Z punktu widzenia patrzącego wyglądało to na obietnicę bez pokrycia. Teraz
+ * mówimy, czego brakuje i gdzie to ustawić, zamiast chować cały nagłówek.
+ *
+ * Niezalogowanemu nie pokazujemy nic: on nie ma gdzie postawić gwiazdki.
+ */
+async function LineupNews({ bands, favorites, zalogowany, t }: { bands: { mbid: string; name: string }[]; favorites: Set<string>; zalogowany: boolean; t: Dict["home"] }) {
+  if (!zalogowany) return null;
+  const news = bands.length ? await lineupNews(bands, favorites).catch(() => []) : [];
+  if (!news.length) {
+    return (
+      <section>
+        <h2 className="text-3xl">{t.lineupTitle}</h2>
+        <p className="mt-2 text-sm text-muted">{bands.length ? t.lineupNoNews : t.lineupEmpty}</p>
+      </section>
+    );
+  }
   return (
     <section>
       <h2 className="text-3xl">{t.lineupTitle}</h2>
@@ -161,7 +178,7 @@ export default async function Home() {
 
       <div className="grid gap-10 lg:grid-cols-[1fr_320px]">
         <Suspense fallback={<p className="font-mono text-xs text-muted">{t.home.lineupLoading}</p>}>
-          <LineupNews bands={newsBands} favorites={favMbids} t={t.home} />
+          <LineupNews bands={newsBands} favorites={favMbids} zalogowany={!!user} t={t.home} />
         </Suspense>
 
         <section>

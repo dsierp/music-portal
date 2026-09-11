@@ -30,7 +30,7 @@ const pl = {
     lead: "Punkt wyjścia: co nowego i co Twoje.",
     steps: [
       { h: "Premiery pod Ciebie", p: "Piątkowe nowości zawężone do gatunków, które wybrałeś w profilu." },
-      { h: "Kto zmienił zespół", p: "Zmiany w składach Twoich ulubionych zespołów — najczęstszy powód, żeby w coś kliknąć." },
+      { h: "Kto zmienił zespół", p: "Zmiany w składach zespołów, które oznaczyłeś gwiazdką. Bez ulubionych ta sekcja nie ma czego pokazać — gwiazdkę stawia się na stronie zespołu." },
       { h: "Dziennik i podróże", p: "Po prawej Twoje ślady i trasy przez muzykę, do których wracasz." },
     ],
   },
@@ -109,7 +109,7 @@ const en: T = {
     lead: "The starting point: what's new and what's yours.",
     steps: [
       { h: "Releases for you", p: "Friday's new albums narrowed to the genres you picked in your profile." },
-      { h: "Who changed bands", p: "Line-up changes in your favourite bands — the most common reason to click into something." },
+      { h: "Who changed bands", p: "Line-up changes in the bands you starred. With no favourites this section has nothing to show — you star a band on its own page." },
       { h: "Journal and journeys", p: "On the right, your own tracks and the routes through music you keep coming back to." },
     ],
   },
@@ -184,7 +184,7 @@ const es: T = {
     lead: "El punto de partida: lo nuevo y lo tuyo.",
     steps: [
       { h: "Novedades para ti", p: "Los estrenos del viernes acotados a los géneros que elegiste en tu perfil." },
-      { h: "Quién cambió de banda", p: "Cambios de formación en tus bandas favoritas: el motivo más habitual para entrar en algo." },
+      { h: "Quién cambió de banda", p: "Cambios de formación en las bandas que marcaste con estrella. Sin favoritos esta sección no tiene nada que mostrar — la estrella se pone en la página de la banda." },
       { h: "Diario y viajes", p: "A la derecha, tus huellas y las rutas por la música a las que vuelves." },
     ],
   },
@@ -259,7 +259,7 @@ const de: T = {
     lead: "Der Ausgangspunkt: was neu ist und was deins ist.",
     steps: [
       { h: "Neuheiten für dich", p: "Die Freitagsveröffentlichungen, eingegrenzt auf die Genres aus deinem Profil." },
-      { h: "Wer die Band gewechselt hat", p: "Besetzungswechsel in deinen Lieblingsbands — der häufigste Grund, irgendwo hineinzuklicken." },
+      { h: "Wer die Band gewechselt hat", p: "Besetzungswechsel in den Bands, die du mit einem Stern markiert hast. Ohne Favoriten hat dieser Abschnitt nichts zu zeigen — den Stern setzt man auf der Bandseite." },
       { h: "Tagebuch und Reisen", p: "Rechts deine Spuren und die Routen durch die Musik, zu denen du zurückkehrst." },
     ],
   },

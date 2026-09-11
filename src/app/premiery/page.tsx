@@ -4,7 +4,7 @@ import { PickCard, ReleaseCard } from "@/components/release-card";
 import { ReleaseFilters, type PozycjaFiltru, type SekcjaFiltru } from "@/components/release-filters";
 import { Masthead } from "@/components/masthead";
 import { heroArt, leadStyle, sectionHeroArt } from "@/lib/lead-style";
-import { allSections, genreLabel as genreLabelFallback, latestSections, releasesFor, sectionImage, splitDb, styleToCategory } from "@/lib/lists";
+import { allSections, dataPozycji, genreLabel as genreLabelFallback, jeszczeNieWyszla, latestSections, releasesFor, sectionImage, splitDb, styleToCategory } from "@/lib/lists";
 import { genreLabel } from "@/lib/dict";
 import { orderByPopularity } from "@/lib/popularity";
 import { currentUser } from "@/lib/auth";
@@ -50,13 +50,21 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
     groupImage[g] = sectionImage(g);
   }
 
+  // Data premiery per wiersz — potrzebna, żeby nie proponować Spotify przy
+  // płycie, która wychodzi dopiero w przyszły piątek.
+  const dataSekcji = new Map(sections.map((s) => [s.id, s.date]));
+  const kiedy = (r: (typeof rel)[number]) => {
+    const d = dataPozycji(r.dayLabel, dataSekcji.get(r.sectionId) ?? "");
+    return jeszczeNieWyszla(d) ? (r.dayLabel?.replace(/^\D+/, "") ?? d!.toLocaleDateString("pl-PL")) : null;
+  };
+
   const items: PozycjaFiltru[] = rel.map((r) => ({
     id: r.id,
     sectionId: r.sectionId,
     g: splitDb(r.genre, r.description),
     star: r.star,
     flagged: !!r.flag && ["comp", "reissue", "live", "ep"].includes(r.flag),
-    node: <ReleaseCard key={r.id} r={r} t={t} />,
+    node: <ReleaseCard key={r.id} r={r} t={t} odKiedy={kiedy(r)} />,
   }));
 
   const sekcje: SekcjaFiltru[] = sections.map((s) => {
@@ -69,7 +77,7 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
       date: s.date,
       sub: s.sub,
       pickId: pick?.id ?? null,
-      pickNode: pick ? <PickCard r={pick} t={t} /> : null,
+      pickNode: pick ? <PickCard r={pick} t={t} odKiedy={kiedy(pick)} /> : null,
       podroz: !!user && moje.some((r) => r.mbid),
       podrozTytul: `${s.title} ${s.date}`,
     };

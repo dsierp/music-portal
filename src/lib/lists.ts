@@ -3,6 +3,7 @@ import { asc, desc, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { genreToSection, MAIN_BY_SLUG } from "./genres";
 import { genreImage } from "./genre-art";
+import { sectionSortDate } from "./pns-parser";
 
 export const GENRE_LABELS: Record<string, string> = {
   db: "Death / black metal",
@@ -152,3 +153,30 @@ export const BEST_CATS: Record<string, string> = {
   pop: "Pop",
 };
 export const BEST_ORDER = ["death", "black", "other", "prog", "jazz", "punk", "electronic", "folk", "country", "classical", "hiphop", "pop"];
+
+/**
+ * Data, kiedy pozycja faktycznie wychodzi.
+ *
+ * Po co: zestawienie obejmuje także NADCHODZĄCY tydzień, więc połowa listy to
+ * płyty, których jeszcze nie ma. Dawanie przy nich przycisków „Spotify" i
+ * „Tidal" to zapraszanie w ślepy zaułek — tam ich po prostu nie ma i nie
+ * będzie do piątku.
+ *
+ * Dzień bierzemy z etykiety wiersza („pt 18.09"), a rok z daty sekcji, bo sama
+ * etykieta go nie ma. Gdy wiersz nie mówi nic o dniu, zostaje data sekcji.
+ */
+export function dataPozycji(dayLabel: string | null, sectionDate: string): Date | null {
+  const rok = sectionDate.match(/(\d{4})/)?.[1];
+  const dzien = dayLabel?.match(/(\d{2})\.(\d{2})/);
+  if (dzien && rok) return new Date(Date.UTC(+rok, +dzien[2] - 1, +dzien[1]));
+  const d = sectionSortDate(sectionDate);
+  return d.getTime() ? d : null;
+}
+
+/** Czy ta data jest jeszcze przed nami (dzisiejszy dzień liczy się jako „już jest"). */
+export function jeszczeNieWyszla(data: Date | null): boolean {
+  if (!data) return false;
+  const dzis = new Date();
+  const dzisUTC = Date.UTC(dzis.getFullYear(), dzis.getMonth(), dzis.getDate());
+  return data.getTime() > dzisUTC;
+}
