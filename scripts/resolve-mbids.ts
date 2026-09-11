@@ -14,6 +14,7 @@
  *   npm run resolve:mbids             → wszystko, czego jeszcze nie próbowano
  *   npm run resolve:mbids -- --all    → także pozycje, przy których próba się nie udała
  *   npm run resolve:mbids -- --minuty=5 → przerwij po pięciu minutach
+ *   npm run resolve:mbids -- --premiery → pomiń best of
  *
  * `--minuty` jest po to, żeby dało się to wołać z post-deploy: budowanie nie
  * może stać dziesięć minut, a i tak najważniejsze jest, żeby premiery z tego
@@ -45,6 +46,9 @@ async function main() {
   const { resolveRelease, resolveBestOf } = await import("../src/lib/resolve");
 
   const all = process.argv.includes("--all");
+  // Best of to 240 pozycji, a klika się w nie rzadko — przy budowaniu liczy się
+  // to, w co ludzie wejdą w piątek. Rankingi dowiążą się przy kliknięciu.
+  const tylkoPremiery = process.argv.includes("--premiery");
   const limitArg = process.argv.find((a) => a.startsWith("--minuty="));
   const koniec = limitArg ? Date.now() + Number(limitArg.split("=")[1]) * 60_000 : Infinity;
   const czasMinal = () => Date.now() > koniec;
@@ -60,10 +64,12 @@ async function main() {
   const staleBest = all
     ? or(isNull(schema.bestOfEntries.mbidTriedAt), lt(schema.bestOfEntries.mbidTriedAt, weekAgo))
     : isNull(schema.bestOfEntries.mbidTriedAt);
-  const best = await db
-    .select({ id: schema.bestOfEntries.id, artist: schema.bestOfEntries.artist, album: schema.bestOfEntries.album })
-    .from(schema.bestOfEntries)
-    .where(and(isNull(schema.bestOfEntries.mbid), staleBest));
+  const best = tylkoPremiery
+    ? []
+    : await db
+        .select({ id: schema.bestOfEntries.id, artist: schema.bestOfEntries.artist, album: schema.bestOfEntries.album })
+        .from(schema.bestOfEntries)
+        .where(and(isNull(schema.bestOfEntries.mbid), staleBest));
 
   const total = releases.length + best.length;
   if (!total) {

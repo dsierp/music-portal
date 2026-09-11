@@ -67,14 +67,18 @@ console.log("post-deploy: premiery są w bazie. Dowiązuję MBID…");
  * wyszukiwarki — i to jest dokładnie to, co widać jako „wchodzę w płytę,
  * a ląduję w szukajce".
  *
- * Budżet czasowy, bo build nie może stać dziesięciu minut: premiery idą
- * pierwsze, best of dostaje resztę czasu, a czego nie zdążymy — dowiąże się
- * przy kliknięciu, jak dotąd.
+ * Budżet DWIE MINUTY i tylko premiery. Pierwsza wersja dawała sześć minut na
+ * wszystko (386 pozycji) i to był zły rachunek: jedno dowiązanie to nierzadko
+ * DWA zapytania do MusicBrainz (najpierw ścisłe po polach, potem luźne), czyli
+ * około dwóch sekund, a nieudana próba przy awarii MusicBrainz nie zostawia
+ * znacznika i wraca przy następnym buildzie. Sześciominutowy budżet wypalał
+ * się więc co deploy, zamiast raz. Best of to 240 z tych 386 pozycji, a klika
+ * się w nie rzadko — niech dowiązuje się przy kliknięciu.
  *
  * Ten krok NIE przerywa builda. Nieudane dowiązanie to gorsze linki, a nie
  * zepsuta strona; import premier już się udał i to on jest tu istotny.
  */
-const d = spawnSync("npm", ["run", "resolve:mbids", "--", "--minuty=6"], {
+const d = spawnSync("npm", ["run", "resolve:mbids", "--", "--minuty=2", "--premiery"], {
   stdio: "inherit",
   shell: process.platform === "win32",
 });
