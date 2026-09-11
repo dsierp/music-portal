@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import { latestSections, releasesFor, bestOfYears, bestOf, BEST_CATS } from "@/lib/lists";
-import { ReleaseRow } from "@/components/release-list";
+import { ReleaseCard as ReleaseRow } from "@/components/release-card";
 import { SearchBox } from "@/components/search-box";
 import { Banner } from "@/components/banner";
 import { Suspense } from "react";

@@ -128,11 +128,27 @@ export async function bestOf(year: string) {
 export async function bestOfYears() {
   return db.select().from(schema.bestOfYears).orderBy(desc(schema.bestOfYears.year));
 }
+/**
+ * Nazwy zapasowe kategorii best of (właściwe idą z tłumaczeń).
+ *
+ * Od 11.09.2026 artefakt przysyła też siedem kategorii niemetalowych, ale
+ * krótszymi listami (5 pozycji, tylko bieżący rok). Dlatego ekran best of NIE
+ * bierze już kategorii z tej stałej — bierze je z tego, co faktycznie jest
+ * w bazie dla wybranego rocznika. Rocznik 2025 ma pięć kategorii, 2026 —
+ * dwanaście, i jedno nie musi wiedzieć o drugim.
+ */
 export const BEST_CATS: Record<string, string> = {
   death: "Death metal",
   black: "Black metal",
   other: "Inne metal — doom / sludge / thrash / heavy / avant",
   prog: "Prog rock / prog metal",
   jazz: "Jazz",
+  punk: "Punk / hardcore",
+  electronic: "Elektronika",
+  folk: "Folk / autorska piosenka",
+  country: "Country / americana",
+  classical: "Klasyka",
+  hiphop: "Hip-hop",
+  pop: "Pop",
 };
-export const BEST_ORDER = ["death", "black", "other", "prog", "jazz"];
+export const BEST_ORDER = ["death", "black", "other", "prog", "jazz", "punk", "electronic", "folk", "country", "classical", "hiphop", "pop"];
