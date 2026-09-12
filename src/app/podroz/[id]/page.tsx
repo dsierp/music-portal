@@ -28,7 +28,7 @@ export default async function ListPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ spotify?: string; n?: string; pominieto?: string; url?: string }>;
+  searchParams: Promise<{ spotify?: string; n?: string; pominieto?: string; url?: string; usun?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
@@ -37,6 +37,7 @@ export default async function ListPage({
   const data = await getList(id).catch(() => null);
   if (!data) notFound();
   const moja = user?.id === data.list.userId;
+  const usuwanie = sp.usun === "1";
   if (!(await canSeeList(user?.id ?? null, id, data.list.userId))) notFound();
 
   const [ludzie, wyslane] = moja
@@ -219,11 +220,24 @@ export default async function ListPage({
         </section>
       )}
 
+      {/* Kasowanie w dwóch krokach. Był tu jeden przycisk, który usuwał podróż
+          od razu — przy czymś nieodwracalnym to za mało. Pytanie idzie przez
+          adres, więc działa bez JavaScriptu i bez okienka. */}
       {moja && (
-        <form action={deleteListAction}>
-          <input type="hidden" name="listId" value={id} />
-          <button className="text-xs text-muted hover:text-warn">{t.lists.deleteList}</button>
-        </form>
+        usuwanie ? (
+          <div className="rounded border border-warn bg-warn/10 p-3">
+            <p className="text-sm text-warn">{fmt(t.lists.deleteConfirm, { title: data.list.title })}</p>
+            <div className="mt-2 flex items-baseline gap-4">
+              <form action={deleteListAction}>
+                <input type="hidden" name="listId" value={id} />
+                <button className="text-sm font-medium text-warn hover:underline">{t.lists.deleteYes}</button>
+              </form>
+              <Link href={`/podroz/${id}`} className="text-sm text-muted hover:text-accent2">{t.common.cancel}</Link>
+            </div>
+          </div>
+        ) : (
+          <Link href={`/podroz/${id}?usun=1`} className="text-xs text-muted hover:text-warn">{t.lists.deleteList}</Link>
+        )
       )}
     </div>
   );

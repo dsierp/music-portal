@@ -7,7 +7,7 @@ import { mostCommented, topRated } from "@/lib/user-data";
 import { currentUser } from "@/lib/auth";
 import { getFavoriteArtists, getLikedAlbums, getMyLists, listsForMe, travelJournal } from "@/lib/user-data";
 import { TravelJournal } from "@/components/travel-journal";
-import { createListAction, dismissShareAction } from "@/app/actions";
+import { createListAction, deleteListAction, dismissShareAction } from "@/app/actions";
 import { i18n } from "@/lib/t";
 import { ScreenHelp } from "@/components/screen-help";
 import { fmt, plural } from "@/lib/i18n";
@@ -36,7 +36,12 @@ async function labelsFor(type: "ALBUM" | "ARTIST", mbids: string[]) {
   return out;
 }
 
-export default async function ListsPage() {
+export default async function ListsPage({ searchParams }: { searchParams: Promise<{ usun?: string }> }) {
+  // Numer podróży, o której usunięcie właśnie pytamy. Kasowanie idzie przez
+  // adres, a nie przez okienko: jest serwerowe, działa bez JavaScriptu
+  // i — najważniejsze — daje jeden krok na zastanowienie się. Wcześniej
+  // jedyny przycisk kasował od razu, bez pytania.
+  const doUsuniecia = (await searchParams).usun ?? null;
   const { locale, t } = await i18n();
   const user = await currentUser();
   const [topAlbums, topArtists, comAlbums, comArtists] = await Promise.all([topRated("ALBUM", 15), topRated("ARTIST", 15), mostCommented("ALBUM", 10), mostCommented("ARTIST", 10)]);
@@ -105,9 +110,28 @@ export default async function ListsPage() {
             {moje.length ? (
               <ul className="mt-3 space-y-1 text-sm">
                 {moje.map((l) => (
-                  <li key={l.id} className="flex items-baseline justify-between gap-2">
-                    <Link href={`/podroz/${l.id}`} className="truncate font-medium hover:text-accent2">{l.title}</Link>
-                    <span className="shrink-0 font-mono text-[10px] text-faint">{plural(locale, l.items, t.lists.itemsCount)}</span>
+                  <li key={l.id} className="space-y-1">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <Link href={`/podroz/${l.id}`} className="truncate font-medium hover:text-accent2">{l.title}</Link>
+                      <span className="flex shrink-0 items-baseline gap-3">
+                        <span className="font-mono text-[10px] text-faint">{plural(locale, l.items, t.lists.itemsCount)}</span>
+                        {doUsuniecia !== l.id && (
+                          <Link href={`/podroze?usun=${l.id}`} className="text-[10px] text-faint hover:text-warn">{t.lists.deleteList}</Link>
+                        )}
+                      </span>
+                    </div>
+                    {doUsuniecia === l.id && (
+                      <div className="rounded border border-warn bg-warn/10 p-2">
+                        <p className="text-xs text-warn">{fmt(t.lists.deleteConfirm, { title: l.title })}</p>
+                        <div className="mt-2 flex items-baseline gap-4">
+                          <form action={deleteListAction}>
+                            <input type="hidden" name="listId" value={l.id} />
+                            <button className="text-xs font-medium text-warn hover:underline">{t.lists.deleteYes}</button>
+                          </form>
+                          <Link href="/podroze" className="text-xs text-muted hover:text-accent2">{t.common.cancel}</Link>
+                        </div>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
