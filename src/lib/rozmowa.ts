@@ -103,14 +103,31 @@ async function tura(id: string, userId: string) {
   try {
     const { porozmawiaj, AiError } = await import("./ai");
     const ud = await import("./user-data");
-    const style = (await ud.getGenres(userId).catch(() => [])).map((g) => g.genre);
-    const zna = (await ud.getLikedAlbums(userId).catch(() => [])).map((a) => `${a.artistName} – ${a.title}`);
+    // Co portal o nim wie. To jest cała przewaga nad zwykłym czatem: „poszukaj
+    // czegoś pod to, co lubię" ma sens tylko wtedy, gdy druga strona naprawdę
+    // widzi jego półkę.
+    const [style, lubiane, odrzucone, ulubieniArtysci, odrzuceniArtysci] = await Promise.all([
+      ud.getGenres(userId).then((g) => g.map((x) => x.genre)).catch(() => [] as string[]),
+      ud.getLikedAlbums(userId).catch(() => []),
+      ud.getLikedAlbums(userId, "dislike").catch(() => []),
+      ud.getFavoriteArtists(userId).catch(() => []),
+      ud.getFavoriteArtists(userId, "dislike").catch(() => []),
+    ]);
+    const podpis = (a: { artistName: string; title: string }) => `${a.artistName} – ${a.title}`;
+    const lubi = lubiane.map(podpis);
+    const nieLubi = [...odrzucone.map(podpis), ...odrzuceniArtysci.map((a) => a.name)];
 
     let odp;
     try {
       odp = await porozmawiaj(
         r.wiadomosci.map((w) => ({ rola: w.rola, tekst: w.tekst })),
-        { style, zna },
+        {
+          style,
+          lubi,
+          ulubieni: ulubieniArtysci.map((a) => a.name),
+          nieLubi,
+          zna: [...lubi, ...odrzucone.map(podpis)],
+        },
       );
     } catch (e) {
       const aiBlad = e instanceof AiError;

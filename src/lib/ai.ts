@@ -375,7 +375,17 @@ export interface OdpowiedzRozmowy {
  */
 export async function porozmawiaj(
   historia: TuraRozmowy[],
-  kontekst: { style?: string[]; zna?: string[] },
+  kontekst: {
+    style?: string[];
+    /** płyty, które oznaczył jako lubiane — jego GUST, nie tylko lista zakazana */
+    lubi?: string[];
+    /** zespoły w ulubionych */
+    ulubieni?: string[];
+    /** to, co odrzucił — „nie moja bajka" */
+    nieLubi?: string[];
+    /** wszystko, co już zna: lubiane, odrzucone i ocenione */
+    zna?: string[];
+  },
 ): Promise<OdpowiedzRozmowy> {
   const system = [
     "Jesteś rozmówcą w portalu dla ludzi słuchających metalu, proga i jazzu.",
@@ -388,6 +398,9 @@ export async function porozmawiaj(
     "- Nie powtarzasz płyt, które padły wcześniej w tej rozmowie.",
     "- `why` to jedno zdanie: co w tej płycie odpowiada na pytanie. Bez przymiotników bez pokrycia.",
     "- Gdy ktoś pyta o coś innego niż muzyka, odpowiadasz krótko i wracasz do płyt.",
+    "- Gdy prosi o coś „pod to, co lubię\" — jego ulubione zespoły i płyty są KOMPASEM, nie listą zakazaną.",
+    "  Szukaj rzeczy pokrewnych: ta sama scena, ten sam producent, ci sami ludzie w składzie, ten sam rodzaj brzmienia.",
+    "  W `why` napisz, do CZEGO z jego półki to pasuje — inaczej nie widać, czemu akurat to.",
     "",
     "Odpowiadasz WYŁĄCZNIE danymi JSON, bez komentarza i bez bloku kodu:",
     '{"odpowiedz":"…","plyty":[{"artist":"…","album":"…","why":"…"}]}',
@@ -396,7 +409,13 @@ export async function porozmawiaj(
 
   const czesci: string[] = [];
   if (kontekst.style?.length) czesci.push(`Style z jego profilu: ${kontekst.style.slice(0, 20).join(", ")}`);
-  if (kontekst.zna?.length) czesci.push(`To już zna — NIE proponuj tego: ${kontekst.zna.slice(0, 60).join("; ")}`);
+  // Gust osobno od listy zakazanej. Wcześniej lubiane płyty szły WYŁĄCZNIE jako
+  // „nie proponuj tego" — więc na prośbę „poszukaj czegoś pod to, co lubię"
+  // model dostawał jego półkę wyłącznie po to, żeby ją ominąć.
+  if (kontekst.ulubieni?.length) czesci.push(`Jego ulubione zespoły (to jest kompas): ${kontekst.ulubieni.slice(0, 40).join(", ")}`);
+  if (kontekst.lubi?.length) czesci.push(`Płyty, które oznaczył jako lubiane (kompas): ${kontekst.lubi.slice(0, 40).join("; ")}`);
+  if (kontekst.nieLubi?.length) czesci.push(`Odrzucił — omijaj takie klimaty: ${kontekst.nieLubi.slice(0, 20).join("; ")}`);
+  if (kontekst.zna?.length) czesci.push(`To już zna — NIE proponuj dokładnie tego: ${kontekst.zna.slice(0, 60).join("; ")}`);
   czesci.push(
     ["Rozmowa do tej pory:", ...historia.slice(-12).map((h) => `${h.rola === "ja" ? "ON" : "TY"}: ${h.tekst}`)].join("\n"),
   );
