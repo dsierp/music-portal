@@ -208,8 +208,13 @@ export const lists = pgTable(
  * razem" jest równie dobrym powodem do zrobienia listy, co „posłuchaj tego".
  * Koncert nie ma MBID-u w naszym rozumieniu (bywa z Ticketmastera) i nie ma
  * u nas własnej strony, więc trzyma przy sobie adres do afisza.
+ *
+ * RECORDING to pojedynczy UTWÓR (mbid nagrania z MusicBrainz). Świadomie nie
+ * ma własnej strony ani ocen: portal jest o płytach, a utwór jest tu po to,
+ * żeby dało się ułożyć trasę „po dwa kawałki z każdej płyty" i wysłać ją do
+ * Spotify bez zgadywania — playlista to utwory, nie płyty.
  */
-export const listTarget = pgEnum("list_target", ["ALBUM", "ARTIST", "CONCERT"]);
+export const listTarget = pgEnum("list_target", ["ALBUM", "ARTIST", "CONCERT", "RECORDING"]);
 
 export const listItems = pgTable(
   "list_item",

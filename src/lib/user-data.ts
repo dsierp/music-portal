@@ -332,7 +332,7 @@ export async function usersCount(): Promise<number> {
 // ---------- listy użytkowników ----------
 
 /** Na listę wchodzi też koncert — patrz komentarz przy `listTarget` w schemacie. */
-export type ListTarget = "ALBUM" | "ARTIST" | "CONCERT";
+export type ListTarget = "ALBUM" | "ARTIST" | "CONCERT" | "RECORDING";
 
 export interface ListItem {
   targetType: ListTarget;

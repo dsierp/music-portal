@@ -10,7 +10,7 @@ import { fmt } from "@/lib/i18n";
 import { RozmowaForm } from "@/components/rozmowa-form";
 import { Odswiezaj } from "@/components/odswiezanie";
 import { Pytanie } from "@/components/rozmowa-pytanie";
-import { podrozZRozmowy } from "@/app/actions";
+import { kawalkiZRozmowy, podrozZRozmowy } from "@/app/actions";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await i18n();
@@ -62,6 +62,12 @@ export default async function RozmowaPage({ params }: { params: Promise<{ id: st
           </div>
         ) : (
           <>
+            {/* Cała rozmowa siedzi w JEDNYM formularzu wyboru: ptaszki przy
+                płytach i dwa przyciski na dole działają na tym samym zbiorze.
+                Pole nowej wiadomości jest osobnym formularzem — formularzy nie
+                wolno zagnieżdżać. */}
+            <form id="wybor" className="space-y-6">
+            <input type="hidden" name="id" value={r.id} />
             {r.wiadomosci.map((w, i) => (
               <div key={i} className={w.rola === "ja" ? "" : "space-y-4"}>
                 {w.rola === "ja" ? (
@@ -74,11 +80,22 @@ export default async function RozmowaPage({ params }: { params: Promise<{ id: st
                         <p className="label">{t.chat.found} <span className="font-mono text-faint">{w.plyty.length}</span></p>
                         <div className="grid gap-2 sm:grid-cols-2">
                           {w.plyty.map((p) => (
-                            <AlbumCard
-                              key={p.album.mbid}
-                              album={p.album}
-                              extra={p.why ? <div className="text-xs text-muted">{p.why}</div> : undefined}
-                            />
+                            <div key={p.album.mbid} className="flex items-start gap-2">
+                              {/* Ptaszek, bo zbioru inaczej nie da się poprawić.
+                                  „Wymień mi X na Y" dokładało Y, ale X zostawało
+                                  i lądowało w podróży razem z nim. Domyślnie
+                                  wszystko zaznaczone — kto nie chce nic
+                                  odklikiwać, nie zauważy różnicy. */}
+                              <label className="mt-3 flex shrink-0 cursor-pointer items-center gap-1" title={t.chat.keepIt}>
+                                <input type="checkbox" name="wybrane" value={p.album.mbid} defaultChecked className="accent-accent" />
+                              </label>
+                              <div className="min-w-0 flex-1">
+                                <AlbumCard
+                                  album={p.album}
+                                  extra={p.why ? <div className="text-xs text-muted">{p.why}</div> : undefined}
+                                />
+                              </div>
+                            </div>
                           ))}
                         </div>
                       </>
@@ -140,16 +157,25 @@ export default async function RozmowaPage({ params }: { params: Promise<{ id: st
               </div>
             )}
 
-            {r.stan !== "robi" && <RozmowaForm t={t} id={r.id} />}
-
-            {/* Dopiero TU z szukania robi się lista — gdy człowiek uzna, że warto. */}
+            {/* Dopiero TU z szukania robi się lista — gdy człowiek uzna, że warto,
+                i z tego, co sam zostawił zaznaczone. */}
             {plyty.length > 0 && r.stan !== "robi" && (
-              <form action={podrozZRozmowy} className="border-t border-rule pt-6">
-                <input type="hidden" name="id" value={r.id} />
-                <button className="btn">{t.chat.makeJourney} <span className="ml-2 font-mono text-xs text-faint">{plyty.length}</span></button>
-                <p className="mt-2 text-xs text-faint">{t.chat.makeJourneyNote}</p>
-              </form>
+              <div className="space-y-4 border-t border-rule pt-6">
+                <div className="flex flex-wrap gap-3">
+                  <button formAction={podrozZRozmowy} className="btn">
+                    {t.chat.makeJourney}
+                  </button>
+                  <button formAction={kawalkiZRozmowy} className="btn btn-accent">
+                    {t.chat.pickStops}
+                  </button>
+                </div>
+                <p className="text-xs text-faint">{t.chat.makeJourneyNote}</p>
+                <p className="text-xs text-faint">{t.chat.pickStopsNote}</p>
+              </div>
             )}
+            </form>
+
+            {r.stan !== "robi" && <RozmowaForm t={t} id={r.id} />}
           </>
         )}
       </div>

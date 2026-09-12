@@ -430,13 +430,36 @@ export async function powiedzCos(_prev: unknown, formData: FormData): Promise<{ 
  * wtedy, gdy człowiek uzna, że warto. Odwrotna kolejność (najpierw lista)
  * robiła podróż z pierwszej lepszej odpowiedzi.
  */
+/**
+ * Które płyty z rozmowy człowiek zaznaczył.
+ *
+ * Bez tego zbiór był nieedytowalny: „wymień mi X na Y" dokładało Y, ale X
+ * zostawało — i lądowało w podróży razem z nim. Ptaszki są domyślnie wszystkie,
+ * więc kto nie chce nic odklikiwać, nie zauważy różnicy.
+ */
+function zaznaczone(formData: FormData, wszystkie: string[]): string[] {
+  const wybrane = formData.getAll("wybrane").map(String).filter(Boolean);
+  const ok = new Set(wszystkie);
+  const z = wybrane.filter((m) => ok.has(m));
+  return z.length ? z : wszystkie;
+}
+
+/**
+ * Podróż z rozmowy — dopiero TU powstaje lista.
+ *
+ * O to chodziło w całym tym ekranie: wynik modelu jest najpierw szukaniem,
+ * które da się pooglądać i podrążyć, a zapisaną podróżą staje się dopiero
+ * wtedy, gdy człowiek uzna, że warto — i z tego, co sam zaznaczył.
+ */
 export async function podrozZRozmowy(formData: FormData) {
   const u = await requireUser();
   const id = String(formData.get("id") ?? "");
   const { wczytajRozmowe, plytyZRozmowy } = await import("@/lib/rozmowa");
   const r = await wczytajRozmowe(id);
   if (!r || r.userId !== u.id) redirect("/rozmowa");
-  const plyty = plytyZRozmowy(r);
+  const wszystkie = plytyZRozmowy(r);
+  const wybor = new Set(zaznaczone(formData, wszystkie.map((p) => p.album.mbid)));
+  const plyty = wszystkie.filter((p) => wybor.has(p.album.mbid));
   if (!plyty.length) redirect(`/rozmowa/${id}`);
 
   const lista = await ud.createList(u.id, r.tytul, r.wiadomosci.find((w) => w.rola === "ja")?.tekst ?? null);
@@ -452,6 +475,48 @@ export async function podrozZRozmowy(formData: FormData) {
   }
   revalidatePath("/podroze");
   redirect(`/podroz/${lista.id}`);
+}
+
+/**
+ * „Wybierz przystanki" — z zaznaczonych płyt robimy listę POJEDYNCZYCH UTWORÓW.
+ *
+ * Po dwa kawałki z każdej płyty, wybrane z PRAWDZIWEJ tracklisty z MusicBrainz
+ * (patrz podroz-zadanie.ts). Dwa powody: dziesięć płyt to kilkanaście godzin
+ * słuchania, a playlista wysłana do Spotify przestaje zgadywać, bo utwór wchodzi
+ * jeden do jednego.
+ */
+export async function kawalkiZRozmowy(formData: FormData) {
+  const u = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const { wczytajRozmowe, plytyZRozmowy } = await import("@/lib/rozmowa");
+  const r = await wczytajRozmowe(id);
+  if (!r || r.userId !== u.id) redirect("/rozmowa");
+  const wszystkie = plytyZRozmowy(r);
+  const wybor = new Set(zaznaczone(formData, wszystkie.map((p) => p.album.mbid)));
+  const plyty = wszystkie
+    .filter((p) => wybor.has(p.album.mbid))
+    .map((p) => ({ mbid: p.album.mbid, label: `${p.album.artistText} – ${p.album.title}`.trim() }));
+  if (!plyty.length) redirect(`/rozmowa/${id}`);
+
+  const { zacznijKawalki } = await import("@/lib/podroz-zadanie");
+  const zadanie = await zacznijKawalki(u.id, r.tytul, plyty);
+  redirect(`/podroze/nieznane/${zadanie}`);
+}
+
+/** To samo, ale z gotowej podróży: zamienia jej płyty na kawałki w nowej liście. */
+export async function kawalkiZListy(formData: FormData) {
+  const u = await requireUser();
+  const listId = String(formData.get("listId") ?? "");
+  const dane = await ud.getList(listId).catch(() => null);
+  if (!dane || dane.list.userId !== u.id) redirect("/podroze");
+  const plyty = dane.items
+    .filter((i) => i.targetType === "ALBUM")
+    .map((i) => ({ mbid: i.targetMbid, label: i.label }));
+  if (!plyty.length) redirect(`/podroz/${listId}`);
+
+  const { zacznijKawalki } = await import("@/lib/podroz-zadanie");
+  const zadanie = await zacznijKawalki(u.id, dane.list.title, plyty);
+  redirect(`/podroze/nieznane/${zadanie}`);
 }
 
 /**

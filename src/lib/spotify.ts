@@ -220,6 +220,25 @@ export function zapytanieOAlbum(artist: string, title: string): string {
   return a ? `album:"${t}" artist:"${a}"` : `album:"${t}"`;
 }
 
+/**
+ * Pojedynczy utwór po nazwie. Przystanek typu RECORDING to konkretny kawałek,
+ * więc do playlisty wchodzi dokładnie on — bez dosypywania reszty płyty.
+ */
+async function znajdzUtwor(userId: string, artist: string, title: string): Promise<string | null> {
+  const szukaj = async (q: string) => {
+    if (!q) return null;
+    const dane = await api<{ tracks?: { items?: { uri: string }[] } }>(
+      userId,
+      `/search?type=track&limit=1&q=${encodeURIComponent(q)}`,
+    ).catch(() => null);
+    return dane?.tracks?.items?.[0]?.uri ?? null;
+  };
+  return (
+    (await szukaj(`track:"${title}" artist:"${artist}"`)) ??
+    (await szukaj([artist, title].filter(Boolean).join(" ")))
+  );
+}
+
 async function znajdzAlbum(userId: string, artist: string, title: string): Promise<string | null> {
   const szukaj = async (q: string) => {
     if (!q) return null;
@@ -284,7 +303,7 @@ export interface WynikWysylki {
 export async function journeyToPlaylist(
   userId: string,
   podroz: { title: string; description?: string | null },
-  przystanki: { targetType: "ALBUM" | "ARTIST" | "CONCERT"; label: string }[],
+  przystanki: { targetType: "ALBUM" | "ARTIST" | "CONCERT" | "RECORDING"; label: string }[],
 ): Promise<WynikWysylki | null> {
   const ja = await api<{ id: string }>(userId, "/me").catch(() => null);
   if (!ja?.id) return null;
@@ -292,6 +311,15 @@ export async function journeyToPlaylist(
   const uris: string[] = [];
   const pominiete: WynikWysylki["pominiete"] = [];
   for (const p of przystanki) {
+    // Utwór wchodzi jeden do jednego — i to jest dokładnie ten przypadek,
+    // w którym playlista wreszcie odpowiada temu, co widać na ekranie.
+    if (p.targetType === "RECORDING") {
+      const { artist, title } = rozbijEtykiete(p.label);
+      const uri = await znajdzUtwor(userId, artist, title);
+      if (uri) uris.push(uri);
+      else pominiete.push({ label: p.label, powod: "nieznaleziono" });
+      continue;
+    }
     if (p.targetType !== "ALBUM") {
       pominiete.push({ label: p.label, powod: "typ" });
       continue;

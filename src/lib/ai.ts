@@ -440,3 +440,61 @@ export async function porozmawiaj(
   if (!odpowiedz && !propozycje.length) throw new AiError("Model nie odpowiedział nic sensownego.", true);
   return { odpowiedz, propozycje };
 }
+
+/** Utwór wybrany z PODANEJ tracklisty — nie z pamięci modelu. */
+export interface WybranyKawalek {
+  /** indeks płyty w przekazanym zbiorze */
+  plyta: number;
+  /** tytuł utworu, dokładnie tak jak był podany */
+  tytul: string;
+  why: string;
+}
+
+/**
+ * Wybór kilku utworów z każdej płyty — z listy, którą sami podajemy.
+ *
+ * TO JEST CAŁY SENS TEJ FUNKCJI: model NIE podaje tytułów z pamięci. Dostaje
+ * prawdziwą tracklistę z MusicBrainz i ma wskazać pozycje z niej. Inaczej
+ * dostalibyśmy listę brzmiącą wiarygodnie i w połowie zmyśloną — a że utwór
+ * bez MBID-u nie ma jak trafić na trasę, wysypałoby się to dopiero przy
+ * kliknięciu.
+ *
+ * Numerujemy utwory, bo po numerze trafia się celniej niż po przepisanym
+ * tytule (modele gubią znaki diakrytyczne, nawiasy i wielkość liter).
+ */
+export async function wybierzKawalki(
+  zbior: { artysta: string; album: string; utwory: string[] }[],
+  ile = 2,
+): Promise<WybranyKawalek[]> {
+  const system = [
+    "Wybierasz utwory z PODANYCH list. Nie wolno Ci podać tytułu, którego nie ma na liście.",
+    "",
+    "Zasady:",
+    `- Z każdej płyty wybierasz dokładnie ${ile} pozycji (mniej tylko wtedy, gdy płyta ma mniej utworów).`,
+    "- Wybieraj to, co najlepiej pokazuje tę płytę komuś, kto jej nie zna — nie zawsze pierwszy kawałek.",
+    "- Unikaj intr, outr, skitów i rzeczy krótszych niż minuta.",
+    "- `why` to jedno krótkie zdanie po polsku: co w tym utworze jest warte posłuchania.",
+    "",
+    "Odpowiadasz WYŁĄCZNIE danymi JSON, bez komentarza i bez bloku kodu:",
+    '{"wybor":[{"plyta":0,"tytul":"…","why":"…"}]}',
+    "`plyta` to numer płyty z listy poniżej, `tytul` przepisany DOKŁADNIE z jej tracklisty.",
+  ].join("\n");
+
+  const opis = zbior
+    .map((p, i) => `PŁYTA ${i}: ${p.artysta} – ${p.album}\n${p.utwory.map((u, j) => `  ${j + 1}. ${u}`).join("\n")}`)
+    .join("\n\n");
+
+  const tekst = await zapytaj(system, opis);
+  const dane = wyluskaj(tekst);
+  if (dane === null) throw new AiError("Odpowiedź modelu nie jest poprawnym JSON-em.", true);
+  const lista = pierwszaTablica(dane);
+  if (!lista) throw new AiError("Model nie zwrócił listy.", true);
+  return lista
+    .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
+    .map((x) => ({
+      plyta: Number(x.plyta ?? x.album ?? x.nr ?? -1),
+      tytul: pole(x, ["tytul", "tytuł", "title", "utwor", "utwór", "track"]),
+      why: pole(x, ["why", "dlaczego", "powod", "powód", "reason", "note"]).slice(0, 300),
+    }))
+    .filter((w) => w.tytul && Number.isInteger(w.plyta) && w.plyta >= 0 && w.plyta < zbior.length);
+}

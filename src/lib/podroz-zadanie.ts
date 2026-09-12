@@ -95,3 +95,110 @@ async function wykonaj(id: string, userId: string, opis: string) {
     await zapisz({ stan: "blad", opis, blad: "nieznany", szczegol: e instanceof Error ? e.message : String(e) });
   }
 }
+
+/**
+ * Zamiana płyt na KAWAŁKI — po kilka z każdej, z prawdziwej tracklisty.
+ *
+ * Idzie w tle z tego samego powodu co reszta: tracklista każdej płyty to
+ * zapytanie do MusicBrainz (jedno na sekundę), a potem jeszcze model. Przy
+ * dziesięciu płytach to pół minuty i nie ma prawa zginąć, gdy ktoś odejdzie
+ * od ekranu. Wynik trafia pod ten sam ekran czekania, co podróże.
+ */
+export async function zacznijKawalki(
+  userId: string,
+  tytul: string,
+  plyty: { mbid: string; label: string }[],
+  ile = 2,
+): Promise<string> {
+  const { after } = await import("next/server");
+  const id = crypto.randomUUID();
+  await kvSet(klucz(id), { stan: "robi", opis: tytul, start: Date.now() } satisfies StanZadania);
+  after(async () => {
+    await wykonajKawalki(id, userId, tytul, plyty, ile);
+  });
+  return id;
+}
+
+async function wykonajKawalki(
+  id: string,
+  userId: string,
+  tytul: string,
+  plyty: { mbid: string; label: string }[],
+  ile: number,
+) {
+  const zapisz = (s: StanZadania) => kvSet(klucz(id), s);
+  try {
+    const { getAlbum } = await import("./musicbrainz");
+    const { wybierzKawalki, AiError } = await import("./ai");
+
+    // Prawdziwe tracklisty. Płyta, której MusicBrainz nie odda, po prostu
+    // wypada — lepiej krótsza trasa niż przystanek, w który nie da się wejść.
+    const zbior: { artysta: string; album: string; utwory: { tytul: string; mbid: string }[] }[] = [];
+    for (const p of plyty.slice(0, 15)) {
+      const album = await getAlbum(p.mbid).catch(() => null);
+      if (!album?.tracks?.length) continue;
+      zbior.push({
+        artysta: album.artistText,
+        album: album.title,
+        utwory: album.tracks
+          .filter((t) => t.recordingMbid)
+          .map((t) => ({ tytul: t.title, mbid: t.recordingMbid! })),
+      });
+    }
+    if (!zbior.length) {
+      await zapisz({ stan: "blad", opis: tytul, blad: "mbAwaria" });
+      return;
+    }
+
+    let wybor;
+    try {
+      wybor = await wybierzKawalki(
+        zbior.map((z) => ({ artysta: z.artysta, album: z.album, utwory: z.utwory.map((u) => u.tytul) })),
+        ile,
+      );
+    } catch (e) {
+      const aiBlad = e instanceof AiError;
+      if (!aiBlad) console.error("kawalki:", e);
+      await zapisz({ stan: "blad", opis: tytul, blad: aiBlad ? "model" : "nieznany", szczegol: e instanceof Error ? e.message : String(e) });
+      return;
+    }
+
+    // Tytuł z odpowiedzi wracamy na MBID. Porównujemy luźno, bo modele gubią
+    // wielkość liter, nawiasy i znaki diakrytyczne — ale jeśli nic nie pasuje,
+    // pozycja wypada. Nie zgadujemy „chodziło mu pewnie o ten".
+    const luzno = (s: string) => s.toLowerCase().replace(/[^a-z0-9ąćęłńóśźż]+/gi, "");
+    const przystanki: { mbid: string; label: string; note: string }[] = [];
+    const widziane = new Set<string>();
+    for (const w of wybor) {
+      const p = zbior[w.plyta];
+      if (!p) continue;
+      const u = p.utwory.find((x) => luzno(x.tytul) === luzno(w.tytul)) ?? p.utwory.find((x) => luzno(x.tytul).startsWith(luzno(w.tytul)));
+      if (!u || widziane.has(u.mbid)) continue;
+      widziane.add(u.mbid);
+      przystanki.push({ mbid: u.mbid, label: `${p.artysta} – ${u.tytul}`, note: w.why });
+    }
+    // Gdy model kompletnie nie trafił, bierzemy po prostu pierwsze utwory —
+    // pusta lista byłaby gorsza niż lista bez uzasadnień.
+    if (!przystanki.length) {
+      for (const p of zbior) {
+        for (const u of p.utwory.slice(0, ile)) {
+          if (widziane.has(u.mbid)) continue;
+          widziane.add(u.mbid);
+          przystanki.push({ mbid: u.mbid, label: `${p.artysta} – ${u.tytul}`, note: "" });
+        }
+      }
+    }
+
+    await podbijLicznik(userId, "nieznane");
+    const lista = await ud.createList(userId, tytul, null);
+    for (const p of przystanki) {
+      await ud
+        .addToList(userId, lista.id, { targetType: "RECORDING", targetMbid: p.mbid, label: p.label, note: p.note || null })
+        .catch(() => {});
+    }
+    await zapisz({ stan: "gotowe", opis: tytul, listId: lista.id });
+  } catch (e) {
+    console.error("kawalki (poza obsługą):", e);
+    await zapisz({ stan: "blad", opis: tytul, blad: "nieznany", szczegol: e instanceof Error ? e.message : String(e) });
+  }
+}

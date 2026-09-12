@@ -1,0 +1,1 @@
+ALTER TYPE "public"."list_target" ADD VALUE 'RECORDING';

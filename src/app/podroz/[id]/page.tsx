@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { currentUser } from "@/lib/auth";
 import { canSeeList, getList, otherUsers, sharedWith, visitedStops } from "@/lib/user-data";
 import { spotifyConfigured, spotifyConnected } from "@/lib/spotify";
-import { connectSpotify, deleteListAction, removeFromListAction, sendJourneyToSpotify, shareListAction, toggleVisitAction } from "@/app/actions";
+import { connectSpotify, deleteListAction, kawalkiZListy, removeFromListAction, sendJourneyToSpotify, shareListAction, toggleVisitAction } from "@/app/actions";
 import { Cover } from "@/components/cover";
 import { i18n } from "@/lib/t";
 import { fmt, formatDate, plural } from "@/lib/i18n";
@@ -95,6 +95,10 @@ export default async function ListPage({
                   ) : (
                     <span className="block truncate font-medium">{it.label}</span>
                   )
+                ) : it.targetType === "RECORDING" ? (
+                  /* Utwór świadomie nie ma u nas strony — portal jest o płytach.
+                     Zostaje nazwa i wyjścia do serwisów, bo po to tu jest. */
+                  <span className="block truncate font-medium">{it.label}</span>
                 ) : (
                   <Link
                     href={it.targetType === "ALBUM" ? `/album/${it.targetMbid}` : `/artist/${it.targetMbid}`}
@@ -104,7 +108,13 @@ export default async function ListPage({
                   </Link>
                 )}
                 <span className="font-mono text-[10px] uppercase text-faint">
-                  {it.targetType === "ALBUM" ? t.common.album : it.targetType === "ARTIST" ? t.common.band : t.nav.concerts}
+                  {it.targetType === "ALBUM"
+                    ? t.common.album
+                    : it.targetType === "ARTIST"
+                      ? t.common.band
+                      : it.targetType === "RECORDING"
+                        ? t.lists.trackLabel
+                        : t.nav.concerts}
                 </span>
                 {it.note && <p className="text-xs text-muted">{it.note}</p>}
                 {/* Wyjścia do serwisów prowadzą przez naszą trasę, która po
@@ -218,6 +228,16 @@ export default async function ListPage({
             <p className="mt-2 text-sm text-muted">{t.lists.shareNoUsers}</p>
           )}
         </section>
+      )}
+
+      {/* Z płyt na kawałki. Osobna lista, nie przeróbka tej — podróż po płytach
+          i wieczór po dwa kawałki to dwie różne rzeczy i obie mają prawo istnieć. */}
+      {moja && data.items.some((i) => i.targetType === "ALBUM") && (
+        <form action={kawalkiZListy} className="border-t border-rule pt-6">
+          <input type="hidden" name="listId" value={id} />
+          <button className="btn">{t.lists.pickStops}</button>
+          <p className="mt-2 text-xs text-faint">{t.lists.pickStopsNote}</p>
+        </form>
       )}
 
       {/* Kasowanie w dwóch krokach. Był tu jeden przycisk, który usuwał podróż
