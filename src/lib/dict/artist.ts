@@ -46,7 +46,7 @@ const pl = {
   crewStudio: "Produkcja i realizacja",
   crewOnAlbums: "przy {n}",
   genresFromWikidata: "gatunki z Wikidanych — MusicBrainz nie ma tu żadnego tagu",
-  noGenres: "Ani MusicBrainz, ani Wikidane nie mają gatunku dla tego zespołu. Tyle udało się zebrać.",
+  noGenres: "Ani MusicBrainz, ani Wikidane nie mają gatunku dla tego artysty. Tyle udało się zebrać.",
   relatedYears: "{years}",
   mbUnavailableWhat: "artysty",
   missingAlbumNotice: "„{title}” nie ma jeszcze w MusicBrainz — dlatego jesteś na stronie artysty, a nie płyty. Bazę uzupełniają ludzie; jeśli znasz tę płytę, możesz ją tam dopisać.",
@@ -82,10 +82,10 @@ const pl = {
   creditsNote: "Praca przy płytach, która nie jest graniem — w MusicBrainz wisi przy wydaniu, nie przy utworze. Stąd też da się ruszyć w podróż.",
   creditsMoreNote: "Pokazujemy 60 najnowszych z {n}.",
 
-  relatedHeading: "Powiązane zespoły",
-  relatedNote: "Liczone z MusicBrainz: przede wszystkim wspólni muzycy, pomocniczo wspólne gatunki. Bez zgadywania — przy każdym zespole widać, co go łączy.",
+  relatedHeading: "Powiązani artyści",
+  relatedNote: "Liczone z MusicBrainz: przede wszystkim wspólni muzycy, pomocniczo wspólne gatunki. Bez zgadywania — przy każdym widać, co łączy.",
   relatedShared: "wspólne: {genres}",
-  relatedLoading: "Szukam powiązanych zespołów…",
+  relatedLoading: "Szukam powiązanych artystów…",
 
   deepLoading: "Wczytuję dyskografię i skład — przy artystach z długim dorobkiem chwilę to trwa…",
 
@@ -194,7 +194,7 @@ const en: T = {
   creditsNote: "Work on records that isn't playing an instrument — MusicBrainz files it against the release, not the recording, so it opens up a trail of its own.",
   creditsMoreNote: "Showing the 60 most recent of {n}.",
 
-  relatedHeading: "Related bands",
+  relatedHeading: "Related artists",
   relatedNote: "Worked out from MusicBrainz: shared musicians count most, shared genres are a tiebreaker. No guessing — each band shows exactly what connects it.",
   relatedShared: "shared: {genres}",
   relatedLoading: "Looking for related bands…",
@@ -305,7 +305,7 @@ const es: T = {
   creditsNote: "Trabajo en discos que no es tocar un instrumento — MusicBrainz lo registra en el lanzamiento, no en la grabación, así que también abre su propio camino.",
   creditsMoreNote: "Mostrando los 60 más recientes de {n}.",
 
-  relatedHeading: "Bandas relacionadas",
+  relatedHeading: "Artistas relacionados",
   relatedNote: "Calculado a partir de MusicBrainz: sobre todo músicos en común, y como criterio secundario, géneros compartidos. Sin adivinar — cada banda muestra exactamente qué la conecta.",
   relatedShared: "en común: {genres}",
   relatedLoading: "Buscando bandas relacionadas…",
@@ -416,7 +416,7 @@ const de: T = {
   creditsNote: "Arbeit an Alben, die kein Instrumentalspiel ist — MusicBrainz führt sie beim Release, nicht bei der Aufnahme, und eröffnet damit einen eigenen Pfad.",
   creditsMoreNote: "Die 60 neuesten von {n} werden angezeigt.",
 
-  relatedHeading: "Verwandte Bands",
+  relatedHeading: "Verwandte Künstler",
   relatedNote: "Aus MusicBrainz errechnet: vor allem gemeinsame Musiker, ergänzend gemeinsame Genres. Ohne Raten — bei jeder Band ist zu sehen, was sie verbindet.",
   relatedShared: "gemeinsam: {genres}",
   relatedLoading: "Suche verwandte Bands…",

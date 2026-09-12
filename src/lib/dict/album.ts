@@ -22,7 +22,7 @@ const pl = {
   wikiCreditsPrefix: "Źródło:",
   wikiCreditsSuffix: " — MusicBrainz nie ma jeszcze tego składu na poziomie nagrań. Nazwiska rozpoznane w MusicBrainz prowadzą do profilu; pozostałe (kropkowane) do wyszukiwarki portalu.",
   searchInPortalTitle: "Szukaj w portalu",
-  noLineupPrefix: "MusicBrainz nie ma jeszcze składu tej płyty. Zajrzyj do zespołu",
+  noLineupPrefix: "MusicBrainz nie ma jeszcze składu tej płyty. Zajrzyj do artysty",
   noLineupMembers: "(członkowie) albo",
 
   currentLineupHeading: "Zespół w tym czasie",

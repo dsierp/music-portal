@@ -37,7 +37,7 @@ const pl = {
   journeyTitle: "Z rozmowy",
   newChat: "Nowa rozmowa",
   yours: "Twoje rozmowy",
-  empty: "Jeszcze nie rozmawialiśmy. Zacznij od czegokolwiek — nastroju, zespołu, płyty, której masz dość.",
+  empty: "Jeszcze nie rozmawialiśmy. Zacznij od czegokolwiek — nastroju, artysty, płyty, której masz dość.",
   gone: "Nie mam już tej rozmowy. Trzymamy je dobę.",
   loginRest: ", żeby pogadać — rozmowa zapisuje się na Twoim koncie.",
   noKey: "Ten ekran potrzebuje klucza do modelu językowego. Bez niego reszta portalu działa normalnie.",

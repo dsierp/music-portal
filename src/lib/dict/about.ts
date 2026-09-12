@@ -15,7 +15,7 @@ const pl = {
 
   whatTitle: "Co tu robisz",
   whatBody:
-    "Przeglądasz piątkowe premiery ułożone pod Twoje gatunki, wchodzisz w płytę albo zespół i ciągniesz dalej: kto grał w składzie, w czym jeszcze gra, kto to wyprodukował i co jeszcze wyprodukował. Oceniasz, komentujesz, odkładasz na później. Z przystanków układasz podróże — własne trasy przez muzykę, którymi możesz się z kimś podzielić. Do tego koncerty w Twoich miastach.",
+    "Przeglądasz piątkowe premiery ułożone pod Twoje gatunki, wchodzisz w płytę albo artystę i ciągniesz dalej: kto grał w składzie, w czym jeszcze gra, kto to wyprodukował i co jeszcze wyprodukował. Oceniasz, komentujesz, odkładasz na później. Z przystanków układasz podróże — własne trasy przez muzykę, którymi możesz się z kimś podzielić. Do tego koncerty w Twoich miastach.",
 
   dataTitle: "Skąd dane",
   dataBody:
@@ -31,7 +31,7 @@ const pl = {
 
   backHome: "Wróć na stronę główną",
   onboardingBody:
-    "Portal prowadzi po muzyce spoza głównego nurtu: premiery, składy, kto z kim grał, koncerty i podróże układane z płyt oraz zespołów.",
+    "Portal prowadzi po muzyce spoza głównego nurtu: premiery, składy, kto z kim grał, koncerty i podróże układane z płyt oraz artystów.",
   onboardingMore: "więcej o portalu →",
 };
 type T = typeof pl;

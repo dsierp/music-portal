@@ -3,9 +3,9 @@ import type { Locale } from "@/lib/i18n";
 
 const pl = {
   lineupTitle: "Zmiany w składach",
-  lineupNote: "Z dat członkostwa w MusicBrainz — ostatnie półtora roku. ★ to Twoje ulubione zespoły.",
-  lineupEmpty: "Nie masz jeszcze ulubionych zespołów. Postaw gwiazdkę na stronie dowolnego zespołu, a tutaj zobaczysz, kto do niego wszedł i kto z niego odszedł.",
-  lineupNoNews: "W Twoich ulubionych zespołach nic się ostatnio nie zmieniło — przynajmniej nic, co trafiło do MusicBrainz.",
+  lineupNote: "Z dat członkostwa w MusicBrainz — ostatnie półtora roku. ★ to Twoi ulubieni artyści.",
+  lineupEmpty: "Nie masz jeszcze ulubionych artystów. Postaw gwiazdkę na stronie dowolnego, a tutaj zobaczysz, kto wszedł do składu i kto z niego odszedł.",
+  lineupNoNews: "U Twoich ulubionych artystów nic się ostatnio nie zmieniło w składach — przynajmniej nic, co trafiło do MusicBrainz.",
   joined: "dołączył(a) do",
   left: "odszedł(-ła) z",
   lineupLoading: "Sprawdzam zmiany w składach…",

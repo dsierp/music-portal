@@ -16,9 +16,9 @@ const pl = {
   logOut: "wyloguj",
   me: "Profil",
   search: "Szukaj",
-  searchPlaceholder: "zespół, płyta, muzyk…",
+  searchPlaceholder: "artysta, płyta, muzyk…",
   language: "Język",
-  siteDescription: "Premiery, best of i podróż po płytach, zespołach i muzykach. Metal, prog, jazz.",
+  siteDescription: "Premiery, best of i podróż po płytach, artystach i muzykach. Metal, prog, jazz.",
   footer: "Dane: MusicBrainz · Wikipedia · Cover Art Archive. Oceny i komentarze należą do użytkowników portalu.",
 };
 type T = typeof pl;
@@ -33,7 +33,7 @@ const en: T = {
   logOut: "sign out",
   me: "Profile",
   search: "Search",
-  searchPlaceholder: "band, album, musician…",
+  searchPlaceholder: "artist, album, musician…",
   language: "Language",
   siteDescription: "New releases, best-of lists and a journey through albums, bands and musicians. Metal, prog, jazz.",
   footer: "Data: MusicBrainz · Wikipedia · Cover Art Archive. Ratings and comments belong to the people who wrote them.",

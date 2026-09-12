@@ -30,7 +30,7 @@ const pl = {
     lead: "Punkt wyjścia: co nowego i co Twoje.",
     steps: [
       { h: "Premiery pod Ciebie", p: "Piątkowe nowości zawężone do gatunków, które wybrałeś w profilu." },
-      { h: "Kto zmienił zespół", p: "Zmiany w składach zespołów, które oznaczyłeś gwiazdką. Bez ulubionych ta sekcja nie ma czego pokazać — gwiazdkę stawia się na stronie zespołu." },
+      { h: "Kto zmienił zespół", p: "Zmiany w składach zespołów, które oznaczyłeś gwiazdką. Bez ulubionych ta sekcja nie ma czego pokazać — gwiazdkę stawia się na stronie artysty." },
       { h: "Dziennik i podróże", p: "Po prawej Twoje ślady i trasy przez muzykę, do których wracasz." },
     ],
   },
@@ -39,8 +39,8 @@ const pl = {
     lead: "Stąd zaczyna się każde odkrycie. Szukaj tu, nie w serwisie streamingowym.",
     steps: [
       { h: "Wpisz cokolwiek", p: "Zespół, płytę albo nazwisko muzyka — nawet z literówką, portal spróbuje się domyślić." },
-      { h: "Zawęź zakresem", p: "Chipsy nad wynikami pytają osobno o płyty, zespoły i ludzi — przy zawężeniu trafień jest więcej." },
-      { h: "Nie kończ na wyniku", p: "Wejdź w płytę, potem w muzyka ze składu, potem w jego inne zespoły. Tu zaczyna się odkrywanie." },
+      { h: "Zawęź zakresem", p: "Chipsy nad wynikami pytają osobno o płyty, artystów i ludzi — przy zawężeniu trafień jest więcej." },
+      { h: "Nie kończ na wyniku", p: "Wejdź w płytę, potem w muzyka ze składu, potem w jego innych artystów. Tu zaczyna się odkrywanie." },
     ],
   },
   premiery: {
@@ -53,13 +53,13 @@ const pl = {
     ],
   },
   artysta: {
-    title: "Strona zespołu albo muzyka",
+    title: "Strona artysty albo muzyka",
     lead: "Najważniejszy ekran w portalu — stąd prowadzą wszystkie nitki.",
     steps: [
       { h: "Oś czasu składu", p: "Kto i kiedy grał. Przerywana kreska znaczy, że dat nie zna żadna baza — nie zgadujemy." },
       { h: "Grał na płytach", p: "U muzyka: czyje płyty nagrywał poza własnymi zespołami. Tędy trafia się najdalej." },
       { h: "Kto to nagrał", p: "Producenci i autorzy okładek. Każde nazwisko to kolejny przystanek — zobacz, przy czym jeszcze pracowali." },
-      { h: "Powiązane zespoły", p: "Liczone ze wspólnych muzyków, nie z popularności. Dlatego prowadzą gdzieś dalej niż „podobni wykonawcy”." },
+      { h: "Powiązani artyści", p: "Liczone ze wspólnych muzyków, nie z popularności. Dlatego prowadzą gdzieś dalej niż „podobni wykonawcy”." },
     ],
   },
   plyta: {
@@ -76,7 +76,7 @@ const pl = {
     title: "Koncerty",
     lead: "Czy i gdzie grają — w miastach, które sam wskażesz.",
     steps: [
-      { h: "Ustaw miasta", p: "Osobno dla ulubionych zespołów i osobno dla gatunków: po ulubionych jedzie się dalej." },
+      { h: "Ustaw miasta", p: "Osobno dla ulubionych artystów i osobno dla gatunków: po ulubionych jedzie się dalej." },
       { h: "Twoje gatunki na wierzchu", p: "Reszta zostaje widoczna, ale niżej — masz decydować sam." },
       { h: "Weź kogoś ze sobą", p: "Koncert też jest przystankiem: wrzuć go do podróży i poleć znajomemu." },
     ],
@@ -85,7 +85,7 @@ const pl = {
     title: "Podróże",
     lead: "Ułożona przez Ciebie trasa przez muzykę — do siebie albo dla kogoś.",
     steps: [
-      { h: "Dokładaj przystanki", p: "Płyty, zespoły, muzycy i koncerty; kolejność jest treścią, więc układ ma znaczenie." },
+      { h: "Dokładaj przystanki", p: "Płyty, artyści, muzycy i koncerty; kolejność jest treścią, więc układ ma znaczenie." },
       { h: "Odhaczaj po drodze", p: "Ptaszek stawia się sam, gdy ocenisz płytę albo wyjdziesz stąd do Spotify czy Tidala." },
       { h: "Poleć albo wyślij sobie", p: "Możesz podrzucić podróż komuś z portalu, a całość zapisać jako prywatną playlistę w Spotify." },
     ],
