@@ -88,8 +88,8 @@ function Actions({ links, href, t, small = false }: { links: { spotify: string; 
   const pill = "rounded-full border px-3 py-1 font-mono transition-colors";
   return (
     <div className={`flex flex-wrap items-center gap-2 ${small ? "text-[11px]" : "text-xs"}`}>
-      <a href={links.spotify} target="_blank" rel="noopener" className={`${pill} border-spotify/40 text-spotify hover:bg-spotify/10`}>▶ Spotify</a>
-      <a href={links.tidal} target="_blank" rel="noopener" className={`${pill} border-tidal/40 text-tidal hover:bg-tidal/10`}>▶ Tidal</a>
+      <a href={links.spotify} target="_blank" rel="noopener" className={`${pill} border-spotify/40 text-spotify hover:bg-spotify/10`}>▸ Spotify</a>
+      <a href={links.tidal} target="_blank" rel="noopener" className={`${pill} border-tidal/40 text-tidal hover:bg-tidal/10`}>⌕ Tidal</a>
       <Link href={href} className={`${pill} border-rule text-muted hover:border-accent2 hover:text-accent2`}>{t.releases.travelCta}</Link>
     </div>
   );
