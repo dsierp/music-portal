@@ -44,3 +44,13 @@ test("bas nie jest gitarą — także w zapisie „bass guitar\"", () => {
   assert.equal(instrumentGroup("electric bass guitar"), "bass");
   assert.equal(instrumentGroup("guitar"), "guitar");
 });
+
+test("membranophone to po prostu bebny", () => {
+  assert.equal(czytelnaRola("membranophone"), "drums");
+  assert.equal(czytelnaRola("Membranophone"), "drums");
+});
+
+test("zrozumiala nazwa zostaje nietknieta", () => {
+  assert.equal(czytelnaRola("bass guitar"), "bass guitar");
+  assert.equal(czytelnaRola("lead vocals"), "lead vocals");
+});

@@ -709,7 +709,11 @@ function normMembership(r: MbArtistRel): Membership | null {
     mbid: r.artist.id,
     name: r.artist.name,
     type: r.artist.type ?? null,
-    roles: (r.attributes ?? []).filter((a) => !["original", "founder"].includes(a)),
+    // Przez `czytelnaRola`, tak samo jak przy nagraniach — inaczej w składzie
+    // stoi „membranophone" zamiast „drums". To nazwa rodziny z klasyfikacji
+    // Hornbostela-Sachsa; redaktorzy MusicBrainz sięgają po nią, gdy nie wiedzą,
+    // na czym dokładnie ktoś grał. Prawdziwa, tylko zapisana dla muzykologa.
+    roles: (r.attributes ?? []).filter((a) => !["original", "founder"].includes(a)).map(czytelnaRola),
     begin: r.begin ?? null,
     end: r.end ?? null,
     current: !r.ended,

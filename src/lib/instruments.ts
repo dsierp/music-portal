@@ -59,6 +59,10 @@ const ZARGON: [RegExp, string][] = [
   [/^electrophone$/i, "electronic instrument"],
   [/^drums \(drum set\)$/i, "drums"],
   [/^other instruments$/i, "instrument"],
+  [/^lamellophone$/i, "thumb piano"],
+  [/^guitar family$/i, "guitar"],
+  [/^percussion$/i, "percussion"],
+  [/^family instruments?$/i, "instrument"],
 ];
 
 export function czytelnaRola(role: string): string {
