@@ -9,12 +9,13 @@
 import type { Locale } from "@/lib/i18n";
 
 const pl = {
-  eyebrow: "Rozmowa",
-  title: "Pogadajmy o muzyce",
-  lead: "Napisz, czego szukasz. Odpowiem płytami — a że każdą sprawdzam w MusicBrainz, w każdą da się wejść.",
+  eyebrow: "Podróż",
+  title: "W nieznane",
+  lead: "Reszta portalu wie, dokąd jedziesz — ta jedna nie. Napisz, czego chcesz posłuchać, a dostaniesz płyty: sprawdzone w MusicBrainz, więc w każdą da się wejść. Możesz dopytywać do skutku, a na końcu zrobić z tego podróż.",
   label: "Twoja wiadomość",
   placeholder: "Czego szukasz? Możesz dopytywać, zawężać, prosić o coś zupełnie innego…",
   send: "Wyślij",
+  cta: "Rusz w nieznane",
   working: "Szukam płyt i sprawdzam każdą w MusicBrainz",
   workingShort: "Szukam…",
   leaveOk: "Możesz stąd wyjść — odpowiedź czeka pod tym adresem.",
@@ -54,12 +55,13 @@ const pl = {
 type T = typeof pl;
 
 const en: T = {
-  eyebrow: "Conversation",
-  title: "Let's talk music",
-  lead: "Write what you're after. I answer with albums — and since every one is checked against MusicBrainz, every one opens.",
+  eyebrow: "Journey",
+  title: "Into the unknown",
+  lead: "The rest of the portal knows where you're going — this one doesn't. Write what you feel like hearing and you get albums: checked against MusicBrainz, so every one opens. Keep asking as long as you like, then turn it into a journey.",
   label: "Your message",
   placeholder: "What are you after? Ask follow-ups, narrow it down, change direction…",
   send: "Send",
+  cta: "Set off",
   working: "Looking for albums and checking each one against MusicBrainz",
   workingShort: "Searching…",
   leaveOk: "You can leave this page — the answer will be waiting at this address.",
@@ -98,12 +100,13 @@ const en: T = {
 };
 
 const es: T = {
-  eyebrow: "Conversación",
-  title: "Hablemos de música",
-  lead: "Escribe qué buscas. Respondo con discos y compruebo cada uno en MusicBrainz, así que todos se pueden abrir.",
+  eyebrow: "Viaje",
+  title: "Hacia lo desconocido",
+  lead: "El resto del portal sabe adónde vas; este no. Escribe qué te apetece escuchar y recibirás discos comprobados en MusicBrainz, así que todos se abren. Pregunta lo que haga falta y al final conviértelo en un viaje.",
   label: "Tu mensaje",
   placeholder: "¿Qué buscas? Puedes repreguntar, acotar o cambiar de rumbo…",
   send: "Enviar",
+  cta: "Zarpar",
   working: "Busco discos y compruebo cada uno en MusicBrainz",
   workingShort: "Buscando…",
   leaveOk: "Puedes salir de aquí: la respuesta te esperará en esta dirección.",
@@ -142,12 +145,13 @@ const es: T = {
 };
 
 const de: T = {
-  eyebrow: "Gespräch",
-  title: "Reden wir über Musik",
-  lead: "Schreib, was du suchst. Ich antworte mit Alben — und weil ich jedes bei MusicBrainz prüfe, lässt sich jedes öffnen.",
+  eyebrow: "Reise",
+  title: "Ins Unbekannte",
+  lead: "Der Rest des Portals weiß, wohin du willst — dieser Teil nicht. Schreib, wonach dir ist, und du bekommst Alben: bei MusicBrainz geprüft, also lässt sich jedes öffnen. Frag so lange nach, wie du magst, und mach am Ende eine Reise daraus.",
   label: "Deine Nachricht",
   placeholder: "Was suchst du? Nachfragen, eingrenzen, Richtung wechseln — alles möglich…",
   send: "Senden",
+  cta: "Aufbrechen",
   working: "Ich suche Alben und prüfe jedes über MusicBrainz",
   workingShort: "Suche…",
   leaveOk: "Du kannst die Seite verlassen — die Antwort wartet unter dieser Adresse.",

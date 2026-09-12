@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Masthead } from "@/components/masthead";
+import { Banner } from "@/components/banner";
 import { AlbumCard } from "@/components/cards";
-import { heroArt, leadStyle } from "@/lib/lead-style";
+
 import { currentUser } from "@/lib/auth";
-import { getGenres } from "@/lib/user-data";
 import { wczytajRozmowe, plytyZRozmowy } from "@/lib/rozmowa";
 import { i18n } from "@/lib/t";
 import { fmt } from "@/lib/i18n";
@@ -39,14 +38,17 @@ export default async function RozmowaPage({ params }: { params: Promise<{ id: st
   const { t } = await i18n();
   const user = await currentUser();
   const r = await wczytajRozmowe(id);
-  const lead = leadStyle(user ? await getGenres(user.id) : []);
   const bledy = t.chat.errors as Record<string, string>;
   const mojaRozmowa = !!r && !!user && r.userId === user.id;
   const plyty = r ? plytyZRozmowy(r) : [];
 
   return (
     <>
-      <Masthead art={heroArt(lead)} eyebrow={t.chat.eyebrow} title={t.chat.title} meta={<span>{t.chat.lead}</span>} />
+      {/* Sztorm, nie nagłówek jak wszędzie indziej: to jedyne miejsce
+          w portalu, gdzie wypływa się bez mapy. */}
+      <Banner image="/img/statek.jpg" title={t.chat.title} position="center 45%">
+        <p className="mt-3 max-w-2xl text-text2">{t.chat.lead}</p>
+      </Banner>
       <div className="mx-auto mt-8 max-w-3xl space-y-6">
         <p>
           <Link href="/rozmowa" className="text-sm text-muted hover:text-accent2">{t.chat.newChat}</Link>

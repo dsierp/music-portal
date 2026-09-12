@@ -63,7 +63,7 @@ export default async function ListPage({
         <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
           <Link href="/podroze" className="text-muted hover:text-accent2">← {t.nav.lists}</Link>
           {moja && data.list.description && (
-            <Link href={`/podroze/nieznane?opis=${encodeURIComponent(data.list.description)}`} className="text-accent2 hover:text-accent">
+            <Link href={`/rozmowa?opis=${encodeURIComponent(data.list.description)}`} className="text-accent2 hover:text-accent">
               {t.lists.tryAgain}
             </Link>
           )}

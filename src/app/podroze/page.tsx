@@ -92,11 +92,11 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
           Dostaje więc własny baner na górze, z tym samym ciężarem co nagłówki
           pozostałych ekranów. Sztorm pasuje: to jedyne miejsce w portalu,
           gdzie wypływa się bez mapy. */}
-      <Link href="/podroze/nieznane" className="group block">
-        <Banner image="/img/statek.jpg" title={t.unknown.title} position="center 45%" compact>
-          <p className="mt-3 max-w-2xl text-text2">{t.unknown.lead}</p>
+      <Link href="/rozmowa" className="group block">
+        <Banner image="/img/statek.jpg" title={t.chat.title} position="center 45%" compact>
+          <p className="mt-3 max-w-2xl text-text2">{t.chat.lead}</p>
           <p className="mt-4 inline-block rounded-full border border-accent/50 px-4 py-1 font-mono text-xs text-accent2 transition-colors group-hover:bg-accent/15">
-            {t.unknown.cta} →
+            {t.chat.cta} →
           </p>
         </Banner>
       </Link>

@@ -57,9 +57,11 @@ function Blad({ blad, szczegol, t }: { blad?: string; szczegol?: string; t: Dict
   );
 }
 
-function Wnetrze({ t, id, stan }: { t: Dict; id?: string; stan: { blad?: string; szczegol?: string } }) {
+function Wnetrze({ t, id, start, stan }: { t: Dict; id?: string; start: string; stan: { blad?: string; szczegol?: string } }) {
   const { pending } = useFormStatus();
-  const [tekst, setTekst] = useState("");
+  // Tekst z adresu: ktoś wraca ze starego adresu albo z gotowej podróży
+  // i ma poprawić swoje zdanie, a nie pisać je od nowa.
+  const [tekst, setTekst] = useState(start);
 
   if (pending) return <Czekanie t={t} pytanie={tekst} />;
   return (
@@ -82,11 +84,11 @@ function Wnetrze({ t, id, stan }: { t: Dict; id?: string; stan: { blad?: string;
   );
 }
 
-export function RozmowaForm({ t, id }: { t: Dict; id?: string }) {
+export function RozmowaForm({ t, id, start = "" }: { t: Dict; id?: string; start?: string }) {
   const [stan, akcja] = useActionState(powiedzCos, {} as { blad?: string; szczegol?: string });
   return (
     <form action={akcja}>
-      <Wnetrze t={t} id={id} stan={stan} />
+      <Wnetrze t={t} id={id} start={start} stan={stan} />
     </form>
   );
 }

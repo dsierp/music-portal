@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Masthead } from "@/components/masthead";
-import { heroArt, leadStyle } from "@/lib/lead-style";
+import { Banner } from "@/components/banner";
+
 import { currentUser } from "@/lib/auth";
-import { getGenres } from "@/lib/user-data";
 import { aiSkonfigurowane } from "@/lib/ai";
 import { i18n } from "@/lib/t";
 import { RozmowaForm } from "@/components/rozmowa-form";
@@ -25,14 +24,18 @@ const PRZYKLADY = ["exPrime", "exSecond", "exThird"] as const;
  * co się uzbierało. Wcześniej z pierwszego zdania powstawała zamknięta lista
  * i jak nie trafiła, zostawało napisać wszystko od nowa.
  */
-export default async function RozmowaStart() {
+export default async function RozmowaStart({ searchParams }: { searchParams: Promise<{ opis?: string }> }) {
+  const opis = (await searchParams).opis?.slice(0, 2000) ?? "";
   const { t } = await i18n();
   const user = await currentUser();
-  const lead = leadStyle(user ? await getGenres(user.id) : []);
 
   return (
     <>
-      <Masthead art={heroArt(lead)} eyebrow={t.chat.eyebrow} title={t.chat.title} meta={<span>{t.chat.lead}</span>} />
+      {/* Sztorm, nie nagłówek jak wszędzie indziej: to jedyne miejsce
+          w portalu, gdzie wypływa się bez mapy. */}
+      <Banner image="/img/statek.jpg" title={t.chat.title} position="center 45%">
+        <p className="mt-3 max-w-2xl text-text2">{t.chat.lead}</p>
+      </Banner>
       <div className="mx-auto mt-8 max-w-2xl space-y-6">
         {!user ? (
           <p className="text-muted"><Link href="/login" className="underline">{t.home.loginCta}</Link>{t.chat.loginRest}</p>
@@ -45,7 +48,7 @@ export default async function RozmowaStart() {
         ) : (
           <>
             <p className="text-sm text-muted">{t.chat.empty}</p>
-            <RozmowaForm t={t} />
+            <RozmowaForm t={t} start={opis} />
             <div>
               <p className="label mb-2">{t.chat.examplesLabel}</p>
               <ul className="space-y-1 text-sm text-muted">
