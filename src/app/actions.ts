@@ -423,13 +423,20 @@ export async function powiedzCos(_prev: unknown, formData: FormData): Promise<{ 
 }
 
 /**
- * Podróż z rozmowy — dopiero TU powstaje lista.
+ * „Daj co masz" — kończy turę tym, co już się potwierdziło.
  *
- * O to chodziło w całym tym ekranie: wynik modelu jest najpierw szukaniem,
- * które da się pooglądać i podrążyć, a zapisaną podróżą staje się dopiero
- * wtedy, gdy człowiek uzna, że warto. Odwrotna kolejność (najpierw lista)
- * robiła podróż z pierwszej lepszej odpowiedzi.
+ * Dwie sytuacje, jedna odpowiedź: albo robota w tle została ucięta i nikt jej
+ * już nie dokończy, albo po prostu starczy tego czekania. W obu przypadkach
+ * płyty, które ekran właśnie pokazuje, są prawdziwe — szkoda je wyrzucać.
  */
+export async function domknijRozmowe(formData: FormData) {
+  const u = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const { domknij } = await import("@/lib/rozmowa");
+  await domknij(id, u.id);
+  redirect(`/rozmowa/${id}`);
+}
+
 /**
  * Które płyty z rozmowy człowiek zaznaczył.
  *

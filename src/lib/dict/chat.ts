@@ -19,6 +19,8 @@ const pl = {
   working: "Szukam płyt i sprawdzam każdą w MusicBrainz",
   workingShort: "Szukam…",
   leaveOk: "Możesz stąd wyjść — odpowiedź czeka pod tym adresem.",
+  takeWhatIsThere: "Daj co masz",
+  giveUp: "Trudno, zacznijmy od nowa",
   youAsked: "Pytasz",
   copy: "Skopiuj",
   copied: "Skopiowane",
@@ -56,6 +58,7 @@ const pl = {
     model: "Nie udało się nic wyszukać. Spróbuj jeszcze raz za chwilę.",
     mbAwaria: "MusicBrainz chwilowo nie odpowiada, więc nie mam czym potwierdzić płyt.",
     nieznany: "Coś poszło nie tak. Spróbuj jeszcze raz.",
+    urwane: "Szukanie się urwało w pół kroku. Płyty, które już są, zostają — resztę trzeba zapytać jeszcze raz.",
   } as Record<string, string>,
 };
 type T = typeof pl;
@@ -71,6 +74,8 @@ const en: T = {
   working: "Looking for albums and checking each one against MusicBrainz",
   workingShort: "Searching…",
   leaveOk: "You can leave this page — the answer will be waiting at this address.",
+  takeWhatIsThere: "Take what you've got",
+  giveUp: "Never mind, start over",
   youAsked: "You asked",
   copy: "Copy",
   copied: "Copied",
@@ -108,6 +113,7 @@ const en: T = {
     model: "The search came back with nothing. Try again in a moment.",
     mbAwaria: "MusicBrainz isn't answering, so there's nothing to confirm the albums against.",
     nieznany: "Something went wrong. Try again.",
+    urwane: "The search broke off halfway. What was already found stays — ask again for the rest.",
   },
 };
 
@@ -122,6 +128,8 @@ const es: T = {
   working: "Busco discos y compruebo cada uno en MusicBrainz",
   workingShort: "Buscando…",
   leaveOk: "Puedes salir de aquí: la respuesta te esperará en esta dirección.",
+  takeWhatIsThere: "Dame lo que tengas",
+  giveUp: "Da igual, empecemos de nuevo",
   youAsked: "Preguntas",
   copy: "Copiar",
   copied: "Copiado",
@@ -159,6 +167,7 @@ const es: T = {
     model: "La búsqueda no devolvió nada. Inténtalo de nuevo en un momento.",
     mbAwaria: "MusicBrainz no responde, así que no tengo con qué confirmar los discos.",
     nieznany: "Algo salió mal. Inténtalo de nuevo.",
+    urwane: "La búsqueda se cortó a medias. Lo ya encontrado se queda; para el resto, pregunta otra vez.",
   },
 };
 
@@ -173,6 +182,8 @@ const de: T = {
   working: "Ich suche Alben und prüfe jedes über MusicBrainz",
   workingShort: "Suche…",
   leaveOk: "Du kannst die Seite verlassen — die Antwort wartet unter dieser Adresse.",
+  takeWhatIsThere: "Gib mir, was du hast",
+  giveUp: "Egal, fangen wir neu an",
   youAsked: "Du fragst",
   copy: "Kopieren",
   copied: "Kopiert",
@@ -210,6 +221,7 @@ const de: T = {
     model: "Die Suche hat nichts ergeben. Versuch es gleich noch einmal.",
     mbAwaria: "MusicBrainz antwortet gerade nicht, also fehlt die Bestätigung für die Alben.",
     nieznany: "Etwas ist schiefgegangen. Versuch es noch einmal.",
+    urwane: "Die Suche ist auf halbem Weg abgebrochen. Was schon da ist, bleibt — für den Rest noch einmal fragen.",
   },
 };
 

@@ -46,6 +46,15 @@ export interface Rozmowa {
    * ekran (odświeżany co trzy sekundy) pokazuje to na bieżąco.
    */
   postep?: string[];
+  /**
+   * Płyty potwierdzone w TEJ turze, jeszcze zanim tura się skończy.
+   *
+   * Dzięki temu „daj co masz" ma co dać, a urwana tura (Vercel ucina funkcję
+   * po minucie) nie zabiera ze sobą wszystkiego, co już było znalezione.
+   */
+  czesciowe?: Znaleziona[];
+  /** Wstęp od portalu do tej tury — potrzebny, gdy domykamy ją ręcznie. */
+  czesciowyTekst?: string;
   stan: "czeka" | "robi" | "blad";
   blad?: string;
   szczegol?: string;
@@ -53,6 +62,17 @@ export interface Rozmowa {
 }
 
 const klucz = (id: string) => `rozmowa:${id}`;
+
+/**
+ * Po tylu milisekundach bez śladu życia uznajemy turę za urwaną.
+ *
+ * Funkcja w Vercelu ma minutę; gdy ją ucięto, nikt już nie przestawi stanu
+ * z „robi" i ekran kręci się w nieskończoność — a człowiek patrzył na to
+ * dwie godziny. Zapisujemy przy KAŻDYM kroku, więc dwie minuty ciszy znaczą
+ * naprawdę koniec, nie wolne zapytanie.
+ */
+export const CISZA_MS = 120_000;
+export const utknela = (r: Rozmowa) => r.stan === "robi" && Date.now() - r.ostatnia > CISZA_MS;
 
 export async function wczytajRozmowe(id: string): Promise<Rozmowa | null> {
   return kvGet<Rozmowa>(klucz(id));
@@ -83,6 +103,8 @@ export async function powiedz(userId: string, tekst: string, id?: string): Promi
   r.wiadomosci.push({ rola: "ja", tekst });
   r.stan = "robi";
   r.postep = ["szukam"];
+  r.czesciowe = [];
+  r.czesciowyTekst = undefined;
   r.blad = undefined;
   r.szczegol = undefined;
   await zapisz(r);
@@ -147,8 +169,20 @@ async function tura(id: string, userId: string) {
     const juz = new Set(
       r.wiadomosci.flatMap((w) => (w.plyty ?? []).map((p) => p.album.mbid)),
     );
-    const { plyty, odpadlo, awaria } = await potwierdz(odp.propozycje, juz, krok);
+    // Wstęp zapisujemy OD RAZU: gdyby funkcję ucięto w połowie sprawdzania,
+    // „daj co masz" ma czym podpisać to, co już jest.
+    r.czesciowyTekst = odp.odpowiedz;
+    r.czesciowe = [];
+    await zapisz(r);
+
+    const dodaj = async (z: Znaleziona) => {
+      r.czesciowe = [...(r.czesciowe ?? []), z];
+      await zapisz(r);
+    };
+    const { plyty, odpadlo, awaria } = await potwierdz(odp.propozycje, juz, krok, dodaj);
     r.wiadomosci.push({ rola: "portal", tekst: odp.odpowiedz, plyty, odpadlo });
+    r.czesciowe = undefined;
+    r.czesciowyTekst = undefined;
     // Awaria MusicBrainz to nie jest „nie ma takich płyt" — mówimy to wprost,
     // zamiast pokazywać pustą odpowiedź i dać człowiekowi myśleć, że model
     // nic nie wymyślił.
@@ -169,6 +203,7 @@ async function potwierdz(
   propozycje: Propozycja[],
   juz: Set<string>,
   krok?: (linia: string) => Promise<void>,
+  dodaj?: (z: Znaleziona) => Promise<void>,
 ): Promise<{ plyty: Znaleziona[]; odpadlo: number; awaria: boolean }> {
   const plyty: Znaleziona[] = [];
   let odpadlo = 0;
@@ -189,10 +224,37 @@ async function potwierdz(
     }
     if (juz.has(znaleziony.mbid)) continue;
     juz.add(znaleziony.mbid);
-    plyty.push({ album: znaleziony, why: p.why });
+    const z = { album: znaleziony, why: p.why };
+    plyty.push(z);
+    await dodaj?.(z);
     await krok?.(`mam::${znaleziony.artistText} – ${znaleziony.title}`);
   }
   return { plyty, odpadlo, awaria };
+}
+
+/**
+ * „Daj co masz" — kończy turę tym, co do tej chwili zdążyło się potwierdzić.
+ *
+ * Dwa powody, dla których to musi być przycisk, a nie tylko automat: tura
+ * bywa urwana przez Vercela (i wtedy nikt już nic nie przestawi), a poza tym
+ * po trzeciej płycie człowiek czasem po prostu ma dość czekania. Nic nie
+ * przerywa roboty w tle — gdyby jeszcze żyła, dopisze swoje jako kolejną
+ * odpowiedź, a te już pokazane płyty i tak się nie powtórzą.
+ */
+export async function domknij(id: string, userId: string): Promise<boolean> {
+  const r = await wczytajRozmowe(id);
+  if (!r || r.userId !== userId || r.stan !== "robi") return false;
+  const plyty = r.czesciowe ?? [];
+  if (plyty.length) r.wiadomosci.push({ rola: "portal", tekst: r.czesciowyTekst ?? "", plyty });
+  await zapisz({
+    ...r,
+    postep: undefined,
+    czesciowe: undefined,
+    czesciowyTekst: undefined,
+    stan: plyty.length ? "czeka" : "blad",
+    blad: plyty.length ? undefined : "urwane",
+  });
+  return true;
 }
 
 /** Wszystkie potwierdzone płyty z rozmowy — materiał na podróż. */

@@ -4,13 +4,13 @@ import { Banner } from "@/components/banner";
 import { AlbumCard } from "@/components/cards";
 
 import { currentUser } from "@/lib/auth";
-import { wczytajRozmowe, plytyZRozmowy } from "@/lib/rozmowa";
+import { wczytajRozmowe, plytyZRozmowy, utknela } from "@/lib/rozmowa";
 import { i18n } from "@/lib/t";
 import { fmt } from "@/lib/i18n";
 import { RozmowaForm } from "@/components/rozmowa-form";
 import { Odswiezaj } from "@/components/odswiezanie";
 import { Pytanie } from "@/components/rozmowa-pytanie";
-import { kawalkiZRozmowy, podrozZRozmowy } from "@/app/actions";
+import { kawalkiZRozmowy, podrozZRozmowy, domknijRozmowe } from "@/app/actions";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await i18n();
@@ -42,6 +42,14 @@ export default async function RozmowaPage({ params }: { params: Promise<{ id: st
   const bledy = t.chat.errors as Record<string, string>;
   const mojaRozmowa = !!r && !!user && r.userId === user.id;
   const plyty = r ? plytyZRozmowy(r) : [];
+  /**
+   * Tura bez śladu życia od dwóch minut już nie wróci — Vercel ucina funkcję
+   * po minucie i nikt wtedy nie przestawia stanu. Bez tego ekran kręcił się
+   * w nieskończoność; dwie godziny, zanim ktoś dał znać.
+   */
+  const utkniete = !!r && utknela(r);
+  const czekamy = !!r && r.stan === "robi" && !utkniete;
+  const czesciowe = r?.czesciowe ?? [];
 
   return (
     <>
@@ -108,7 +116,40 @@ export default async function RozmowaPage({ params }: { params: Promise<{ id: st
               </div>
             ))}
 
-            {r.stan === "robi" && (
+            {/* Płyty potwierdzone w TRWAJĄCEJ turze — pokazujemy je od razu,
+                bo są już prawdziwe. Dzięki temu „daj co masz" nie jest obietnicą,
+                tylko tym, co człowiek ma przed oczami. */}
+            {r.stan === "robi" && czesciowe.length > 0 && (
+              <div className="space-y-2">
+                <p className="label">{t.chat.found} <span className="font-mono text-faint">{czesciowe.length}</span></p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {czesciowe.map((p) => (
+                    <AlbumCard
+                      key={p.album.mbid}
+                      album={p.album}
+                      extra={p.why ? <div className="text-xs text-muted">{p.why}</div> : undefined}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Szukanie urwane w pół kroku. Nie udajemy, że trwa. */}
+            {utkniete && (
+              <div className="rounded border border-warn bg-warn/10 p-4" role="alert">
+                <div className="flex items-start gap-3">
+                  <span className="mt-0.5 shrink-0 text-lg leading-none text-warn" aria-hidden>!</span>
+                  <div className="min-w-0 space-y-3">
+                    <p className="font-medium text-warn">{bledy.urwane}</p>
+                    <button formAction={domknijRozmowe} className="btn">
+                      {czesciowe.length ? t.chat.takeWhatIsThere : t.chat.giveUp}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {czekamy && (
               <>
                 <Odswiezaj />
                 <div className="rounded border border-rule bg-surface p-6" role="status" aria-live="polite">
@@ -141,6 +182,15 @@ export default async function RozmowaPage({ params }: { params: Promise<{ id: st
                     </ul>
                   )}
                   <p className="mt-4 text-xs text-faint">{t.chat.leaveOk}</p>
+                  {/* Czekanie ma mieć wyjście. Płyty na górze są już
+                      potwierdzone — kto ma dość, bierze tyle, ile jest. */}
+                  {czesciowe.length > 0 && (
+                    <p className="mt-3">
+                      <button formAction={domknijRozmowe} className="btn">
+                        {t.chat.takeWhatIsThere}
+                      </button>
+                    </p>
+                  )}
                 </div>
               </>
             )}

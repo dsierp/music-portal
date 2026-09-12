@@ -44,6 +44,12 @@ export default async function CzekaniePage({ params }: { params: Promise<{ id: s
   const lead = leadStyle(user ? await getGenres(user.id) : []);
   const bledy = t.unknown.errors as Record<string, string>;
   const opis = stan?.opis ?? "";
+  /**
+   * Funkcja w Vercelu ma minutę. Gdy ją ucięto, nikt już nie przestawi stanu
+   * z „robi" i ekran kręciłby się bez końca — więc po trzech minutach mówimy
+   * wprost, że to się urwało, i dajemy przycisk zamiast kręciołka.
+   */
+  const utknelo = stan?.stan === "robi" && Date.now() - stan.start > 180_000;
 
   return (
     <>
@@ -57,13 +63,13 @@ export default async function CzekaniePage({ params }: { params: Promise<{ id: s
               <Link href="/podroze/nieznane" className="btn btn-accent">{t.unknown.cta}</Link>
             </p>
           </div>
-        ) : stan.stan === "blad" ? (
+        ) : stan.stan === "blad" || utknelo ? (
           <div className="space-y-4">
             <div className="rounded border border-warn bg-warn/10 p-4" role="alert">
               <div className="flex items-start gap-3">
                 <span className="mt-0.5 shrink-0 text-lg leading-none text-warn" aria-hidden>!</span>
                 <div className="min-w-0">
-                  <p className="font-medium text-warn">{bledy[stan.blad] ?? bledy.nieznany}</p>
+                  <p className="font-medium text-warn">{bledy[stan.stan === "blad" ? stan.blad : "urwane"] ?? bledy.nieznany}</p>
                   
                 </div>
               </div>
