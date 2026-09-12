@@ -1,4 +1,4 @@
-import { eq, like, lt, sql } from "drizzle-orm";
+import { eq, inArray, like, lt, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 
 /**
@@ -220,4 +220,17 @@ export async function kvGet<T>(key: string): Promise<T | null> {
   } catch {
     return null;
   }
+}
+
+/** Wiele kluczy naraz — JEDNO zapytanie zamiast N. Brakujących po prostu nie ma. */
+export async function kvGetMany<T>(keys: string[]): Promise<Map<string, T>> {
+  const out = new Map<string, T>();
+  if (!keys.length) return out;
+  try {
+    const rows = await db.query.apiCache.findMany({ where: inArray(schema.apiCache.key, keys) });
+    for (const r of rows) out.set(r.key, r.json as T);
+  } catch {
+    /* brak bazy — zachowujemy się jak przy pustym buforze */
+  }
+  return out;
 }

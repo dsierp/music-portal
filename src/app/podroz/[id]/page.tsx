@@ -40,6 +40,20 @@ export default async function ListPage({
   const usuwanie = sp.usun === "1";
   if (!(await canSeeList(user?.id ?? null, id, data.list.userId))) notFound();
 
+  /**
+   * Czego NIE ma w serwisach — z poprzednich kliknięć.
+   *
+   * Jedno zapytanie na całą podróż (nie jedno na wiersz), bo to tylko podpowiedź
+   * graficzna. Pierwsze wyjście jest w ciemno; potem każdy widzi, że tam czeka
+   * wyszukiwarka, a nie płyta.
+   */
+  const { kvGetMany } = await import("@/lib/cache");
+  const klucze = data.items.flatMap((i) => [`link:spotify:${i.targetMbid}`, `link:tidal:${i.targetMbid}`]);
+  const znane = await kvGetMany<{ url: string | null }>(klucze);
+  const wiadomoBrak = new Set(
+    [...znane.entries()].filter(([, v]) => !v?.url).map(([k]) => k.replace(/^link:/, "")),
+  );
+
   const [ludzie, wyslane] = moja
     ? await Promise.all([otherUsers(user!.id), sharedWith(id)])
     : [[] as { id: string; name: string; me: boolean }[], [] as { userId: string; dismissedAt: Date | null }[]];
@@ -123,29 +137,30 @@ export default async function ListPage({
                 {it.targetType !== "CONCERT" && (
                   <div className="mt-0.5 flex gap-3">
                     {[
-                      // Spotify: adres dobiera trasa /go/stop przy kliknięciu —
-                      // prosto na płytę, a gdy jej nie znajdzie, wyszukiwarka.
-                      {
-                        nazwa: "Spotify",
-                        param:
-                          it.targetType === "ALBUM" && spotifyGotowy
-                            ? `&serwis=spotify&etykieta=${encodeURIComponent(it.label)}`
-                            : `&to=${encodeURIComponent(`https://open.spotify.com/search/${encodeURIComponent(it.label.replace(/\s+[–—-]\s+/, " "))}`)}`,
-                      },
-                      {
-                        nazwa: "Tidal",
-                        param: `&to=${encodeURIComponent(`https://tidal.com/search?q=${encodeURIComponent(it.label.replace(/\s+[–—-]\s+/, " "))}`)}`,
-                      },
-                    ].map((s) => (
+                      // Oba serwisy dobiera teraz trasa /go/stop przy kliknięciu:
+                      // najpierw adres z MusicBrainz (działa też dla utworu i —
+                      // co ważniejsze — dla Tidala, który bez klucza dewelopera
+                      // nie ma czego szukać), potem szukanie po nazwie
+                      // w Spotify, a na końcu wyszukiwarka.
+                      { nazwa: "Spotify", serwis: "spotify" },
+                      { nazwa: "Tidal", serwis: "tidal" },
+                    ].map((s) => ({
+                      ...s,
+                      param: `&serwis=${s.serwis}&etykieta=${encodeURIComponent(it.label)}`,
+                      // Wiemy z poprzedniego kliknięcia, że tu nic nie ma? Lupka
+                      // zamiast strzałki, żeby nikt nie liczył na wejście prosto
+                      // w płytę i nie zdziwił się wyszukiwarką.
+                      szukanie: wiadomoBrak.has(`${s.serwis}:${it.targetMbid}`),
+                    })).map((s) => (
                       <a
                         key={s.nazwa}
                         href={`/go/stop?listId=${encodeURIComponent(id)}&type=${it.targetType}&mbid=${encodeURIComponent(it.targetMbid)}${s.param}`}
                         target="_blank"
                         rel="noopener"
-                        title={fmt(t.lists.openIn, { name: s.nazwa })}
-                        className="font-mono text-[10px] text-muted hover:text-accent2"
+                        title={s.szukanie ? fmt(t.lists.onlySearch, { name: s.nazwa }) : fmt(t.lists.openIn, { name: s.nazwa })}
+                        className={`font-mono text-[10px] hover:text-accent2 ${s.szukanie ? "text-faint" : "text-muted"}`}
                       >
-                        ▸ {s.nazwa}
+                        {s.szukanie ? "⌕" : "▸"} {s.nazwa}
                       </a>
                     ))}
                   </div>

@@ -1177,3 +1177,36 @@ export function topAlbum(
     .sort((x, y) => (y.mbRating!.value - x.mbRating!.value) || (y.mbRating!.votes - x.mbRating!.votes));
   return zMb.length ? { album: zMb[0], source: "musicbrainz" } : null;
 }
+
+
+// ---------- gdzie tego posłuchać ----------
+
+/**
+ * Adres płyty albo utworu w serwisie streamingowym — Z MUSICBRAINZ.
+ *
+ * Po co, skoro Spotify ma własne szukanie: bo Tidal go nie ma. Bez klucza
+ * dewelopera nie da się u nich niczego rozwiązać, więc przystanek prowadził
+ * zawsze do wyszukiwarki — czyli do roboty, którą człowiek musiał dokończyć
+ * sam. MusicBrainz trzyma te adresy jako zwykłe relacje URL i oddaje je
+ * w jednym zapytaniu, za darmo, dla obu serwisów naraz.
+ *
+ * Działa też dla POJEDYNCZEGO UTWORU (`recording`) — a to jedyny sposób, żeby
+ * kawałek z listy otwierał się od razu, zamiast lądować w wyszukiwarce.
+ */
+export async function linkSerwisu(
+  typ: "release-group" | "recording",
+  mbid: string,
+  host: RegExp,
+): Promise<string | null> {
+  const dane = await cached(`mb:urls:${typ}:${mbid}`, TTL.lookup, () =>
+    mbFetch<{ relations?: { url?: { resource?: string } }[] }>(`/${typ}/${mbid}`, { inc: "url-rels" }),
+  ).catch(() => null);
+  for (const r of dane?.relations ?? []) {
+    const u = r.url?.resource;
+    if (u && host.test(u)) return u;
+  }
+  return null;
+}
+
+export const HOST_SPOTIFY = /^https:\/\/open\.spotify\.com\//i;
+export const HOST_TIDAL = /^https:\/\/(listen\.)?tidal\.com\//i;
