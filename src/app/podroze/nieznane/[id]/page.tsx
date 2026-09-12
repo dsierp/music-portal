@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Masthead } from "@/components/masthead";
+import { Odswiezaj } from "@/components/odswiezanie";
 import { heroArt, leadStyle } from "@/lib/lead-style";
 import { currentUser } from "@/lib/auth";
 import { getGenres } from "@/lib/user-data";
@@ -74,7 +75,7 @@ export default async function CzekaniePage({ params }: { params: Promise<{ id: s
           </div>
         ) : (
           <>
-            <meta httpEquiv="refresh" content="3" />
+            <Odswiezaj />
             <div className="rounded border border-rule bg-surface p-6" role="status" aria-live="polite">
               <div className="flex items-start gap-4">
                 <span className="mt-1 h-6 w-6 shrink-0 animate-spin rounded-full border-2 border-rule border-t-accent" aria-hidden />

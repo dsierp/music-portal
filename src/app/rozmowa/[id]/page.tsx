@@ -8,6 +8,7 @@ import { wczytajRozmowe, plytyZRozmowy } from "@/lib/rozmowa";
 import { i18n } from "@/lib/t";
 import { fmt } from "@/lib/i18n";
 import { RozmowaForm } from "@/components/rozmowa-form";
+import { Odswiezaj } from "@/components/odswiezanie";
 import { Pytanie } from "@/components/rozmowa-pytanie";
 import { podrozZRozmowy } from "@/app/actions";
 
@@ -92,7 +93,7 @@ export default async function RozmowaPage({ params }: { params: Promise<{ id: st
 
             {r.stan === "robi" && (
               <>
-                <meta httpEquiv="refresh" content="3" />
+                <Odswiezaj />
                 <div className="rounded border border-rule bg-surface p-6" role="status" aria-live="polite">
                   <div className="flex items-center gap-4">
                     <span className="h-6 w-6 shrink-0 animate-spin rounded-full border-2 border-rule border-t-accent" aria-hidden />
