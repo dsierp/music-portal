@@ -150,17 +150,26 @@ async function wykonajKawalki(
       return;
     }
 
-    let wybor;
+    /**
+     * Gdy model zawiedzie, NIE wywalamy całej listy.
+     *
+     * Tracklisty są już pobrane — najdroższa część roboty (jedno zapytanie na
+     * sekundę do MusicBrainz) jest za nami. Wyrzucenie tego przez kiepską
+     * odpowiedź modelu to najgorsze możliwe zakończenie: człowiek czeka pół
+     * minuty i dostaje czerwoną ramkę. Bierzemy wtedy po prostu pierwsze
+     * utwory — bez uzasadnień, ale lista jest.
+     */
+    let wybor: Awaited<ReturnType<typeof wybierzKawalki>> = [];
     try {
       wybor = await wybierzKawalki(
-        zbior.map((z) => ({ artysta: z.artysta, album: z.album, utwory: z.utwory.map((u) => u.tytul) })),
+        // Przycinamy, żeby prośba nie puchła: przy dziesięciu płytach po
+        // trzydzieści utworów słabszy model gubi się i przestaje zwracać JSON.
+        zbior.slice(0, 10).map((z) => ({ artysta: z.artysta, album: z.album, utwory: z.utwory.slice(0, 20).map((u) => u.tytul) })),
         ile,
       );
     } catch (e) {
-      const aiBlad = e instanceof AiError;
-      if (!aiBlad) console.error("kawalki:", e);
-      await zapisz({ stan: "blad", opis: tytul, blad: aiBlad ? "model" : "nieznany", szczegol: e instanceof Error ? e.message : String(e) });
-      return;
+      if (!(e instanceof AiError)) console.error("kawalki:", e);
+      // lecimy dalej z pustym wyborem — niżej jest zapasowy
     }
 
     // Tytuł z odpowiedzi wracamy na MBID. Porównujemy luźno, bo modele gubią
@@ -177,8 +186,8 @@ async function wykonajKawalki(
       widziane.add(u.mbid);
       przystanki.push({ mbid: u.mbid, label: `${p.artysta} – ${u.tytul}`, note: w.why });
     }
-    // Gdy model kompletnie nie trafił, bierzemy po prostu pierwsze utwory —
-    // pusta lista byłaby gorsza niż lista bez uzasadnień.
+    // Zapasowy wybór: pierwsze utwory z każdej płyty. Włącza się i wtedy, gdy
+    // model w ogóle nie odpowiedział, i wtedy, gdy odpowiedział bzdurą.
     if (!przystanki.length) {
       for (const p of zbior) {
         for (const u of p.utwory.slice(0, ile)) {
