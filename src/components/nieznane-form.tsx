@@ -74,7 +74,7 @@ function Blad({ stan, t }: { stan: { blad?: string; szczegol?: string }; t: Dict
           <p className="font-medium text-warn">{(bledy[stan.blad] ?? bledy.nieznany).replace("{n}", stan.szczegol ?? "")}</p>
           {/* Różnica między „zły klucz" a „brak środków" to różnica między dwiema
               zupełnie innymi rzeczami do zrobienia. */}
-          {stan.szczegol && stan.blad !== "limit" && (
+          {stan.szczegol && stan.blad === "brakKlucza" && (
             <p className="mt-2 break-words font-mono text-xs text-faint">{stan.szczegol}</p>
           )}
         </div>

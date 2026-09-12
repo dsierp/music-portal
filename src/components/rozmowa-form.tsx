@@ -48,7 +48,9 @@ function Blad({ blad, szczegol, t }: { blad?: string; szczegol?: string; t: Dict
         <span className="mt-0.5 shrink-0 text-lg leading-none text-warn" aria-hidden>!</span>
         <div className="min-w-0">
           <p className="font-medium text-warn">{(bledy[blad] ?? bledy.nieznany).replace("{n}", szczegol ?? "")}</p>
-          {szczegol && blad !== "limit" && <p className="mt-2 break-words font-mono text-xs text-faint">{szczegol}</p>}
+          {/* Techniczny szczegół zostaje w logach — na ekranie portal po prostu
+              szuka i czasem nie znajdzie. */}
+          {szczegol && blad === "brakKlucza" && <p className="mt-2 break-words font-mono text-xs text-faint">{szczegol}</p>}
         </div>
       </div>
     </div>

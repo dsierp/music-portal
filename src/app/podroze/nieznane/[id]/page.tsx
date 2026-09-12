@@ -63,7 +63,7 @@ export default async function CzekaniePage({ params }: { params: Promise<{ id: s
                 <span className="mt-0.5 shrink-0 text-lg leading-none text-warn" aria-hidden>!</span>
                 <div className="min-w-0">
                   <p className="font-medium text-warn">{bledy[stan.blad] ?? bledy.nieznany}</p>
-                  {stan.szczegol && <p className="mt-2 break-words font-mono text-xs text-faint">{stan.szczegol}</p>}
+                  
                 </div>
               </div>
             </div>

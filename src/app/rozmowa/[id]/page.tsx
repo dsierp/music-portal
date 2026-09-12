@@ -109,7 +109,7 @@ export default async function RozmowaPage({ params }: { params: Promise<{ id: st
                   <span className="mt-0.5 shrink-0 text-lg leading-none text-warn" aria-hidden>!</span>
                   <div className="min-w-0">
                     <p className="font-medium text-warn">{bledy[r.blad ?? "nieznany"] ?? bledy.nieznany}</p>
-                    {r.szczegol && <p className="mt-2 break-words font-mono text-xs text-faint">{r.szczegol}</p>}
+                    
                   </div>
                 </div>
               </div>

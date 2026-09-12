@@ -114,8 +114,18 @@ async function zapytaj(system: string, tresc: string): Promise<string> {
   // U OpenRoutera: najpierw model właściwy, potem darmowe, gdy odmówi
   // z powodu pieniędzy albo nieistnienia. Każdy inny błąd przerywa od razu —
   // przy odrzuconym kluczu (401) ponawianie na innym modelu nic nie da.
+  /**
+   * Najwyżej TRZY podejścia, i to po cichu.
+   *
+   * Wcześniej portal przebiegał całą listę darmowych modeli, aż któryś
+   * odpowiedział. Wychodziło z tego czekanie bez końca i odpowiedzi w trzech
+   * różnych jakościach pod rząd — raz sensowna lista, raz polszczyzna z
+   * koreańskimi znakami. Dla człowieka po drugiej stronie to ma być JEDNO
+   * szukanie, które albo coś znajdzie, albo nie; żadnych skoków, żadnych
+   * nazw modeli na ekranie.
+   */
   const zKatalogu = await darmoweModele();
-  const doProbowania = [...new Set([MODEL_OPENROUTER, ...zKatalogu, ...MODELE_ZAPASOWE])];
+  const doProbowania = [...new Set([MODEL_OPENROUTER, ...zKatalogu, ...MODELE_ZAPASOWE])].slice(0, 3);
   let ostatni: AiError | null = null;
   for (const m of doProbowania) {
     try {
@@ -125,7 +135,7 @@ async function zapytaj(system: string, tresc: string): Promise<string> {
       ostatni = e;
     }
   }
-  throw ostatni ?? new AiError("Żaden model nie odpowiedział.");
+  throw ostatni ?? new AiError("Szukanie nic nie zwróciło.");
 }
 
 /** Jedno podejście do konkretnego modelu. */
