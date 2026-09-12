@@ -1,4 +1,5 @@
 import { addToListAction } from "@/app/actions";
+import { MenuZamykane } from "./menu-zamykane";
 import type { ListTarget } from "@/lib/user-data";
 
 /**
@@ -8,6 +9,10 @@ import type { ListTarget } from "@/lib/user-data";
  * gdy strona jeszcze się doładowuje. Można wybrać istniejącą listę albo od razu
  * założyć nową — bo pomysł na listę zwykle przychodzi przy konkretnej płycie,
  * a nie w spisie list.
+ *
+ * Opakowane w `MenuZamykane`, bo to menu wisi NAD treścią: samo `<details>`
+ * zwija się tylko ponownym kliknięciem w nagłówek, więc kliknięcie obok
+ * wyglądało na zacięcie. Teraz zamyka je też Escape.
  */
 export function AddToList({
   type,
@@ -37,7 +42,7 @@ export function AddToList({
 }) {
   const dostepne = lists.filter((l) => !already.includes(l.id));
   return (
-    <details className="relative">
+    <MenuZamykane className="relative">
       <summary className="btn cursor-pointer list-none">
         {already.length ? `${t.addTo} · ${already.length}` : t.addTo}
       </summary>
@@ -70,6 +75,6 @@ export function AddToList({
           <button className="btn btn-accent w-full justify-center">{t.add}</button>
         </form>
       </div>
-    </details>
+    </MenuZamykane>
   );
 }
