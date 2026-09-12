@@ -339,3 +339,75 @@ function pierwszaTablica(dane: unknown): unknown[] | null {
   }
   return null;
 }
+
+/** Jedna tura rozmowy — nasza albo jego. */
+export interface TuraRozmowy {
+  rola: "ja" | "portal";
+  tekst: string;
+}
+
+export interface OdpowiedzRozmowy {
+  odpowiedz: string;
+  propozycje: Propozycja[];
+}
+
+/**
+ * Rozmowa o muzyce — zamiast jednego strzału w gotową listę.
+ *
+ * DLACZEGO INACZEJ NIŻ „PODRÓŻ W NIEZNANE": tamto z jednego zdania robiło od
+ * razu zamkniętą podróż. Jak nie trafiło, zostawało tylko napisać wszystko od
+ * nowa. Tu każda odpowiedź jest wynikiem szukania: da się dopytać, zawęzić,
+ * pójść w bok — a listę zrobić dopiero z tego, co się uzbierało.
+ *
+ * Model dostaje CAŁĄ dotychczasową rozmowę w jednej wiadomości. Prosto, ale
+ * przenośnie: to samo wychodzi u Anthropic i u OpenRoutera, a portal nie musi
+ * znać dwóch formatów historii.
+ */
+export async function porozmawiaj(
+  historia: TuraRozmowy[],
+  kontekst: { style?: string[]; zna?: string[] },
+): Promise<OdpowiedzRozmowy> {
+  const system = [
+    "Jesteś rozmówcą w portalu dla ludzi słuchających metalu, proga i jazzu.",
+    "Rozmawiasz PO POLSKU, krótko i konkretnie — jak znajomy, który zna się na płytach.",
+    "",
+    "Zasady:",
+    "- Odpowiadasz dwiema–czterema zdaniami. Bez wstępów, bez podsumowań.",
+    "- Gdy pytanie prosi o muzykę, dokładasz od 3 do 8 KONKRETNYCH albumów.",
+    "- Tylko albumy, które NAPRAWDĘ istnieją. Nie jesteś pewien tytułu — pomijasz.",
+    "- Nie powtarzasz płyt, które padły wcześniej w tej rozmowie.",
+    "- `why` to jedno zdanie: co w tej płycie odpowiada na pytanie. Bez przymiotników bez pokrycia.",
+    "- Gdy ktoś pyta o coś innego niż muzyka, odpowiadasz krótko i wracasz do płyt.",
+    "",
+    "Odpowiadasz WYŁĄCZNIE danymi JSON, bez komentarza i bez bloku kodu:",
+    '{"odpowiedz":"…","plyty":[{"artist":"…","album":"…","why":"…"}]}',
+    "Nic przed JSON-em i nic po nim. Gdy nie proponujesz płyt, `plyty` to pusta lista.",
+  ].join("\n");
+
+  const czesci: string[] = [];
+  if (kontekst.style?.length) czesci.push(`Style z jego profilu: ${kontekst.style.slice(0, 20).join(", ")}`);
+  if (kontekst.zna?.length) czesci.push(`To już zna — NIE proponuj tego: ${kontekst.zna.slice(0, 60).join("; ")}`);
+  czesci.push(
+    ["Rozmowa do tej pory:", ...historia.slice(-12).map((h) => `${h.rola === "ja" ? "ON" : "TY"}: ${h.tekst}`)].join("\n"),
+  );
+  czesci.push("Odpowiedz na ostatnią wiadomość.");
+
+  const tekst = await zapytaj(system, czesci.join("\n\n"));
+  const dane = wyluskaj(tekst);
+  if (dane === null) throw new AiError("Odpowiedź modelu nie jest poprawnym JSON-em.", true);
+  const obj = (dane && typeof dane === "object" && !Array.isArray(dane) ? dane : {}) as Record<string, unknown>;
+  const odpowiedz = pole(obj, ["odpowiedz", "answer", "text", "reply", "message"]).slice(0, 2000);
+  const lista = pierwszaTablica(dane) ?? [];
+  const propozycje = lista
+    .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
+    .map((x) => ({
+      artist: pole(x, ["artist", "artysta", "band", "zespol", "zespół", "wykonawca"]),
+      album: pole(x, ["album", "tytul", "tytuł", "title", "plyta", "płyta", "record"]),
+      why: pole(x, ["why", "dlaczego", "powod", "powód", "reason", "note"]).slice(0, 400),
+    }))
+    .filter((p) => p.artist && p.album);
+  // Pusta odpowiedź I pusta lista to nie jest rozmowa — to model, który nie
+  // zrozumiał zadania. Warto spróbować innego.
+  if (!odpowiedz && !propozycje.length) throw new AiError("Model nie odpowiedział nic sensownego.", true);
+  return { odpowiedz, propozycje };
+}

@@ -24,6 +24,7 @@ export async function Nav() {
           <Link href="/koncerty">{t.nav.concerts}</Link>
           <Link href="/best-of">{t.nav.bestOf}</Link>
           <Link href="/podroze">{t.nav.lists}</Link>
+          <Link href="/rozmowa">{t.nav.chat}</Link>
           {/* Znak zapytania zamiast słowa: w menu jest już ciasno, a to i tak
               zagląda się raz. Tytuł niesie nazwę dla czytników ekranu. */}
           <Link href="/pomoc" title={t.help.guideTitle} aria-label={t.help.guideTitle} className="font-mono text-muted hover:text-accent2">

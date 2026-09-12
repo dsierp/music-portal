@@ -10,6 +10,7 @@ import { about } from "./about";
 import { album } from "./album";
 import { artist } from "./artist";
 import { auth } from "./auth";
+import { chat } from "./chat";
 import { common } from "./common";
 import { unknown } from "./unknown";
 import { concerts } from "./concerts";
@@ -28,6 +29,7 @@ export function dict(locale: Locale) {
     album: album[locale],
     artist: artist[locale],
     auth: auth[locale],
+    chat: chat[locale],
     common: common[locale],
     unknown: unknown[locale],
     concerts: concerts[locale],

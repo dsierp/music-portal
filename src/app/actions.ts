@@ -391,3 +391,65 @@ export async function podrozWNieznane(_prev: unknown, formData: FormData): Promi
   redirect(`/podroze/nieznane/${id}`);
 }
 
+
+// ---------- rozmowa o muzyce ----------
+
+/**
+ * Wiadomość w rozmowie. Tu dzieje się tylko to, co szybkie: sprawdzenie
+ * tekstu, klucza i limitu. Sama odpowiedź (model + MusicBrainz) leci w tle,
+ * bo trwa kilkanaście sekund i nie ma prawa zginąć, gdy ktoś odejdzie od
+ * ekranu — patrz rozmowa.ts.
+ */
+export async function powiedzCos(_prev: unknown, formData: FormData): Promise<{ blad?: string; szczegol?: string }> {
+  const u = await requireUser();
+  const tekst = String(formData.get("tekst") ?? "").trim().slice(0, 2000);
+  const id = String(formData.get("id") ?? "") || undefined;
+  if (tekst.length < 3) return { blad: "krotki" };
+
+  const { aiSkonfigurowane } = await import("@/lib/ai");
+  if (!aiSkonfigurowane()) return { blad: "brakKlucza" };
+
+  // Limit dzienny liczymy w TURACH, nie w rozmowach: każda tura woła model,
+  // więc to ona kosztuje. Liczba jest hojniejsza niż przy podróżach, bo
+  // rozmowa z natury składa się z kilku pytań.
+  const { licznikDzienny, podbijLicznik } = await import("@/lib/cache");
+  const LIMIT = Number(process.env.ROZMOWY_DZIENNIE || 30);
+  if ((await licznikDzienny(u.id, "rozmowa")) >= LIMIT) return { blad: "limit", szczegol: String(LIMIT) };
+  await podbijLicznik(u.id, "rozmowa");
+
+  const { powiedz } = await import("@/lib/rozmowa");
+  const nowy = await powiedz(u.id, tekst, id);
+  redirect(`/rozmowa/${nowy}`);
+}
+
+/**
+ * Podróż z rozmowy — dopiero TU powstaje lista.
+ *
+ * O to chodziło w całym tym ekranie: wynik modelu jest najpierw szukaniem,
+ * które da się pooglądać i podrążyć, a zapisaną podróżą staje się dopiero
+ * wtedy, gdy człowiek uzna, że warto. Odwrotna kolejność (najpierw lista)
+ * robiła podróż z pierwszej lepszej odpowiedzi.
+ */
+export async function podrozZRozmowy(formData: FormData) {
+  const u = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const { wczytajRozmowe, plytyZRozmowy } = await import("@/lib/rozmowa");
+  const r = await wczytajRozmowe(id);
+  if (!r || r.userId !== u.id) redirect("/rozmowa");
+  const plyty = plytyZRozmowy(r);
+  if (!plyty.length) redirect(`/rozmowa/${id}`);
+
+  const lista = await ud.createList(u.id, r.tytul, r.wiadomosci.find((w) => w.rola === "ja")?.tekst ?? null);
+  for (const p of plyty) {
+    await ud
+      .addToList(u.id, lista.id, {
+        targetType: "ALBUM",
+        targetMbid: p.album.mbid,
+        label: `${p.album.artistText} – ${p.album.title}`.trim(),
+        note: p.why || null,
+      })
+      .catch(() => {});
+  }
+  revalidatePath("/podroze");
+  redirect(`/podroz/${lista.id}`);
+}
