@@ -960,7 +960,7 @@ export default async function ArtistPage({
               </>
             )}
             {!style.items.length && <p className="mt-2 text-xs text-faint">{t.artist.noGenres}</p>}
-            <div className="mt-3"><LinksRow links={artist.links} wikiUrl={wiki?.url} /></div>
+            <div className="mt-3"><LinksRow links={artist.links} wikiUrl={wiki?.url} mbid={mbid} typ="artist" etykieta={artist.name} /></div>
             <div className="mt-3 flex items-center gap-3">
               {user ? (
                 <>

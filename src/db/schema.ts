@@ -4,7 +4,7 @@
  * Katalog płyt/artystów nie jest kopiowany — kluczem jest MBID (MusicBrainz ID).
  */
 import { relations } from "drizzle-orm";
-import { index, integer, jsonb, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import type { AdapterAccountType } from "next-auth/adapters";
 
 // ---------- Auth.js (tabele wymagane przez @auth/drizzle-adapter) ----------
@@ -21,6 +21,20 @@ export const users = pgTable("user", {
    * żeby wybór szedł za nim na telefon i drugi komputer.
    */
   locale: text("locale"),
+  /**
+   * Nazwa, pod którą widzą Cię inni w portalu — i JEDYNA, jaką kiedykolwiek
+   * pokazujemy. Wcześniej brak nazwy oznaczał wyświetlenie fragmentu adresu
+   * e-mail sprzed małpy: nikt się na to nie zgadzał, a przy koncie zakładanym
+   * Google'em nikt tego nawet nie przewidział.
+   */
+  nick: text("nick"),
+  /**
+   * Zgoda na pokazywanie się innym przy poleceniu podróży. Domyślnie NIE.
+   *
+   * Wpisana w bazie jako brak zgody, nie jako „jeszcze nie zdecydował" —
+   * bo to jest ta sama odpowiedź, a brak decyzji nie może znaczyć „można".
+   */
+  discoverable: boolean("discoverable").notNull().default(false),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 

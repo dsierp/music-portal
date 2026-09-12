@@ -190,7 +190,7 @@ export default async function AlbumPage({
                 ))}
               </p>
             )}
-            <div className="mt-3"><LinksRow links={linki} wikiUrl={wiki?.url} /></div>
+            <div className="mt-3"><LinksRow links={linki} wikiUrl={wiki?.url} mbid={mbid} typ="release-group" etykieta={`${album.artistText} – ${album.title}`} /></div>
             <div className="mt-3 flex items-center gap-3">
               {user ? (
                 // Dwa przyciski, nie jeden przełącznik: „lubię" i „nie moja bajka"

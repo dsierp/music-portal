@@ -1198,7 +1198,7 @@ export function topAlbum(
  * kawałek z listy otwierał się od razu, zamiast lądować w wyszukiwarce.
  */
 export async function linkSerwisu(
-  typ: "release-group" | "recording",
+  typ: "release-group" | "recording" | "artist",
   mbid: string,
   host: RegExp,
 ): Promise<string | null> {
@@ -1208,6 +1208,27 @@ export async function linkSerwisu(
   for (const r of dane?.relations ?? []) {
     const u = r.url?.resource;
     if (u && host.test(u)) return u;
+  }
+
+  /**
+   * Przy płycie adresy streamingu wiszą zwykle przy WYDANIU, nie przy grupie
+   * wydawniczej — i dlatego samo pytanie o grupę prawie zawsze wracało puste.
+   * Jedno przeglądanie wydań z relacjami URL załatwia wszystkie naraz.
+   */
+  if (typ === "release-group") {
+    const wydania = await cached(`mb:rel-urls:${mbid}`, TTL.lookup, () =>
+      mbFetch<{ releases?: { relations?: { url?: { resource?: string } }[] }[] }>("/release/", {
+        "release-group": mbid,
+        inc: "url-rels",
+        limit: 25,
+      }),
+    ).catch(() => null);
+    for (const w of wydania?.releases ?? []) {
+      for (const r of w.relations ?? []) {
+        const u = r.url?.resource;
+        if (u && host.test(u)) return u;
+      }
+    }
   }
   return null;
 }

@@ -2,7 +2,7 @@
  * Dane użytkowników: oceny, komentarze, preferencje, ulubione.
  * Czyste funkcje bazodanowe — bez sprawdzania sesji (to robią server actions).
  */
-import { and, asc, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { scalDziennik, type JournalEvent } from "@/lib/journal";
 
@@ -440,14 +440,62 @@ export async function listsWith(userId: string, targetType: ListTarget, targetMb
  * Ludzie, którym można polecić listę. Świadomie BEZ adresów e-mail — do wskazania
  * odbiorcy wystarczy nazwa, a adres to nie nasza rzecz do pokazywania.
  */
+/**
+ * Komu wolno polecić podróż.
+ *
+ * TYLKO ci, którzy się na to zgodzili i podali nazwę. Wcześniej ta lista
+ * pokazywała WSZYSTKICH użytkowników portalu, a komu brakowało nazwy — tego
+ * pokazywała jako fragment adresu e-mail sprzed małpy. Nikt się na to nie
+ * pisał; przy koncie zakładanym Google'em nikt tego nawet nie przewidział.
+ *
+ * Siebie widzimy zawsze, niezależnie od zgody: „poleć sobie" to zwykła kolejka
+ * do posłuchania, a zgoda dotyczy pokazywania się OBCYM.
+ */
 export async function otherUsers(userId: string) {
   const rows = await db
-    .select({ id: schema.users.id, name: schema.users.name, email: schema.users.email })
+    .select({ id: schema.users.id, nick: schema.users.nick, discoverable: schema.users.discoverable })
     .from(schema.users)
-    .orderBy(asc(schema.users.name));
-  // Siebie zostawiamy na liście: „poleć sobie" to zwykła kolejka do posłuchania,
-  // a nie dziwactwo — odfiltrowanie samego siebie było moim błędem założenia.
-  return rows.map((u) => ({ id: u.id, name: u.name || u.email.split("@")[0], me: u.id === userId }));
+    .orderBy(asc(schema.users.nick));
+  return rows
+    .filter((u) => u.id === userId || (u.discoverable && u.nick))
+    .map((u) => ({ id: u.id, name: u.nick || "", me: u.id === userId }));
+}
+
+/**
+ * Szukanie ludzi po nazwie — zamiast pokazywania spisu wszystkich.
+ *
+ * Nawet lista samych zgadzających się jest spisem: wchodzisz w dowolną podróż
+ * i masz przed sobą wszystkich, którzy się zapisali. Tu trzeba wiedzieć, kogo
+ * się szuka. Zgoda dalej obowiązuje — bez niej nie ma Cię w wynikach.
+ */
+export async function findUsersByNick(userId: string, q: string) {
+  const fraza = q.trim().slice(0, 40);
+  if (fraza.length < 2) return [];
+  const rows = await db
+    .select({ id: schema.users.id, nick: schema.users.nick })
+    .from(schema.users)
+    .where(and(eq(schema.users.discoverable, true), isNotNull(schema.users.nick), ilike(schema.users.nick, `%${fraza}%`)))
+    .orderBy(asc(schema.users.nick))
+    .limit(10);
+  return rows.filter((u) => u.id !== userId).map((u) => ({ id: u.id, name: u.nick ?? "", me: false }));
+}
+
+/** Nazwa i zgoda — do ekranu profilu. */
+export async function getSharingProfile(userId: string) {
+  const u = await db.query.users.findFirst({ where: eq(schema.users.id, userId), columns: { nick: true, discoverable: true } });
+  return { nick: u?.nick ?? "", discoverable: !!u?.discoverable };
+}
+
+/**
+ * Zapis nazwy i zgody. Bez nazwy nie da się być widocznym — inaczej wrócilibyśmy
+ * do pokazywania czegoś, czego człowiek nie wybrał.
+ */
+export async function setSharingProfile(userId: string, nick: string, discoverable: boolean) {
+  const czysty = nick.trim().slice(0, 40);
+  await db
+    .update(schema.users)
+    .set({ nick: czysty || null, discoverable: czysty ? discoverable : false })
+    .where(eq(schema.users.id, userId));
 }
 
 export async function shareList(userId: string, listId: string, toUserIds: string[], note?: string | null) {
@@ -483,8 +531,7 @@ export async function listsForMe(userId: string, includeDismissed = false) {
       note: schema.listShares.note,
       createdAt: schema.listShares.createdAt,
       dismissedAt: schema.listShares.dismissedAt,
-      fromName: schema.users.name,
-      fromEmail: schema.users.email,
+      fromNick: schema.users.nick,
       items: count(schema.listItems.targetMbid),
     })
     .from(schema.listShares)
@@ -496,9 +543,11 @@ export async function listsForMe(userId: string, includeDismissed = false) {
         ? eq(schema.listShares.toUserId, userId)
         : and(eq(schema.listShares.toUserId, userId), isNull(schema.listShares.dismissedAt)),
     )
-    .groupBy(schema.lists.id, schema.listShares.note, schema.listShares.createdAt, schema.listShares.dismissedAt, schema.users.name, schema.users.email)
+    .groupBy(schema.lists.id, schema.listShares.note, schema.listShares.createdAt, schema.listShares.dismissedAt, schema.users.nick)
     .orderBy(desc(schema.listShares.createdAt));
-  return rows.map((r) => ({ ...r, items: Number(r.items), from: r.fromName || r.fromEmail.split("@")[0] }));
+  // Adres e-mail nie wychodzi stąd NIGDY — nawet w kawałku. Kto nie podał
+  // nazwy, jest po prostu „kimś z portalu".
+  return rows.map((r) => ({ ...r, items: Number(r.items), from: r.fromNick || "" }));
 }
 
 export async function dismissShare(userId: string, listId: string) {
@@ -611,8 +660,7 @@ export async function travelJournal(userId: string, limit = 12): Promise<Journal
         at: schema.listShares.createdAt,
         listId: schema.lists.id,
         title: schema.lists.title,
-        fromName: schema.users.name,
-        fromEmail: schema.users.email,
+        fromNick: schema.users.nick,
       })
       .from(schema.listShares)
       .innerJoin(schema.lists, eq(schema.lists.id, schema.listShares.listId))
@@ -673,7 +721,7 @@ export async function travelJournal(userId: string, limit = 12): Promise<Journal
         kind: "shared" as const,
         title: r.title,
         href: `/podroz/${r.listId}`,
-        context: r.fromName || r.fromEmail.split("@")[0],
+        context: r.fromNick || "",
         contextHref: null,
         sentiment: null,
         score: null,

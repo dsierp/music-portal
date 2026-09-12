@@ -12,11 +12,50 @@ import { fmt } from "@/lib/i18n";
  * w opisie. Bez tego w pasku brakowało Wikipedii dokładnie tam, gdzie widać ją
  * na tej samej stronie — wyglądało to na wycięty link.
  */
-export async function LinksRow({ links, compact = false, wikiUrl }: { links: Links; compact?: boolean; wikiUrl?: string | null }) {
+export async function LinksRow({
+  links,
+  compact = false,
+  wikiUrl,
+  mbid,
+  typ,
+  etykieta,
+}: {
+  links: Links;
+  compact?: boolean;
+  wikiUrl?: string | null;
+  /** MBID płyty (release-group) albo artysty — bez niego zostaje wyszukiwanie */
+  mbid?: string;
+  typ?: "release-group" | "artist";
+  /** „Artysta – Tytuł" albo sama nazwa — do szukania po nazwie i do wyszukiwarki */
+  etykieta?: string;
+}) {
   const { t } = await i18n();
+  const { kvGetMany } = await import("@/lib/cache");
   const cls = compact ? "text-xs" : "text-sm";
   const wikipedia = links.wikipedia ?? wikiUrl ?? null;
   const dokladne = new Set(links.exact ?? []);
+  /**
+   * Spotify i Tidal prowadzą przez naszą trasę, która szuka adresu DOPIERO
+   * przy kliknięciu. Inaczej prawie zawsze wychodziła wyszukiwarka: MusicBrainz
+   * wiesza adresy streamingu przy konkretnym wydaniu, a nie przy grupie
+   * wydawniczej, więc pytanie o samą grupę wracało puste — choć płyta
+   * w serwisie jest.
+   */
+  const przezTrase = (serwis: "spotify" | "tidal") =>
+    mbid
+      ? `/go/serwis?serwis=${serwis}&typ=${typ ?? "release-group"}&mbid=${encodeURIComponent(mbid)}&etykieta=${encodeURIComponent(etykieta ?? "")}`
+      : serwis === "spotify"
+        ? links.spotify
+        : links.tidal;
+  const wynikiLinkow = mbid
+    ? await kvGetMany<{ url: string | null }>([`link:spotify:${mbid}`, `link:tidal:${mbid}`]).catch(() => new Map())
+    : new Map();
+  /** true = mamy adres, false = wiemy, że go nie ma, undefined = nie sprawdzone */
+  const stanSerwisu = (serwis: string) => {
+    if (!mbid) return dokladne.has(serwis as never) ? true : false;
+    const w = wynikiLinkow.get(`link:${serwis}:${mbid}`);
+    return w ? !!w.url : dokladne.has(serwis as never) ? true : undefined;
+  };
 
   /**
    * Ten sam znak co przy przystankach podróży, i z tego samego powodu.
@@ -26,31 +65,34 @@ export async function LinksRow({ links, compact = false, wikiUrl }: { links: Lin
    * klikał w „Bandcamp" spodziewając się płyty, a lądował w wyszukiwarce.
    * Teraz strzałka znaczy „wchodzisz prosto tam", lupka „to jest szukanie".
    */
-  const Odnosnik = ({ url, klucz, nazwa, klasa }: { url: string; klucz: string; nazwa: string; klasa: string }) => {
-    const wprost = dokladne.has(klucz as never);
-    return (
-      <a
-        href={url}
-        target="_blank"
-        rel="noopener"
-        title={wprost ? fmt(t.lists.openIn, { name: nazwa }) : fmt(t.lists.onlySearch, { name: nazwa })}
-        className={`${klasa} hover:underline`}
-      >
-        {wprost ? "▸" : "⌕"} {nazwa}
-      </a>
-    );
-  };
+  const Odnosnik = ({ url, stan, nazwa, klasa }: { url: string; stan: boolean | undefined; nazwa: string; klasa: string }) => (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener"
+      title={
+        stan === true
+          ? fmt(t.lists.openIn, { name: nazwa })
+          : stan === false
+            ? fmt(t.lists.onlySearch, { name: nazwa })
+            : fmt(t.lists.notChecked, { name: nazwa })
+      }
+      className={`${klasa} hover:underline`}
+    >
+      {stan === true ? "▸" : stan === false ? "⌕" : "·"} {nazwa}
+    </a>
+  );
 
   return (
     <div className={`flex flex-wrap gap-x-4 gap-y-1 font-mono ${cls}`}>
-      <Odnosnik url={links.spotify} klucz="spotify" nazwa="Spotify" klasa="text-spotify hover:text-spotify" />
-      <Odnosnik url={links.tidal} klucz="tidal" nazwa="Tidal" klasa="text-tidal hover:text-tidal" />
-      {links.bandcamp && <Odnosnik url={links.bandcamp} klucz="bandcamp" nazwa="Bandcamp" klasa="text-text2" />}
-      {links.metalArchives && <Odnosnik url={links.metalArchives} klucz="metalArchives" nazwa="Metal-Archives" klasa="text-text2" />}
-      {links.allmusic && <Odnosnik url={links.allmusic} klucz="allmusic" nazwa="AllMusic" klasa="text-text2" />}
-      {links.discogs && <Odnosnik url={links.discogs} klucz="discogs" nazwa="Discogs" klasa="text-text2" />}
-      {wikipedia && <Odnosnik url={wikipedia} klucz="wikipedia" nazwa="Wikipedia" klasa="text-text2" />}
-      {links.official && <Odnosnik url={links.official} klucz="official" nazwa="www" klasa="text-text2" />}
+      <Odnosnik url={przezTrase("spotify")} stan={stanSerwisu("spotify")} nazwa="Spotify" klasa="text-spotify hover:text-spotify" />
+      <Odnosnik url={przezTrase("tidal")} stan={stanSerwisu("tidal")} nazwa="Tidal" klasa="text-tidal hover:text-tidal" />
+      {links.bandcamp && <Odnosnik url={links.bandcamp} stan={dokladne.has("bandcamp")} nazwa="Bandcamp" klasa="text-text2" />}
+      {links.metalArchives && <Odnosnik url={links.metalArchives} stan={dokladne.has("metalArchives")} nazwa="Metal-Archives" klasa="text-text2" />}
+      {links.allmusic && <Odnosnik url={links.allmusic} stan={dokladne.has("allmusic")} nazwa="AllMusic" klasa="text-text2" />}
+      {links.discogs && <Odnosnik url={links.discogs} stan={dokladne.has("discogs")} nazwa="Discogs" klasa="text-text2" />}
+      {wikipedia && <Odnosnik url={wikipedia} stan={true} nazwa="Wikipedia" klasa="text-text2" />}
+      {links.official && <Odnosnik url={links.official} stan={true} nazwa="www" klasa="text-text2" />}
     </div>
   );
 }

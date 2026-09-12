@@ -2,9 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { currentUser } from "@/lib/auth";
-import { getAreas, getFavoriteArtists, getGenres, getLikedAlbums, getUserLocale, myRatings, usersCount } from "@/lib/user-data";
+import { getAreas, getFavoriteArtists, getGenres, getLikedAlbums, getUserLocale, myRatings, usersCount, getSharingProfile } from "@/lib/user-data";
 import { isAdmin } from "@/lib/admin";
-import { addAreaAction, connectSpotify, removeAreaAction, setGenreAction, skipOnboarding, toggleFavorite, toggleLike } from "@/app/actions";
+import { addAreaAction, connectSpotify, removeAreaAction, setGenreAction, setSharingAction, skipOnboarding, toggleFavorite, toggleLike } from "@/app/actions";
 import { spotifyConfigured, spotifyConnected } from "@/lib/spotify";
 import { MAIN_CATEGORIES } from "@/lib/genres";
 import { orderByPopularity } from "@/lib/popularity";
@@ -27,6 +27,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const user = await currentUser();
   if (!user) redirect("/login?callbackUrl=/ja");
   const profileLocale = await getUserLocale(user.id).catch(() => null);
+  const widocznosc = await getSharingProfile(user.id).catch(() => ({ nick: "", discoverable: false }));
   const { locale, t } = await i18n(profileLocale);
   // Etykiety wag (1–5) trzymamy w słowniku profilu, nie w lib/genres.ts —
   // ten plik jest wspólny i nie tłumaczymy go tutaj.
@@ -109,6 +110,32 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         <h2 className="text-2xl">{t.profile.languageTitle}</h2>
         <p className="mb-3 text-sm text-muted">{t.profile.languageExplain}</p>
         <LanguagePicker locale={locale} label={t.nav.language} />
+      </section>
+
+      {/* Zgoda na pokazywanie się innym. Osobno od reszty profilu, bo to jedyne
+          miejsce, w którym coś o Tobie wychodzi poza Twoje konto. */}
+      <section id="widocznosc">
+        <h2 className="text-2xl">{t.profile.sharingTitle}</h2>
+        <p className="mb-3 text-sm text-muted">{t.profile.sharingIntro}</p>
+        <form action={setSharingAction} className="space-y-2">
+          <label className="block text-sm text-muted">
+            {t.profile.nickLabel}
+            <input
+              name="nick"
+              defaultValue={widocznosc.nick}
+              maxLength={40}
+              placeholder={t.profile.nickPlaceholder}
+              className="input mt-1 py-1 text-sm"
+              autoComplete="off"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="discoverable" value="1" defaultChecked={widocznosc.discoverable} />
+            {t.profile.discoverableLabel}
+          </label>
+          <p className="text-xs text-faint">{t.profile.sharingNeedsNick}</p>
+          <button className="btn">{t.profile.sharingSave}</button>
+        </form>
       </section>
 
       <section id="obszary">

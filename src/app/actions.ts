@@ -532,3 +532,17 @@ export async function powtorzPytanie(formData: FormData) {
   // rozmowa stoi tam, gdzie stała.
   if (wynik?.blad) redirect(`/rozmowa/${String(formData.get("id") ?? "")}`);
 }
+
+/**
+ * Nazwa widoczna dla innych i zgoda na polecanie.
+ *
+ * Domyślnie nikt nie jest widoczny — a bez nazwy nie da się widoczności włączyć.
+ * Wcześniej portal pokazywał WSZYSTKICH użytkowników na liście „poleć podróż",
+ * a komu brakowało nazwy, tego pokazywał jako fragment adresu e-mail. Nikt się
+ * na to nie pisał.
+ */
+export async function setSharingAction(formData: FormData) {
+  const u = await requireUser();
+  await ud.setSharingProfile(u.id, String(formData.get("nick") ?? ""), formData.get("discoverable") === "1");
+  revalidatePath("/ja");
+}

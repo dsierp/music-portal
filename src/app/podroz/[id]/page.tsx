@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { after } from "next/server";
 import type { Metadata } from "next";
 import { currentUser } from "@/lib/auth";
-import { canSeeList, getList, otherUsers, sharedWith, visitedStops } from "@/lib/user-data";
+import { canSeeList, findUsersByNick, getList, otherUsers, sharedWith, visitedStops } from "@/lib/user-data";
 import { spotifyConfigured, spotifyConnected } from "@/lib/spotify";
 import { connectSpotify, deleteListAction, kawalkiZListy, removeFromListAction, sendJourneyToSpotify, shareListAction, toggleVisitAction } from "@/app/actions";
 import { Cover } from "@/components/cover";
@@ -29,7 +29,7 @@ export default async function ListPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ spotify?: string; n?: string; pominieto?: string; url?: string; usun?: string }>;
+  searchParams: Promise<{ spotify?: string; n?: string; pominieto?: string; url?: string; usun?: string; kto?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
@@ -86,6 +86,10 @@ export default async function ListPage({
     });
   }
 
+  const szukanyKto = sp.kto ?? "";
+  const znalezieni = moja && szukanyKto.trim().length >= 2
+    ? await findUsersByNick(user!.id, szukanyKto).catch(() => [])
+    : [];
   const [ludzie, wyslane] = moja
     ? await Promise.all([otherUsers(user!.id), sharedWith(id)])
     : [[] as { id: string; name: string; me: boolean }[], [] as { userId: string; dismissedAt: Date | null }[]];
@@ -255,33 +259,49 @@ export default async function ListPage({
         </section>
       )}
 
+      {/* Polecanie: SZUKAMY człowieka po nazwie, nie pokazujemy spisu.
+          Spis — nawet samych zgadzających się — znaczyłby, że wchodząc
+          w dowolną podróż masz przed sobą wszystkich zapisanych. Tu trzeba
+          wiedzieć, kogo się szuka; kto się nie zgodził, nie pojawi się wcale. */}
       {moja && (
         <section className="card">
           <h2 className="text-xl">{t.lists.shareTitle}</h2>
-          {ludzie.length ? (
-            <form action={shareListAction} className="mt-2 space-y-2">
-              <input type="hidden" name="listId" value={id} />
-              <div className="flex flex-wrap gap-3">
-                {ludzie.map((p) => (
-                  <label key={p.id} className="flex items-center gap-1.5 text-sm">
-                    <input type="checkbox" name="to" value={p.id} defaultChecked={juzPolecone.has(p.id)} />
-                    {p.me ? t.lists.meLabel : p.name}
-                  </label>
-                ))}
-              </div>
-              <input name="note" placeholder={t.lists.shareNote} className="input py-1 text-sm" autoComplete="off" />
-              <button className="btn btn-accent">{t.lists.shareSubmit}</button>
-              {juzPolecone.size > 0 && (
-                <p className="font-mono text-[10px] text-faint">
-                  {fmt(t.lists.sharedAlready, {
-                    names: ludzie.filter((p) => juzPolecone.has(p.id)).map((p) => p.name).join(", "),
-                  })}
-                </p>
-              )}
-            </form>
-          ) : (
-            <p className="mt-2 text-sm text-muted">{t.lists.shareNoUsers}</p>
-          )}
+          <form method="get" className="mt-2 flex flex-wrap gap-2">
+            <input
+              name="kto"
+              defaultValue={szukanyKto}
+              placeholder={t.lists.shareSearchPlaceholder}
+              className="input min-w-0 flex-1 py-1 text-sm"
+              autoComplete="off"
+            />
+            <button className="btn">{t.lists.shareSearch}</button>
+          </form>
+
+          <form action={shareListAction} className="mt-3 space-y-2">
+            <input type="hidden" name="listId" value={id} />
+            <div className="flex flex-wrap gap-3">
+              {/* Siebie widać zawsze — „poleć sobie" to kolejka do posłuchania,
+                  a zgoda dotyczy pokazywania się obcym. */}
+              {ludzie.filter((p) => p.me).map((p) => (
+                <label key={p.id} className="flex items-center gap-1.5 text-sm">
+                  <input type="checkbox" name="to" value={p.id} defaultChecked={juzPolecone.has(p.id)} />
+                  {t.lists.meLabel}
+                </label>
+              ))}
+              {znalezieni.map((p) => (
+                <label key={p.id} className="flex items-center gap-1.5 text-sm">
+                  <input type="checkbox" name="to" value={p.id} defaultChecked={juzPolecone.has(p.id)} />
+                  {p.name}
+                </label>
+              ))}
+            </div>
+            {szukanyKto.trim().length >= 2 && !znalezieni.length && (
+              <p className="text-sm text-muted">{t.lists.shareNobodyFound}</p>
+            )}
+            <input name="note" placeholder={t.lists.shareNote} className="input py-1 text-sm" autoComplete="off" />
+            <button className="btn btn-accent">{t.lists.shareSubmit}</button>
+            <p className="text-xs text-faint">{t.lists.shareNote2}</p>
+          </form>
         </section>
       )}
 
