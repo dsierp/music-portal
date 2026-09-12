@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { after } from "next/server";
 import type { Metadata } from "next";
 import { currentUser } from "@/lib/auth";
 import { canSeeList, getList, otherUsers, sharedWith, visitedStops } from "@/lib/user-data";
@@ -47,12 +48,43 @@ export default async function ListPage({
    * graficzna. Pierwsze wyjście jest w ciemno; potem każdy widzi, że tam czeka
    * wyszukiwarka, a nie płyta.
    */
-  const { kvGetMany } = await import("@/lib/cache");
-  const klucze = data.items.flatMap((i) => [`link:spotify:${i.targetMbid}`, `link:tidal:${i.targetMbid}`]);
+  const { kvGetMany, kvSet } = await import("@/lib/cache");
+  const doSprawdzenia = data.items
+    .filter((i) => i.targetType === "ALBUM" || i.targetType === "RECORDING")
+    .slice(0, 12);
+  const klucze = doSprawdzenia.flatMap((i) => [`link:spotify:${i.targetMbid}`, `link:tidal:${i.targetMbid}`]);
   const znane = await kvGetMany<{ url: string | null }>(klucze);
-  const wiadomoBrak = new Set(
-    [...znane.entries()].filter(([, v]) => !v?.url).map(([k]) => k.replace(/^link:/, "")),
+  /** `true` = mamy adres, `false` = wiemy, że go nie ma, `undefined` = nie sprawdzone. */
+  const stanLinku = new Map<string, boolean>(
+    [...znane.entries()].map(([k, v]) => [k.replace(/^link:/, ""), !!v?.url]),
   );
+
+  /**
+   * Czego jeszcze nie wiemy — dociągamy PO ODDANIU STRONY.
+   *
+   * Inaczej nie dałoby się tego pokazać uczciwie: żeby wiedzieć, czy przystanek
+   * ma adres w serwisie, trzeba zapytać MusicBrainz, a to sekunda na zapytanie.
+   * Wpleceni w render kazalibyśmy człowiekowi czekać pół minuty na listę, którą
+   * już widzi. Więc pierwsze wejście pokazuje „nie sprawdzone", a robota leci
+   * w tle i przy następnym odświeżeniu stan jest już prawdziwy.
+   */
+  const brakujace = klucze.filter((k) => !znane.has(k));
+  if (brakujace.length) {
+    after(async () => {
+      const { linkSerwisu, HOST_SPOTIFY, HOST_TIDAL } = await import("@/lib/musicbrainz");
+      for (const k of brakujace.slice(0, 24)) {
+        const [, serwis, mb] = k.split(":");
+        const poz = doSprawdzenia.find((i) => i.targetMbid === mb);
+        if (!poz) continue;
+        const url = await linkSerwisu(
+          poz.targetType === "RECORDING" ? "recording" : "release-group",
+          mb,
+          serwis === "tidal" ? HOST_TIDAL : HOST_SPOTIFY,
+        ).catch(() => null);
+        await kvSet(k, { url }).catch(() => {});
+      }
+    });
+  }
 
   const [ludzie, wyslane] = moja
     ? await Promise.all([otherUsers(user!.id), sharedWith(id)])
@@ -150,17 +182,25 @@ export default async function ListPage({
                       // Wiemy z poprzedniego kliknięcia, że tu nic nie ma? Lupka
                       // zamiast strzałki, żeby nikt nie liczył na wejście prosto
                       // w płytę i nie zdziwił się wyszukiwarką.
-                      szukanie: wiadomoBrak.has(`${s.serwis}:${it.targetMbid}`),
+                      stan: stanLinku.get(`${s.serwis}:${it.targetMbid}`),
                     })).map((s) => (
                       <a
                         key={s.nazwa}
                         href={`/go/stop?listId=${encodeURIComponent(id)}&type=${it.targetType}&mbid=${encodeURIComponent(it.targetMbid)}${s.param}`}
                         target="_blank"
                         rel="noopener"
-                        title={s.szukanie ? fmt(t.lists.onlySearch, { name: s.nazwa }) : fmt(t.lists.openIn, { name: s.nazwa })}
-                        className={`font-mono text-[10px] hover:text-accent2 ${s.szukanie ? "text-faint" : "text-muted"}`}
+                        title={
+                          s.stan === true
+                            ? fmt(t.lists.openIn, { name: s.nazwa })
+                            : s.stan === false
+                              ? fmt(t.lists.onlySearch, { name: s.nazwa })
+                              : fmt(t.lists.notChecked, { name: s.nazwa })
+                        }
+                        className={`font-mono text-[10px] hover:text-accent2 ${s.stan === true ? "text-accent2" : "text-faint"}`}
                       >
-                        {s.szukanie ? "⌕" : "▸"} {s.nazwa}
+                        {/* Trzy stany, bo dwa kłamały: dopóki nie sprawdzimy,
+                            „strzałka" obiecywała wejście prosto w płytę. */}
+                        {s.stan === true ? "▸" : s.stan === false ? "⌕" : "·"} {s.nazwa}
                       </a>
                     ))}
                   </div>
