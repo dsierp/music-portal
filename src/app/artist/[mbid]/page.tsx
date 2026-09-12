@@ -1003,6 +1003,17 @@ export default async function ArtistPage({
                   }}
                 />
               )}
+              {/* Stąd w nieznane, z gotowym pytaniem o artystów w tym klimacie.
+                  Bez tego trzeba było iść do osobnej zakładki i przepisywać
+                  nazwę ręcznie. Pytanie ląduje w polu, więc da się je poprawić. */}
+              {user && (
+                <Link
+                  href={`/rozmowa?opis=${encodeURIComponent(fmt(t.chat.similarArtist, { what: artist.name }))}`}
+                  className="btn"
+                >
+                  {t.chat.findSimilar}
+                </Link>
+              )}
               {favs > 0 && <span className="font-mono text-xs text-muted">{fmt(t.artist.favoritesCount, { n: favs })}</span>}
             </div>
           </div>

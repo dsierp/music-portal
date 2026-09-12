@@ -240,6 +240,19 @@ export default async function AlbumPage({
                   }}
                 />
               )}
+              {/* Stąd w nieznane, z gotowym pytaniem. Płyta, którą właśnie
+                  oglądasz, jest najlepszym możliwym punktem wyjścia — a bez
+                  tego trzeba było iść do osobnej zakładki i przepisywać nazwę
+                  ręcznie. Pytanie ląduje w polu, więc da się je poprawić przed
+                  wysłaniem. */}
+              {user && (
+                <Link
+                  href={`/rozmowa?opis=${encodeURIComponent(fmt(t.chat.similarAlbum, { what: `${album.artistText} – ${album.title}` }))}`}
+                  className="btn"
+                >
+                  {t.chat.findSimilar}
+                </Link>
+              )}
               {likes > 0 && <span className="font-mono text-xs text-muted">{plural(locale, likes, t.album.likesCount)}</span>}
             </div>
             <ScreenHelp screen="plyta" />
