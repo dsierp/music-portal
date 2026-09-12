@@ -453,3 +453,17 @@ export async function podrozZRozmowy(formData: FormData) {
   revalidatePath("/podroze");
   redirect(`/podroz/${lista.id}`);
 }
+
+/**
+ * „Odtwórz jeszcze raz" — to samo pytanie puszczone drugi raz.
+ *
+ * Osobne opakowanie, bo `powiedzCos` ma kształt pod `useActionState`
+ * (poprzedni stan + formularz), a tu jest zwykły przycisk w formularzu.
+ */
+export async function powtorzPytanie(formData: FormData) {
+  const wynik = await powiedzCos(null, formData);
+  // Udana próba kończy się przekierowaniem, więc tutaj jesteśmy tylko wtedy,
+  // gdy coś odmówiło (najczęściej dzienny limit). Wracamy pod ten sam adres —
+  // rozmowa stoi tam, gdzie stała.
+  if (wynik?.blad) redirect(`/rozmowa/${String(formData.get("id") ?? "")}`);
+}

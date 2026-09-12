@@ -9,6 +9,7 @@ import { wczytajRozmowe, plytyZRozmowy } from "@/lib/rozmowa";
 import { i18n } from "@/lib/t";
 import { fmt } from "@/lib/i18n";
 import { RozmowaForm } from "@/components/rozmowa-form";
+import { Pytanie } from "@/components/rozmowa-pytanie";
 import { podrozZRozmowy } from "@/app/actions";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -61,10 +62,7 @@ export default async function RozmowaPage({ params }: { params: Promise<{ id: st
             {r.wiadomosci.map((w, i) => (
               <div key={i} className={w.rola === "ja" ? "" : "space-y-4"}>
                 {w.rola === "ja" ? (
-                  <div className="rounded border border-rule bg-surface px-4 py-3">
-                    <p className="label mb-1">{t.chat.youAsked}</p>
-                    <p className="text-lg text-text">{w.tekst}</p>
-                  </div>
+                  <Pytanie t={t} tekst={w.tekst} id={r.id} />
                 ) : (
                   <>
                     {w.tekst && <p className="text-text2">{w.tekst}</p>}
@@ -98,6 +96,30 @@ export default async function RozmowaPage({ params }: { params: Promise<{ id: st
                     <span className="h-6 w-6 shrink-0 animate-spin rounded-full border-2 border-rule border-t-accent" aria-hidden />
                     <p className="text-sm text-text2">{t.chat.working}</p>
                   </div>
+                  {/* Co się właśnie dzieje, wiersz po wierszu. Kręciołek mówi
+                      „coś się dzieje"; to mówi CO — którą płytę sprawdzam
+                      i która przed chwilą odpadła. Przy czymś, co trwa pół
+                      minuty, to jest różnica między czekaniem a gapieniem się. */}
+                  {!!r.postep?.length && (
+                    <ul className="mt-4 space-y-1 font-mono text-xs">
+                      {r.postep.map((linia, j) => {
+                        const [rodzaj, co] = linia.split("::");
+                        const podpis =
+                          rodzaj === "szukam" ? t.chat.stepSearching
+                          : rodzaj === "sprawdzam" ? t.chat.stepChecking
+                          : rodzaj === "mam" ? t.chat.stepHave
+                          : t.chat.stepMissing;
+                        return (
+                          <li key={j} className={rodzaj === "brak" ? "text-faint line-through" : "text-muted"}>
+                            <span className={rodzaj === "mam" ? "text-accent2" : "text-faint"}>
+                              {rodzaj === "mam" ? "✓" : rodzaj === "brak" ? "✕" : "·"}
+                            </span>{" "}
+                            {podpis}{co ? `: ${co}` : ""}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
                   <p className="mt-4 text-xs text-faint">{t.chat.leaveOk}</p>
                 </div>
               </>

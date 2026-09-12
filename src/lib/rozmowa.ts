@@ -37,6 +37,15 @@ export interface Rozmowa {
   userId: string;
   tytul: string;
   wiadomosci: Wiadomosc[];
+  /**
+   * Co się właśnie dzieje — wiersz po wierszu, tak jak leci.
+   *
+   * Kręciołek mówi tylko „coś się dzieje". Przy czymś, co trwa pół minuty,
+   * człowiek chce wiedzieć CO: że najpierw szukam, a potem sprawdzam kolejne
+   * płyty po kolei i która właśnie odpadła. Zapisujemy po każdym kroku, więc
+   * ekran (odświeżany co trzy sekundy) pokazuje to na bieżąco.
+   */
+  postep?: string[];
   stan: "czeka" | "robi" | "blad";
   blad?: string;
   szczegol?: string;
@@ -73,6 +82,7 @@ export async function powiedz(userId: string, tekst: string, id?: string): Promi
       };
   r.wiadomosci.push({ rola: "ja", tekst });
   r.stan = "robi";
+  r.postep = ["szukam"];
   r.blad = undefined;
   r.szczegol = undefined;
   await zapisz(r);
@@ -85,6 +95,11 @@ export async function powiedz(userId: string, tekst: string, id?: string): Promi
 async function tura(id: string, userId: string) {
   const r = await wczytajRozmowe(id);
   if (!r) return;
+  /** Dopisuje wiersz postępu i od razu go zapisuje — ekran czyta na bieżąco. */
+  const krok = async (linia: string) => {
+    r.postep = [...(r.postep ?? []), linia];
+    await zapisz(r);
+  };
   try {
     const { porozmawiaj, AiError } = await import("./ai");
     const ud = await import("./user-data");
@@ -102,6 +117,7 @@ async function tura(id: string, userId: string) {
       if (!aiBlad) console.error("rozmowa:", e);
       await zapisz({
         ...r,
+        postep: undefined,
         stan: "blad",
         blad: aiBlad ? "model" : "nieznany",
         szczegol: e instanceof Error ? e.message : String(e),
@@ -114,13 +130,14 @@ async function tura(id: string, userId: string) {
     const juz = new Set(
       r.wiadomosci.flatMap((w) => (w.plyty ?? []).map((p) => p.album.mbid)),
     );
-    const { plyty, odpadlo, awaria } = await potwierdz(odp.propozycje, juz);
+    const { plyty, odpadlo, awaria } = await potwierdz(odp.propozycje, juz, krok);
     r.wiadomosci.push({ rola: "portal", tekst: odp.odpowiedz, plyty, odpadlo });
     // Awaria MusicBrainz to nie jest „nie ma takich płyt" — mówimy to wprost,
     // zamiast pokazywać pustą odpowiedź i dać człowiekowi myśleć, że model
     // nic nie wymyślił.
     await zapisz({
       ...r,
+      postep: undefined,
       stan: awaria && !plyty.length ? "blad" : "czeka",
       blad: awaria && !plyty.length ? "mbAwaria" : undefined,
     });
@@ -134,11 +151,13 @@ async function tura(id: string, userId: string) {
 async function potwierdz(
   propozycje: Propozycja[],
   juz: Set<string>,
+  krok?: (linia: string) => Promise<void>,
 ): Promise<{ plyty: Znaleziona[]; odpadlo: number; awaria: boolean }> {
   const plyty: Znaleziona[] = [];
   let odpadlo = 0;
   let awaria = false;
   for (const p of propozycje.slice(0, 8)) {
+    await krok?.(`sprawdzam::${p.artist} – ${p.album}`);
     let znaleziony: AlbumSummary | null = null;
     try {
       znaleziony = await findAlbumMbid(p.artist, p.album);
@@ -148,11 +167,13 @@ async function potwierdz(
     }
     if (!znaleziony) {
       odpadlo++;
+      await krok?.(`brak::${p.artist} – ${p.album}`);
       continue;
     }
     if (juz.has(znaleziony.mbid)) continue;
     juz.add(znaleziony.mbid);
     plyty.push({ album: znaleziony, why: p.why });
+    await krok?.(`mam::${znaleziony.artistText} – ${znaleziony.title}`);
   }
   return { plyty, odpadlo, awaria };
 }
