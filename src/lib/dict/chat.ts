@@ -10,7 +10,7 @@ import type { Locale } from "@/lib/i18n";
 
 const pl = {
   eyebrow: "Podróż",
-  title: "W nieznane",
+  title: "Podróż w nieznane",
   lead: "Reszta portalu wie, dokąd jedziesz — ta jedna nie. Napisz, czego chcesz posłuchać, a dostaniesz płyty: sprawdzone w MusicBrainz, więc w każdą da się wejść. Możesz dopytywać do skutku, a na końcu zrobić z tego podróż.",
   label: "Twoja wiadomość",
   placeholder: "Czego szukasz? Możesz dopytywać, zawężać, prosić o coś zupełnie innego…",
@@ -56,7 +56,7 @@ type T = typeof pl;
 
 const en: T = {
   eyebrow: "Journey",
-  title: "Into the unknown",
+  title: "A journey into the unknown",
   lead: "The rest of the portal knows where you're going — this one doesn't. Write what you feel like hearing and you get albums: checked against MusicBrainz, so every one opens. Keep asking as long as you like, then turn it into a journey.",
   label: "Your message",
   placeholder: "What are you after? Ask follow-ups, narrow it down, change direction…",
@@ -101,7 +101,7 @@ const en: T = {
 
 const es: T = {
   eyebrow: "Viaje",
-  title: "Hacia lo desconocido",
+  title: "Viaje hacia lo desconocido",
   lead: "El resto del portal sabe adónde vas; este no. Escribe qué te apetece escuchar y recibirás discos comprobados en MusicBrainz, así que todos se abren. Pregunta lo que haga falta y al final conviértelo en un viaje.",
   label: "Tu mensaje",
   placeholder: "¿Qué buscas? Puedes repreguntar, acotar o cambiar de rumbo…",
@@ -146,7 +146,7 @@ const es: T = {
 
 const de: T = {
   eyebrow: "Reise",
-  title: "Ins Unbekannte",
+  title: "Reise ins Unbekannte",
   lead: "Der Rest des Portals weiß, wohin du willst — dieser Teil nicht. Schreib, wonach dir ist, und du bekommst Alben: bei MusicBrainz geprüft, also lässt sich jedes öffnen. Frag so lange nach, wie du magst, und mach am Ende eine Reise daraus.",
   label: "Deine Nachricht",
   placeholder: "Was suchst du? Nachfragen, eingrenzen, Richtung wechseln — alles möglich…",

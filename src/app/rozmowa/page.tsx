@@ -47,6 +47,12 @@ export default async function RozmowaStart({ searchParams }: { searchParams: Pro
           </div>
         ) : (
           <>
+            {/* Mapa przy pustym ekranie. Nie ozdobnik: pusty formularz
+                onieśmiela, a ta sama mapa wita w Podróżach — więc od razu
+                widać, że to jest ta sama rzecz, tylko bez wytyczonej trasy. */}
+            <div className="overflow-hidden rounded-lg border border-rule">
+              <img src="/img/mapa.jpg" alt="" className="h-40 w-full object-cover object-[center_45%] opacity-80 sm:h-56" />
+            </div>
             <p className="text-sm text-muted">{t.chat.empty}</p>
             <RozmowaForm t={t} start={opis} />
             <div>

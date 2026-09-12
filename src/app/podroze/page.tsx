@@ -86,20 +86,10 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
         </p>
       </Banner>
       <ScreenHelp screen="podroze" />
-      {/* Wejście do podróży „w nieznane".
-          Najpierw była to zwykła ramka z tekstem w środku strony — i okazała
-          się nie do znalezienia: dwa razy szukana, dwa razy przeoczona.
-          Dostaje więc własny baner na górze, z tym samym ciężarem co nagłówki
-          pozostałych ekranów. Sztorm pasuje: to jedyne miejsce w portalu,
-          gdzie wypływa się bez mapy. */}
-      <Link href="/rozmowa" className="group block">
-        <Banner image="/img/statek.jpg" title={t.chat.title} position="center 45%" compact>
-          <p className="mt-3 max-w-2xl text-text2">{t.chat.lead}</p>
-          <p className="mt-4 inline-block rounded-full border border-accent/50 px-4 py-1 font-mono text-xs text-accent2 transition-colors group-hover:bg-accent/15">
-            {t.chat.cta} →
-          </p>
-        </Banner>
-      </Link>
+      {/* Podróże zostają Podróżami: własne trasy, polecone i zestawienia.
+          Wejście „w nieznane" miało tu swój baner, dopóki nie miało własnego
+          miejsca — teraz jest osobną zakładką w nawigacji i nie ma powodu,
+          żeby zabierało górę tego ekranu. */}
       {/* Własne listy najpierw: rankingi portalu są ciekawe, ale to, co człowiek
           sam ułożył (i co dostał od kogoś), jest jego. */}
       {user && (
