@@ -12,7 +12,33 @@
  */
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { findAlbumMbid, MbError, searchArtists } from "./musicbrainz";
+import { czyTaPlyta, findAlbumMbid, MbError, searchArtists } from "./musicbrainz";
+import { kvGet, kvSet } from "./cache";
+
+/**
+ * Sprawdzenie ZAPISANEGO dowiązania — raz na pozycję, przy pierwszym kliknięciu.
+ *
+ * Przez pewien czas dopasowywanie brało pierwszy wynik z brzegu i część premier
+ * ma w bazie MBID cudzej płyty („Terrestrial Hospice" prowadziło do „Terrestrial
+ * Access Network"). Nowe sito przy szukaniu tego nie naprawi, bo do szukania już
+ * nie dochodzi — MBID jest zapisany. Więc raz go weryfikujemy, a gdy się nie
+ * zgadza, kasujemy dowiązanie i portal szuka od nowa, już poprawnie.
+ *
+ * Wynik siedzi w buforze, więc to jedno dodatkowe pytanie na pozycję, nie na
+ * kliknięcie. Awaria MusicBrainz niczego nie kasuje — wtedy zostawiamy jak jest.
+ */
+async function dowiazaniePoprawne(mbid: string, artist: string, album: string): Promise<boolean> {
+  const klucz = `mbid-ok:${mbid}:${artist}:${album}`;
+  const znane = await kvGet<{ ok: boolean }>(klucz).catch(() => null);
+  if (znane) return znane.ok;
+  try {
+    const ok = await czyTaPlyta(mbid, artist, album);
+    await kvSet(klucz, { ok }).catch(() => {});
+    return ok;
+  } catch {
+    return true; // nie wiemy — nie ruszamy
+  }
+}
 
 /**
  * Jak długo nie wracamy do pozycji, której w MusicBrainz naprawdę nie ma.
@@ -37,7 +63,14 @@ async function znajdz(artist: string, album: string): Promise<{ mbid: string | n
 export async function resolveRelease(id: string): Promise<string | null> {
   const r = await db.query.releases.findFirst({ where: eq(schema.releases.id, id) });
   if (!r || !r.artist || !r.album) return null;
-  if (r.mbid) return r.mbid;
+  if (r.mbid) {
+    if (await dowiazaniePoprawne(r.mbid, r.artist, r.album)) return r.mbid;
+    await db.update(schema.releases).set({ mbid: null, mbidTriedAt: null }).where(eq(schema.releases.id, id)).catch(() => {});
+    // Zerujemy też w pamięci, inaczej warunek niżej („próbowano niedawno")
+    // zablokowałby ponowne szukanie na pół doby.
+    r.mbid = null;
+    r.mbidTriedAt = null;
+  }
   if (r.mbidTriedAt && Date.now() - r.mbidTriedAt.getTime() < RETRY_AFTER_MS) return null;
   const { mbid, awaria } = await znajdz(r.artist, r.album);
   if (awaria) return null; // bez zapisu — spróbujemy przy następnym kliknięciu
@@ -52,7 +85,12 @@ export async function resolveRelease(id: string): Promise<string | null> {
 export async function resolveBestOf(id: string): Promise<string | null> {
   const r = await db.query.bestOfEntries.findFirst({ where: eq(schema.bestOfEntries.id, id) });
   if (!r) return null;
-  if (r.mbid) return r.mbid;
+  if (r.mbid) {
+    if (await dowiazaniePoprawne(r.mbid, r.artist, r.album)) return r.mbid;
+    await db.update(schema.bestOfEntries).set({ mbid: null, mbidTriedAt: null }).where(eq(schema.bestOfEntries.id, id)).catch(() => {});
+    r.mbid = null;
+    r.mbidTriedAt = null;
+  }
   if (r.mbidTriedAt && Date.now() - r.mbidTriedAt.getTime() < RETRY_AFTER_MS) return null;
   const { mbid, awaria } = await znajdz(r.artist, r.album);
   if (awaria) return null;
