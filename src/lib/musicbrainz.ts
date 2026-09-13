@@ -484,6 +484,48 @@ function lucene(s: string) {
   return s.replace(/[+\-&|!(){}[\]^"~*?:\\/]/g, " ").replace(/\s+/g, " ").trim();
 }
 
+/** Do porównań: bez ogonków, bez interpunkcji, małymi literami. */
+function goly(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/\band\b|\bthe\b|&/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * Czy to NA PEWNO ten artysta.
+ *
+ * Bez tego sprawdzenia z MusicBrainz wracało cokolwiek. „Der Weg Einer
+ * Freiheit — Innern (Instrumental)" z premier lądowało na płycie „Justice Der —
+ * Covers II": nawias w tytule rozwalał zapytanie, zostawało samo „Der",
+ * a pierwszy wynik z brzegu szedł na stronę jako trafienie. Człowiek klikał
+ * w jedną płytę i dostawał zupełnie inną — a portal stoi na tym, że
+ * w każdą pozycję da się wejść i będzie tam to, co obiecano.
+ *
+ * Dopuszczamy zawieranie się nazw („Opeth" vs „Opeth feat. ktoś") i większość
+ * wspólnych słów, bo zapis po obu stronach bywa różny.
+ */
+export function tenSamArtysta(zMb: string, szukany: string): boolean {
+  const a = goly(zMb), b = goly(szukany);
+  if (!a || !b) return false;
+  if (a === b || a.includes(b) || b.includes(a)) return true;
+  const sa = new Set(a.split(" ")), sb = b.split(" ");
+  const wspolne = sb.filter((w) => sa.has(w)).length;
+  return wspolne >= Math.ceil(Math.max(sa.size, sb.length) * 0.6);
+}
+
+/** Czy tytuł to ten sam tytuł — z przymknięciem oka na dopiski w nawiasie. */
+export function tenSamTytul(zMb: string, szukany: string): boolean {
+  const bezNawiasow = (s: string) => goly(s.replace(/[([{][^)\]}]*[)\]}]/g, " "));
+  const a = goly(zMb), b = goly(szukany);
+  if (a === b) return true;
+  const ab = bezNawiasow(zMb), bb = bezNawiasow(szukany);
+  return !!ab && !!bb && (ab === bb || ab.includes(bb) || bb.includes(ab));
+}
+
 export async function searchAlbums(query: string, limit = 20): Promise<AlbumSummary[]> {
   const q = lucene(query);
   if (!q) return [];
@@ -593,12 +635,28 @@ export async function searchArtists(
   }));
 }
 
+/**
+ * Czy zapisany MBID to naprawdę TA płyta.
+ *
+ * Potrzebne, bo błędne dopasowania zdążyły zostać zapisane w bazie i sito
+ * przy szukaniu już ich nie ruszy — trzeba je wyczyścić osobno
+ * (`npm run verify:mbids`).
+ */
+export async function czyTaPlyta(mbid: string, artist: string, album: string): Promise<boolean> {
+  const rg = await cached(`mb:rg-min:${mbid}`, TTL.lookup, () =>
+    mbFetch<MbReleaseGroup>(`/release-group/${mbid}`, { inc: "artist-credits" }),
+  );
+  const s = normReleaseGroup(rg);
+  return tenSamArtysta(s.artistText, artist) && tenSamTytul(s.title, album);
+}
+
 /** Szuka release-group po artyście i tytule (do rozwiązywania premier/best-of na MBID). */
 export async function findAlbumMbid(artist: string, album: string): Promise<AlbumSummary | null> {
   const a = lucene(artist), t = lucene(album);
   if (!a || !t) return null;
   const pytaj = async (query: string) => {
-    const data = await cached(`mb:rg-find:v2:${query}`, TTL.lookup, () =>
+    // v3: v2 zdążyło zapamiętać trafienia sprzed sita — trzeba je ominąć.
+    const data = await cached(`mb:rg-find:v3:${query}`, TTL.lookup, () =>
       mbFetch<{ "release-groups": (MbReleaseGroup & { score?: number })[] }>("/release-group/", { query, limit: 5 }),
     );
     return data["release-groups"] ?? [];
@@ -607,9 +665,29 @@ export async function findAlbumMbid(artist: string, album: string): Promise<Albu
   // różny („LINDA" vs „Linda", myślniki, znaki diakrytyczne, dopiski wydawcy),
   // a przy ścisłym zapytaniu takie drobiazgi dają zero trafień i człowiek
   // zamiast płyty ląduje w wyszukiwarce.
+  /**
+   * Tytuł bez dopisku w nawiasie — „Innern (Instrumental)" to w MusicBrainz
+   * po prostu „Innern". Taki dopisek to najczęstszy powód, dla którego ścisłe
+   * pytanie wraca puste, choć płyta jest.
+   */
+  const tKrotki = lucene(album.replace(/[([{][^)\]}]*[)\]}]/g, " "));
+
+  // Artysta ZAWSZE w cudzysłowie i zawsze w swoim polu. Wcześniej ostatnia
+  // próba szła luzem — a wtedy wielowyrazowa nazwa rozpadała się na osobne
+  // słowa i wystarczyło jedno z nich, żeby trafić w cudzą płytę.
   let wyniki = await pytaj(`releasegroup:"${t}" AND artist:"${a}"`);
-  if (!wyniki.length) wyniki = await pytaj(`${t} AND artist:${a}`);
-  const best = wyniki.find((rg) => (rg.score ?? 0) >= 80) ?? wyniki[0];
+  if (!wyniki.length && tKrotki && tKrotki !== t) wyniki = await pytaj(`releasegroup:"${tKrotki}" AND artist:"${a}"`);
+  if (!wyniki.length) wyniki = await pytaj(`releasegroup:${tKrotki || t} AND artist:"${a}"`);
+
+  /**
+   * I dopiero teraz sprawdzamy, CO przyszło. MusicBrainz zawsze coś odda —
+   * wynik bez tego sita bywał płytą zupełnie innego zespołu.
+   */
+  const pasuje = wyniki.filter((rg) => {
+    const s = normReleaseGroup(rg);
+    return tenSamArtysta(s.artistText, artist) && tenSamTytul(s.title, album);
+  });
+  const best = pasuje.find((rg) => (rg.score ?? 0) >= 80) ?? pasuje[0];
   return best ? normReleaseGroup(best) : null;
 }
 

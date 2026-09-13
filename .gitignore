@@ -45,3 +45,7 @@ data/pglite*
 # logi diagnostyczne
 portal.log
 build.log
+
+# robocze pliki przenoszone z kontenera
+*.patch
+mbtest.mjs
