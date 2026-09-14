@@ -13,7 +13,7 @@ Stan na wrzesień 2026.
 | Baza | PostgreSQL — **Neon** na produkcji, **PGlite** lokalnie (ta sama schema) |
 | ORM | Drizzle ORM 0.45 + drizzle-kit (migracje w `drizzle/`) |
 | Logowanie | NextAuth 5 (beta) + `@auth/drizzle-adapter` |
-| Model językowy | OpenRouter albo Anthropic API (`src/lib/ai.ts`) |
+| Model językowy | własny dostawca zgodny z OpenAI, OpenRouter albo Anthropic (`src/lib/ai.ts`) |
 | Walidacja | zod 3 |
 | Testy | wbudowany `node --test` przez `tsx` (`tests/*.test.ts`) |
 | Hosting | Vercel (funkcje serverless), domena `music-travel.app` |
@@ -71,8 +71,10 @@ Spotify jest podwójny: to i sposób logowania, i sposób PODŁĄCZENIA konta
 
 ## Model językowy
 
-`src/lib/ai.ts` — jedna funkcja `zapytaj()`, dwa możliwe źródła:
-`OPENROUTER_API_KEY` albo `ANTHROPIC_API_KEY`. Domyślnie Claude Haiku.
+`src/lib/ai.ts` — jedna funkcja `zapytaj()`, trzy możliwe źródła, w tej
+kolejności: własny dostawca zgodny z OpenAI (`AI_BASE_URL` + `AI_API_KEY` +
+`AI_MODEL` — tak wystawia modele Comtegra i podobni), `OPENROUTER_API_KEY`,
+`ANTHROPIC_API_KEY`. Domyślnie Claude Haiku.
 Przy porażce próbuje maksymalnie 3 modeli (lista darmowych ciągnięta z katalogu
 OpenRoutera), potem oddaje błąd.
 
@@ -106,6 +108,7 @@ AUTH_APPLE_ID / _SECRET
 AUTH_FACEBOOK_ID / _SECRET
 SPOTIFY_CLIENT_ID / _SECRET
 AUTH_DEV_LOGIN               # logowanie na hasło, tylko lokalnie
+AI_BASE_URL + AI_API_KEY + AI_MODEL   # własny dostawca (OpenAI-compatible)
 OPENROUTER_API_KEY | ANTHROPIC_API_KEY
 OPENROUTER_MODEL | ANTHROPIC_MODEL
 MUSICBRAINZ_USER_AGENT       # wymagane przez MusicBrainz

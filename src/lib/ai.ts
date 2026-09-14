@@ -7,16 +7,18 @@
  * bez przejścia przez `findAlbumMbid`. Portal z założenia nie buduje własnej
  * bazy wiedzy; tu też nie zaczynamy.
  *
- * DWAJ DOSTAWCY, JEDEN INTERFEJS. Portal umie gadać albo wprost z Anthropic,
- * albo przez OpenRouter — ten drugi daje jeden klucz do wielu modeli, więc da
- * się przełączać model samą zmienną środowiskową, bez ruszania kodu. Wybiera
- * ten, na który jest klucz; gdy są oba, wygrywa OpenRouter (ustawiono go
- * świadomie, a ANTHROPIC_API_KEY bywa w środowisku z innych powodów).
+ * TRZEJ DOSTAWCY, JEDEN INTERFEJS. Portal umie gadać wprost z Anthropic, przez
+ * OpenRouter, albo z DOWOLNYM dostawcą mówiącym po OpenAI-owemu — własnym,
+ * hostowanym u siebie czy lokalnym. Wybiera tego, na którego jest klucz.
  *
- * Klucze: OPENROUTER_API_KEY albo ANTHROPIC_API_KEY (Vercel → Settings →
- * Environment Variables, albo .env.local na maszynie). Bez żadnego portal
- * działa normalnie — ekran „w nieznane" mówi, że jest nieskonfigurowany,
- * zamiast się wywalać.
+ * Kolejność, gdy jest więcej niż jeden: własny (AI_BASE_URL) → OpenRouter →
+ * Anthropic. Własny wygrywa, bo nikt go nie ustawia przypadkiem;
+ * ANTHROPIC_API_KEY bywa w środowisku z zupełnie innych powodów.
+ *
+ * Klucze (Vercel → Settings → Environment Variables, albo .env.local na
+ * maszynie): AI_BASE_URL + AI_API_KEY + AI_MODEL, OPENROUTER_API_KEY albo
+ * ANTHROPIC_API_KEY. Bez żadnego portal działa normalnie — ekran „w nieznane"
+ * mówi, że jest nieskonfigurowany, zamiast się wywalać.
  */
 
 /** Model do zmiany bez ruszania kodu — inny dla każdego dostawcy. */
@@ -45,15 +47,40 @@ const MODELE_ZAPASOWE = [
 const API_ANTHROPIC = "https://api.anthropic.com/v1/messages";
 const API_OPENROUTER = "https://openrouter.ai/api/v1/chat/completions";
 
+/**
+ * TRZECI DOSTAWCA: dowolny własny, byle mówił po OpenAI-owemu.
+ *
+ * Tak wystawia się większość modeli hostowanych u siebie albo u lokalnego
+ * dostawcy (Comtegra i podobni): ten sam `/v1/chat/completions`, ten sam
+ * kształt zapytania, inny adres i klucz. Skoro rozmowa jest identyczna jak
+ * z OpenRouterem, nie ma po co pisać osobnego kodu — wystarczy pozwolić
+ * podmienić adres.
+ *
+ *   AI_BASE_URL=https://adres-dostawcy/v1     (albo od razu pełny /chat/completions)
+ *   AI_API_KEY=...
+ *   AI_MODEL=nazwa-modelu-u-dostawcy
+ *
+ * Ten dostawca ma pierwszeństwo: skoro ktoś go ustawił świadomie, to nie po
+ * to, żeby portal dalej gadał z kimś innym. Nie ma tu podmieniania modeli —
+ * u swojego dostawcy jest ten jeden, za który się płaci.
+ */
+const AI_MODEL = process.env.AI_MODEL || "";
+function adresWlasny(): string | null {
+  const b = process.env.AI_BASE_URL?.trim().replace(/\/+$/, "");
+  if (!b || !process.env.AI_API_KEY) return null;
+  return b.endsWith("/chat/completions") ? b : `${b}/chat/completions`;
+}
+
 /** Adres portalu — OpenRouter prosi o niego w nagłówkach, do statystyk. */
 const SKAD = process.env.NEXT_PUBLIC_SITE_URL || "https://music-travel.app";
 
 export function aiSkonfigurowane(): boolean {
-  return !!(process.env.OPENROUTER_API_KEY || process.env.ANTHROPIC_API_KEY);
+  return !!(adresWlasny() || process.env.OPENROUTER_API_KEY || process.env.ANTHROPIC_API_KEY);
 }
 
 /** Który dostawca obsłuży zapytanie — do pokazania w logach i diagnostyce. */
 export function ktoryModel(): string | null {
+  if (adresWlasny()) return `wlasny:${AI_MODEL || "(brak AI_MODEL)"}`;
   if (process.env.OPENROUTER_API_KEY) return `openrouter:${MODEL_OPENROUTER}`;
   if (process.env.ANTHROPIC_API_KEY) return `anthropic:${MODEL_ANTHROPIC}`;
   return null;
@@ -106,7 +133,11 @@ function rozmiar(id: string): number {
 async function zapytaj(system: string, tresc: string): Promise<string> {
   const or = process.env.OPENROUTER_API_KEY;
   const ant = process.env.ANTHROPIC_API_KEY;
-  if (!or && !ant) throw new AiError("Brak klucza do modelu (OPENROUTER_API_KEY albo ANTHROPIC_API_KEY).");
+  if (adresWlasny()) {
+    if (!AI_MODEL) throw new AiError("Ustawiono AI_BASE_URL i AI_API_KEY, ale brakuje AI_MODEL.");
+    return jedenStrzal(system, tresc, AI_MODEL);
+  }
+  if (!or && !ant) throw new AiError("Brak klucza do modelu (AI_API_KEY, OPENROUTER_API_KEY albo ANTHROPIC_API_KEY).");
 
   // U Anthropic nie ma czego podmieniać — jeden model, jeden strzał.
   if (!or) return jedenStrzal(system, tresc, MODEL_ANTHROPIC);
@@ -142,8 +173,25 @@ async function zapytaj(system: string, tresc: string): Promise<string> {
 async function jedenStrzal(system: string, tresc: string, model: string): Promise<string> {
   const or = process.env.OPENROUTER_API_KEY;
   const ant = process.env.ANTHROPIC_API_KEY;
+  const wlasny = adresWlasny();
 
-  const [url, naglowki, body] = or
+  const [url, naglowki, body] = wlasny
+    ? [
+        wlasny,
+        {
+          "content-type": "application/json",
+          authorization: `Bearer ${process.env.AI_API_KEY}`,
+        },
+        {
+          model,
+          max_tokens: 4000,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: tresc },
+          ],
+        },
+      ]
+    : or
     ? [
         API_OPENROUTER,
         {
