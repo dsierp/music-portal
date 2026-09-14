@@ -43,7 +43,9 @@ export default async function RozmowaStart({ searchParams }: { searchParams: Pro
           /* Bez klucza ekran nie udaje, że działa — mówi, czego brakuje. */
           <div className="card">
             <p className="text-sm text-warn">{t.chat.noKey}</p>
-            <p className="mt-2 font-mono text-xs text-faint">OPENROUTER_API_KEY albo ANTHROPIC_API_KEY</p>
+            {/* Trzej dostawcy, więc i podpowiedź wymienia trzy drogi — inaczej
+                po przesiadce na własnego wygląda to na awarię portalu. */}
+            <p className="mt-2 font-mono text-xs text-faint">AI_BASE_URL + AI_API_KEY + AI_MODEL, OPENROUTER_API_KEY albo ANTHROPIC_API_KEY</p>
           </div>
         ) : (
           <>
