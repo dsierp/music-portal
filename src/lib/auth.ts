@@ -46,7 +46,12 @@ if (enabled("SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET")) {
       // URL", czyli ekranem „problem z konfiguracją serwera".
       authorization: {
         url: "https://accounts.spotify.com/authorize",
-        params: { scope: SPOTIFY_SCOPES },
+        // `show_dialog` pokazuje ekran Spotify z pytaniem, którego konta użyć,
+        // zamiast po cichu brać to zalogowane w przeglądarce. Bez tego
+        // podpięcie INNEGO konta wymagało wylogowania się ze Spotify albo okna
+        // prywatnego — czego nikt sam nie wymyśli, stojąc przed napisem
+        // „Konto połączone" i milczącym kafelkiem „Słuchasz teraz".
+        params: { scope: SPOTIFY_SCOPES, show_dialog: "true" },
       },
     }),
   );

@@ -80,6 +80,30 @@ export async function spotifyConnected(userId: string): Promise<boolean> {
 }
 
 /**
+ * KTÓRE konto Spotify jest podłączone — nazwa, a gdy się nie uda, identyfikator.
+ *
+ * Bez tego „Konto połączone" jest półprawdą: człowiek słucha na jednym koncie,
+ * podłączył kiedyś inne i nie ma jak się o tym dowiedzieć — widzi tylko, że
+ * „Słuchasz teraz" uparcie milczy. Nazwa konta rozstrzyga to w sekundę.
+ */
+export async function spotifyKto(userId: string): Promise<string | null> {
+  const konto = await kontoSpotify(userId).catch(() => null);
+  if (!konto) return null;
+  const ja = await api<{ display_name?: string; id?: string }>(userId, "/me").catch(() => null);
+  return ja?.display_name || ja?.id || konto.providerAccountId || null;
+}
+
+/**
+ * Odłączenie konta. Kasujemy tylko powiązanie ze Spotify — konto w portalu,
+ * oceny i podróże zostają nietknięte.
+ */
+export async function spotifyRozlacz(userId: string): Promise<void> {
+  await db
+    .delete(schema.accounts)
+    .where(and(eq(schema.accounts.userId, userId), eq(schema.accounts.provider, "spotify")));
+}
+
+/**
  * Ważny token dostępu, w razie potrzeby odświeżony.
  *
  * Spotify wydaje tokeny na godzinę, a sesja w portalu trwa tygodniami — więc

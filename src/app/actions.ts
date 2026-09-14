@@ -291,6 +291,21 @@ export async function connectSpotify(callbackUrl = "/ja") {
 }
 
 /**
+ * Odłączenie Spotify — i jedyna droga do podpięcia INNEGO konta.
+ *
+ * Powód z życia: człowiek podłączył kiedyś jedno konto, a słucha na drugim.
+ * „Słuchasz teraz" milczy i nic w portalu tego nie tłumaczy, bo konto jest
+ * przecież połączone. Tu się to rozplątuje: odłącz, połącz tamto.
+ */
+export async function disconnectSpotify() {
+  const u = await requireUser();
+  const { spotifyRozlacz } = await import("@/lib/spotify");
+  await spotifyRozlacz(u.id);
+  revalidatePath("/ja");
+  revalidatePath("/");
+}
+
+/**
  * Podróż jako prywatna playlista. Zespoły i koncerty zostają poza nią —
  * playlista Spotify to utwory — więc wynik mówi wprost, co nie weszło.
  */

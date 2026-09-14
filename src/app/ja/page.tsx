@@ -4,8 +4,8 @@ import type { Metadata } from "next";
 import { currentUser } from "@/lib/auth";
 import { getAreas, getFavoriteArtists, getGenres, getLikedAlbums, getUserLocale, myRatings, usersCount, getSharingProfile } from "@/lib/user-data";
 import { isAdmin } from "@/lib/admin";
-import { addAreaAction, connectSpotify, removeAreaAction, setGenreAction, setSharingAction, skipOnboarding, toggleFavorite, toggleLike } from "@/app/actions";
-import { spotifyConfigured, spotifyConnected } from "@/lib/spotify";
+import { addAreaAction, connectSpotify, disconnectSpotify, removeAreaAction, setGenreAction, setSharingAction, skipOnboarding, toggleFavorite, toggleLike } from "@/app/actions";
+import { spotifyConfigured, spotifyConnected, spotifyKto } from "@/lib/spotify";
 import { MAIN_CATEGORIES } from "@/lib/genres";
 import { orderByPopularity } from "@/lib/popularity";
 import { genreImage } from "@/lib/genre-art";
@@ -59,6 +59,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   // a bez kliknięcia użytkownika nie mamy do jego konta żadnego dostępu.
   const spotifyGotowy = spotifyConfigured();
   const spotifyJest = spotifyGotowy ? await spotifyConnected(user.id).catch(() => false) : false;
+  // Które konto — inaczej „połączone" nic nie mówi komuś, kto ma ich dwa.
+  const spotifyKtoTo = spotifyJest ? await spotifyKto(user.id).catch(() => null) : null;
 
   return (
     <div className="space-y-10">
@@ -83,7 +85,18 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           <h2 className="text-xl">Spotify</h2>
           <p className="mt-1 text-xs text-muted">{t.profile.spotifyNote}</p>
           {spotifyJest ? (
-            <p className="mt-2 text-sm text-ok">{t.profile.spotifyConnected}</p>
+            <>
+              <p className="mt-2 text-sm text-ok">
+                {t.profile.spotifyConnected}
+                {spotifyKtoTo && <span className="text-text2"> {fmt(t.profile.spotifyWhich, { kto: spotifyKtoTo })}</span>}
+              </p>
+              {/* Odłączenie jest jedyną drogą do podpięcia innego konta —
+                  stąd obok od razu wyjaśnienie, po co miałby to robić. */}
+              <p className="mt-1 text-xs text-faint">{t.profile.spotifySwitchNote}</p>
+              <form action={disconnectSpotify} className="mt-2">
+                <button className="btn">{t.profile.spotifyDisconnect}</button>
+              </form>
+            </>
           ) : (
             <form action={connectSpotify.bind(null, "/ja")} className="mt-2">
               <button className="btn btn-accent">{t.lists.spotifyConnect}</button>
