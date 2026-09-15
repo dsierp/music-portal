@@ -379,3 +379,38 @@ export const apiCache = pgTable("api_cache", {
   json: jsonb("json").notNull(),
   fetchedAt: timestamp("fetched_at", { mode: "date" }).defaultNow().notNull(),
 });
+
+/**
+ * Co naprawdę leciało — dziennik odsłuchań.
+ *
+ * DLACZEGO WŁASNA TABELA, SKORO SĄ LISTY: lista jest decyzją („chcę tego
+ * posłuchać"), a to jest faktem („to leciało"). Fakty się nie kasują ani nie
+ * układają w kolejności; służą do tego, żeby portal mógł kiedyś powiedzieć
+ * „w zeszłym tygodniu siedziałeś w tym, spróbuj tamtego".
+ *
+ * Skąd się bierze:
+ * - `spotify` — z pytania „co teraz gra", które i tak zadajemy przy otwartej
+ *   karcie. Zero dodatkowych zgód, zero dodatkowych zapytań.
+ * - `klik` — wyjście z portalu w Spotify albo Tidala. Jedyne źródło, które
+ *   działa dla Tidala, bo ten nie oddaje ani historii, ani stanu odtwarzania.
+ *
+ * MBID bywa pusty i to jest normalne: Spotify podaje nazwy, nie identyfikatory
+ * MusicBrainz. Dowiązujemy je dopiero wtedy, gdy są do czegoś potrzebne.
+ */
+export const playSource = pgEnum("play_source", ["spotify", "klik"]);
+
+export const plays = pgTable(
+  "play",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    artist: text("artist").notNull(),
+    title: text("title").notNull(),
+    album: text("album"),
+    /** release-group, gdy znany — z kliknięcia w portalu albo dowiązany później */
+    mbid: text("mbid"),
+    source: playSource("source").notNull(),
+    playedAt: timestamp("played_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [index("play_user").on(t.userId, t.playedAt)],
+);

@@ -21,5 +21,12 @@ export async function GET() {
   const { nowPlaying, spotifyConfigured } = await import("@/lib/spotify");
   if (!spotifyConfigured()) return NextResponse.json({ teraz: null });
   const teraz = await nowPlaying(user.id).catch(() => null);
+  // Przy okazji zapisujemy, co leciało. Pytanie i tak padło, więc dziennik
+  // odsłuchań nie kosztuje ani jednego zapytania więcej — a to on pozwala
+  // potem powiedzieć „w zeszłym tygodniu siedziałeś w tym".
+  if (teraz) {
+    const { zapiszOdsluch } = await import("@/lib/grane");
+    await zapiszOdsluch(user.id, { artist: teraz.artist, title: teraz.title, album: teraz.album, source: "spotify" });
+  }
   return NextResponse.json({ teraz }, { headers: { "cache-control": "no-store" } });
 }

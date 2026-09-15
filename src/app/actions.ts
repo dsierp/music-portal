@@ -500,6 +500,35 @@ function zaznaczone(formData: FormData, wszystkie: string[]): string[] {
  * które da się pooglądać i podrążyć, a zapisaną podróżą staje się dopiero
  * wtedy, gdy człowiek uzna, że warto — i z tego, co sam zaznaczył.
  */
+/**
+ * Podróż z dziennika odsłuchań — „zrób z tego, co grałem".
+ *
+ * Płyty z dziennika mają nazwy, a nie identyfikatory (Spotify podaje tekst),
+ * więc dowiązujemy je tu, po jednej na sekundę, jak wszędzie przy MusicBrainz.
+ * Czego nie da się potwierdzić, to nie wchodzi na listę — ta sama zasada co
+ * w całym portalu: w każdą pozycję ma się dać wejść.
+ */
+export async function podrozZGranych() {
+  const u = await requireUser();
+  const { ostatniePlyty } = await import("@/lib/grane");
+  const { findAlbumMbid } = await import("@/lib/musicbrainz");
+  const plyty = (await ostatniePlyty(u.id, 30, 12).catch(() => [])).slice(0, 10);
+  if (!plyty.length) redirect("/grane");
+
+  const { i18n } = await import("@/lib/t");
+  const { t } = await i18n();
+  const lista = await ud.createList(u.id, t.lists.playedTitle, t.lists.playedIntro);
+  for (const p of plyty) {
+    const znany = p.mbid ?? (await findAlbumMbid(p.artist, p.album).catch(() => null))?.mbid;
+    if (!znany) continue;
+    await ud
+      .addToList(u.id, lista.id, { targetType: "ALBUM", targetMbid: znany, label: `${p.artist} – ${p.album}` })
+      .catch(() => {});
+  }
+  revalidatePath("/podroze");
+  redirect(`/podroz/${lista.id}`);
+}
+
 export async function podrozZRozmowy(formData: FormData) {
   const u = await requireUser();
   const id = String(formData.get("id") ?? "");

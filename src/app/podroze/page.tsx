@@ -106,7 +106,12 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
       {user && (
         <div className="grid gap-4 md:grid-cols-2">
           <section className="card">
-            <h2 className="text-xl">{t.lists.myListsTitle}</h2>
+            <div className="flex items-baseline justify-between gap-2">
+              <h2 className="text-xl">{t.lists.myListsTitle}</h2>
+              {/* Dziennik odsłuchań mieszka obok list, bo to z niego robi się
+                  następną listę — a nie w profilu, gdzie nikt go nie szuka. */}
+              <Link href="/grane" className="text-xs text-muted hover:text-accent2">{t.lists.playedTitle} →</Link>
+            </div>
             <p className="mt-1 text-xs text-muted">{t.lists.myListsIntro}</p>
             {moje.length ? (
               <ul className="mt-3 space-y-1 text-sm">

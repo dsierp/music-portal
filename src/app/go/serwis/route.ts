@@ -44,6 +44,25 @@ export async function GET(req: NextRequest) {
     await kvSet(`link:${serwis}:${mbid}`, { url: znalezione ? cel : null }).catch(() => {});
   }
 
+  // Wyjście w serwis to jedyny ślad odsłuchania, jaki mamy przy Tidalu — ten
+  // nie oddaje ani historii, ani stanu odtwarzania. Zapisujemy więc sam fakt
+  // kliknięcia: człowiek poszedł tego posłuchać.
+  {
+    const { currentUser } = await import("@/lib/auth");
+    const user = await currentUser().catch(() => null);
+    if (user && etykieta) {
+      const [artysta, ...reszta] = etykieta.split(/\s+[–—-]\s+/);
+      const { zapiszOdsluch } = await import("@/lib/grane");
+      await zapiszOdsluch(user.id, {
+        artist: artysta ?? etykieta,
+        title: reszta.join(" – ") || etykieta,
+        album: reszta.join(" – ") || null,
+        mbid: typ === "release-group" ? mbid || null : null,
+        source: "klik",
+      });
+    }
+  }
+
   let adres: URL;
   try {
     adres = new URL(cel);
