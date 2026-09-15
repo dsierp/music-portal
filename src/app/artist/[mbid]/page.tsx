@@ -9,8 +9,9 @@ import { ScreenHelp } from "@/components/screen-help";
 import { LineupFilter } from "@/components/lineup-filter";
 import { OrderToggle } from "@/components/order-toggle";
 import { currentUser } from "@/lib/auth";
-import { artistSentiment, commentTree, favoriteCount, getMyLists, listsWith, ratingAverages, ratingSummary } from "@/lib/user-data";
+import { artistSentiment, commentTree, favoriteCount, getMyLists, listsWith, ratingAverages, ratingSummary, wDoPosluchania } from "@/lib/user-data";
 import { AddToList } from "@/components/add-to-list";
+import { DoPosluchania } from "@/components/do-posluchania";
 import { toggleFavorite } from "@/app/actions";
 import { LinksRow } from "@/components/links";
 import { RatingBadge, RatingPanel } from "@/components/rating";
@@ -891,9 +892,13 @@ export default async function ArtistPage({
     artist.genres.length || artist.tags.length ? Promise.resolve([] as string[]) : wdGenres(artist.links, locale).catch(() => []),
   ]);
   const [summary, tree, fav, favs] = [summaryS.value, treeS.value, favS.value, favsS.value];
-  const [mojeListy, naListach] = user
-    ? await Promise.all([getMyLists(user.id).catch(() => []), listsWith(user.id, "ARTIST", mbid).catch(() => [])])
-    : [[] as Awaited<ReturnType<typeof getMyLists>>, [] as string[]];
+  const [mojeListy, naListach, wKolejce] = user
+    ? await Promise.all([
+        getMyLists(user.id).catch(() => []),
+        listsWith(user.id, "ARTIST", mbid).catch(() => []),
+        wDoPosluchania(user.id, "ARTIST", mbid).catch(() => false),
+      ])
+    : [[] as Awaited<ReturnType<typeof getMyLists>>, [] as string[], false];
   const dbDown = summaryS.failed || treeS.failed || favS.failed || favsS.failed;
 
   // Styl zespołu z pierwszego źródła, które cokolwiek wie.
@@ -985,6 +990,15 @@ export default async function ArtistPage({
                 </>
               ) : (
                 <Link href={`/login?callbackUrl=/artist/${mbid}`} className="btn">{t.artist.favoriteAdd}</Link>
+              )}
+              {user && (
+                <DoPosluchania
+                  type="ARTIST"
+                  mbid={mbid}
+                  label={artist.name}
+                  jest={wKolejce}
+                  t={{ add: t.lists.laterAdd, on: t.lists.laterOn, remove: t.lists.laterRemove }}
+                />
               )}
               {user && (
                 <AddToList

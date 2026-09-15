@@ -349,6 +349,7 @@ export async function getMyLists(userId: string) {
       id: schema.lists.id,
       title: schema.lists.title,
       description: schema.lists.description,
+      slot: schema.lists.slot,
       updatedAt: schema.lists.updatedAt,
       items: count(schema.listItems.targetMbid),
     })
@@ -357,7 +358,11 @@ export async function getMyLists(userId: string) {
     .where(eq(schema.lists.userId, userId))
     .groupBy(schema.lists.id)
     .orderBy(desc(schema.lists.updatedAt));
-  return rows.map((r) => ({ ...r, items: Number(r.items) }));
+  // „Do posłuchania" zawsze na górze: to jest kolejka, po którą się tu wraca,
+  // a nie jedna z wielu opowieści.
+  return rows
+    .map((r) => ({ ...r, items: Number(r.items) }))
+    .sort((a, b) => (a.slot === "later" ? -1 : b.slot === "later" ? 1 : 0));
 }
 
 export async function getList(id: string) {
@@ -434,6 +439,65 @@ export async function listsWith(userId: string, targetType: ListTarget, targetMb
       ),
     );
   return rows.map((r) => r.id);
+}
+
+// ---------- „Do posłuchania" ----------
+
+/**
+ * Jedna lista na osobę, zakładana przy pierwszym użyciu.
+ *
+ * Po co osobno, skoro są zwykłe listy: te są opowieścią, którą się układa
+ * i komuś pokazuje. „Do posłuchania" to kolejka — rzecz z natury tymczasowa,
+ * do której odkłada się jednym kliknięciem i z której się zdejmuje po
+ * przesłuchaniu. Zmuszanie do wybierania listy za każdym razem, gdy coś wpadnie
+ * w oko, kończyłoby się tym, że nikt by nic nie odkładał.
+ */
+export async function listaDoPosluchania(userId: string, tytul: string) {
+  const jest = await db.query.lists.findFirst({
+    where: and(eq(schema.lists.userId, userId), eq(schema.lists.slot, "later")),
+  });
+  if (jest) return jest;
+  const [nowa] = await db.insert(schema.lists).values({ userId, title: tytul, slot: "later" }).returning();
+  return nowa;
+}
+
+/** Czy to już leży w kolejce — do stanu przycisku. */
+export async function wDoPosluchania(userId: string, targetType: ListTarget, targetMbid: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: schema.listItems.listId })
+    .from(schema.listItems)
+    .innerJoin(schema.lists, eq(schema.lists.id, schema.listItems.listId))
+    .where(
+      and(
+        eq(schema.lists.userId, userId),
+        eq(schema.lists.slot, "later"),
+        eq(schema.listItems.targetType, targetType),
+        eq(schema.listItems.targetMbid, targetMbid),
+      ),
+    )
+    .limit(1);
+  return !!row;
+}
+
+/**
+ * Odłóż albo zdejmij — jeden przycisk w obie strony.
+ *
+ * Ten sam przycisk zdejmuje, bo kolejka, z której nie da się nic wyrzucić bez
+ * chodzenia na inny ekran, po tygodniu przestaje być kolejką.
+ */
+export async function przelaczDoPosluchania(
+  userId: string,
+  tytul: string,
+  item: { targetType: ListTarget; targetMbid: string; label: string; url?: string | null },
+): Promise<boolean> {
+  const lista = await listaDoPosluchania(userId, tytul);
+  if (!lista) return false;
+  if (await wDoPosluchania(userId, item.targetType, item.targetMbid)) {
+    await removeFromList(userId, lista.id, item.targetType, item.targetMbid);
+    return false;
+  }
+  await addToList(userId, lista.id, item);
+  return true;
 }
 
 /**

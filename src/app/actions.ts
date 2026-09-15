@@ -227,6 +227,33 @@ export async function addToListAction(formData: FormData) {
   revalidatePath("/podroze");
 }
 
+/**
+ * „Do posłuchania" — jedno kliknięcie w obie strony.
+ *
+ * Bez wybierania listy: to jest kolejka, a nie opowieść. Tytuł listy bierzemy
+ * z języka portalu przy pierwszym użyciu — potem jest już jej własnym tytułem
+ * i nie zmienia się przy zmianie języka, bo to lista tej osoby, nie napis
+ * w interfejsie.
+ */
+export async function toggleDoPosluchania(formData: FormData) {
+  const u = await requireUser();
+  const type = listTarget.parse(formData.get("type"));
+  const id = type === "CONCERT" ? String(formData.get("mbid") ?? "").slice(0, 120) : mbid.parse(formData.get("mbid"));
+  if (!id) return;
+  const { i18n } = await import("@/lib/t");
+  const { t } = await i18n();
+  await ud.przelaczDoPosluchania(u.id, t.lists.laterTitle, {
+    targetType: type,
+    targetMbid: id,
+    label: String(formData.get("label") ?? "").slice(0, 300),
+    url: String(formData.get("url") ?? "") || null,
+  });
+  if (type !== "CONCERT") revalidatePath(pathFor(type, id));
+  else revalidatePath("/koncerty");
+  revalidatePath("/podroze");
+  revalidatePath("/");
+}
+
 export async function removeFromListAction(formData: FormData) {
   const u = await requireUser();
   const listId = String(formData.get("listId") ?? "");

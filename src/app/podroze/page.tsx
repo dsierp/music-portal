@@ -113,10 +113,15 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
                 {moje.map((l) => (
                   <li key={l.id} className="space-y-1">
                     <div className="flex items-baseline justify-between gap-2">
-                      <Link href={`/podroz/${l.id}`} className="truncate font-medium hover:text-accent2">{l.title}</Link>
+                      <Link href={`/podroz/${l.id}`} className="truncate font-medium hover:text-accent2">
+                        {/* Kolejka wygląda inaczej, bo i jest inna: nie układa
+                            się jej dla kogoś, tylko odkłada na nią i zdejmuje. */}
+                        {l.slot === "later" && <span className="mr-1 text-accent2">↺</span>}
+                        {l.title}
+                      </Link>
                       <span className="flex shrink-0 items-baseline gap-3">
                         <span className="font-mono text-[10px] text-faint">{plural(locale, l.items, t.lists.itemsCount)}</span>
-                        {doUsuniecia !== l.id && (
+                        {doUsuniecia !== l.id && l.slot !== "later" && (
                           <Link href={`/podroze?usun=${l.id}`} className="text-[10px] text-faint hover:text-warn">{t.lists.deleteList}</Link>
                         )}
                       </span>

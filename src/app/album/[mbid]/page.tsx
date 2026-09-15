@@ -7,8 +7,9 @@ import { nameKeys } from "@/lib/names";
 import { MbUnavailable } from "@/components/mb-unavailable";
 import { ScreenHelp } from "@/components/screen-help";
 import { currentUser } from "@/lib/auth";
-import { albumSentiment, commentTree, getMyLists, likeCount, listsWith, ratingAverages, ratingSummary } from "@/lib/user-data";
+import { albumSentiment, commentTree, getMyLists, likeCount, listsWith, ratingAverages, ratingSummary, wDoPosluchania } from "@/lib/user-data";
 import { AddToList } from "@/components/add-to-list";
+import { DoPosluchania } from "@/components/do-posluchania";
 import { toggleFavorite, toggleLike } from "@/app/actions";
 import { LinksRow, ReviewLinks } from "@/components/links";
 import { getExternalRatings } from "@/lib/externalRatings";
@@ -96,9 +97,13 @@ export default async function AlbumPage({
   const liked = likedS.value;
   const likes = likesS.value;
   const others = more.filter((a) => a.mbid !== mbid && a.primaryType === "Album" && !a.secondaryTypes.length).slice(0, 8);
-  const [mojeListy, naListach] = user
-    ? await Promise.all([getMyLists(user.id).catch(() => []), listsWith(user.id, "ALBUM", mbid).catch(() => [])])
-    : [[] as Awaited<ReturnType<typeof getMyLists>>, [] as string[]];
+  const [mojeListy, naListach, wKolejce] = user
+    ? await Promise.all([
+        getMyLists(user.id).catch(() => []),
+        listsWith(user.id, "ALBUM", mbid).catch(() => []),
+        wDoPosluchania(user.id, "ALBUM", mbid).catch(() => false),
+      ])
+    : [[] as Awaited<ReturnType<typeof getMyLists>>, [] as string[], false];
   const otherRatingsS = await dbSafe(ratingAverages("ALBUM", others.map((a) => a.mbid)), new Map<string, { avg: number; count: number }>());
   const otherRatings = otherRatingsS.value;
   const dbDown = summaryS.failed || treeS.failed || likedS.failed || likesS.failed || otherRatingsS.failed;
@@ -222,6 +227,15 @@ export default async function AlbumPage({
                 </>
               ) : (
                 <Link href={`/login?callbackUrl=/album/${mbid}`} className="btn">{t.album.likeAdd}</Link>
+              )}
+              {user && (
+                <DoPosluchania
+                  type="ALBUM"
+                  mbid={mbid}
+                  label={`${album.artistText} – ${album.title}`}
+                  jest={wKolejce}
+                  t={{ add: t.lists.laterAdd, on: t.lists.laterOn, remove: t.lists.laterRemove }}
+                />
               )}
               {user && (
                 <AddToList

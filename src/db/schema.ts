@@ -206,10 +206,24 @@ export const lists = pgTable(
     userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     description: text("description"),
+    /**
+     * Listy specjalne — jedna sztuka na użytkownika, zakładana sama.
+     *
+     * Na razie jedna: `"later"`, czyli „Do posłuchania". Różni się od zwykłej
+     * podróży tym, że ma być JEDNA i zawsze pod ręką — odkładasz na nią płytę
+     * jednym kliknięciem, zamiast wybierać, na którą z siedmiu list ją wrzucić.
+     * Zwykłe listy mają tu `null` i zachowują się jak dotąd.
+     */
+    slot: text("slot"),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
   },
-  (t) => [index("list_user").on(t.userId, t.updatedAt)],
+  (t) => [
+    index("list_user").on(t.userId, t.updatedAt),
+    // NULL-e w Postgresie są różne od siebie, więc to ogranicza tylko listy
+    // specjalne: jedna „Do posłuchania" na osobę, dowolnie wiele zwykłych.
+    uniqueIndex("list_user_slot").on(t.userId, t.slot),
+  ],
 );
 
 /**
