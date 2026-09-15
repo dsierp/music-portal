@@ -7,10 +7,11 @@ import { ReleaseCard as ReleaseRow } from "@/components/release-card";
 import { SearchBox } from "@/components/search-box";
 import { Banner } from "@/components/banner";
 import { Suspense } from "react";
+import { SluchaszTeraz } from "@/components/teraz";
 import { lineupNews } from "@/lib/lineup-news";
 import { getFavoriteArtists, getGenres, getLikedAlbums, getMyLists, listsForMe, recentComments, travelJournal } from "@/lib/user-data";
 import { TravelJournal } from "@/components/travel-journal";
-import { nowPlaying, spotifyConfigured } from "@/lib/spotify";
+import { spotifyConfigured } from "@/lib/spotify";
 import { journeyFromReleases } from "@/app/actions";
 import type { JournalEvent } from "@/lib/journal";
 import { genreToSection } from "@/lib/genres";
@@ -27,53 +28,6 @@ export const dynamic = "force-dynamic";
  * „Kto zmienił zespół" — osobny strumień, bo to jedno zapytanie do MusicBrainz
  * na zespół (limit 1/s). Strona główna nie ma na to czekać.
  */
-/**
- * „Słuchasz teraz" — jedno pytanie do Spotify, w osobnym strumieniu.
- *
- * Osobno, bo to jedyny kawałek strony, który potrafi być nieaktualny za pół
- * minuty, i jedyny, który zależy od cudzego serwisu. Gdy nic nie leci albo
- * konto nie jest połączone, kafelek po prostu nie istnieje — cisza jest tu
- * normalnym stanem, nie błędem.
- */
-async function NowPlayingCard({ userId, t }: { userId: string; t: Dict }) {
-  const teraz = await nowPlaying(userId).catch(() => null);
-  if (!teraz) return null;
-  return (
-    <section className="card">
-      <div className="label mb-2">{t.home.nowPlaying}</div>
-      <div className="flex items-center gap-3">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        {teraz.cover && <img src={teraz.cover} alt="" className="h-12 w-12 rounded" />}
-        <div className="min-w-0">
-          <a href={teraz.url} target="_blank" rel="noopener" className="block truncate font-medium hover:text-accent2 hover:underline">
-            {teraz.title}
-          </a>
-          <div className="truncate text-xs text-muted">{teraz.artist}</div>
-        </div>
-      </div>
-      <SearchLink query={teraz.album} artysta={teraz.artist} label={t.home.nowPlayingFind} />
-    </section>
-  );
-}
-
-/**
- * Skok z odtwarzanego utworu do tej płyty u nas — stąd zaczyna się grzebanie.
- *
- * Prowadzi przez trasę, która odnajduje płytę w MusicBrainz przy kliknięciu.
- * Wyszukiwarka jest tu ostatecznością, a nie przystankiem: człowiek wie, czego
- * chce, więc pokazywanie mu listy wyników to zabieranie kroku.
- */
-function SearchLink({ query, label, artysta }: { query: string; label: string; artysta?: string }) {
-  return (
-    <Link
-      href={`/go/mb?typ=album&nazwa=${encodeURIComponent(query)}${artysta ? `&artysta=${encodeURIComponent(artysta)}` : ""}`}
-      className="mt-2 block text-xs text-muted hover:text-accent2"
-    >
-      {label}
-    </Link>
-  );
-}
-
 /**
  * Zmiany w składach ulubionych zespołów.
  *
@@ -226,11 +180,10 @@ export default async function Home() {
         </div>
 
         <aside className="space-y-6">
-          {user && spotifyConfigured() && (
-            <Suspense fallback={null}>
-              <NowPlayingCard userId={user.id} t={t} />
-            </Suspense>
-          )}
+          {/* Kafelek dociąga się sam, JUŻ PO wyświetleniu strony — patrz
+              components/teraz.tsx. W strumieniu tej strony czekał za
+              MusicBrainz i Wikipedią, czyli czasem i minutę. */}
+          {user && spotifyConfigured() && <SluchaszTeraz tytul={t.home.nowPlaying} znajdz={t.home.nowPlayingFind} />}
           <TravelJournal events={dziennik} locale={locale} t={t} more="/podroze#dziennik" />
           {user && (mojeListy.length > 0 || dlaMnie.length > 0) && (
             <section className="card">
