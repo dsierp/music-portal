@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import { latestSections, releasesFor, bestOfYears, bestOf, BEST_CATS } from "@/lib/lists";
-import { ReleaseCard as ReleaseRow } from "@/components/release-card";
+import { Kafelki } from "@/components/kafelki";
 import { SearchBox } from "@/components/search-box";
 import { Banner } from "@/components/banner";
 import { Suspense } from "react";
@@ -251,23 +251,20 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
                 {t.common.showAll} <span className="font-mono text-xs text-faint">({kolejka.ile})</span> →
               </Link>
             </div>
-            <ul className="mt-3 space-y-1">
-              {kolejka.items.map((i) => (
-                <li key={`${i.targetType}-${i.targetMbid}`} className="truncate text-sm">
-                  <span className="mr-2 text-accent2">↺</span>
-                  {i.targetType === "CONCERT" ? (
-                    i.label
-                  ) : (
-                    <Link
-                      href={i.targetType === "ARTIST" ? `/artist/${i.targetMbid}` : `/album/${i.targetMbid}`}
-                      className="hover:text-accent2"
-                    >
-                      {i.label}
-                    </Link>
-                  )}
-                </li>
-              ))}
-            </ul>
+            <Kafelki
+              items={kolejka.items.map((i) => ({
+                key: `${i.targetType}-${i.targetMbid}`,
+                href:
+                  i.targetType === "ARTIST"
+                    ? `/artist/${i.targetMbid}`
+                    : i.targetType === "CONCERT"
+                      ? i.url ?? "/koncerty"
+                      : `/album/${i.targetMbid}`,
+                mbid: i.targetType === "ALBUM" ? i.targetMbid : null,
+                title: i.label.split(" – ").slice(1).join(" – ") || i.label,
+                subtitle: i.label.split(" – ")[0],
+              }))}
+            />
           </section>
         )}
         {/* „Ostatnio" — kolejność jak w serwisach, do których ludzie są
@@ -279,25 +276,18 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
               <h2 className="text-3xl">{t.home.recentTitle}</h2>
               <Link href="/grane" className="text-sm text-muted hover:text-accent2">{t.common.showAll} →</Link>
             </div>
-            <ul className="mt-4 grid grid-cols-3 gap-4 sm:grid-cols-6">
-              {ostatnio.map((o) => {
-                const gdzie = o.mbid
+            <Kafelki
+              items={ostatnio.map((o) => ({
+                key: `${o.artist}-${o.album}`,
+                href: o.mbid
                   ? `/album/${o.mbid}`
-                  : `/go/mb?typ=album&nazwa=${encodeURIComponent(o.album)}&artysta=${encodeURIComponent(o.artist)}`;
-                return (
-                  <li key={`${o.artist}-${o.album}`} className="min-w-0">
-                    <Link href={gdzie} className="group block">
-                      <div className="aspect-square overflow-hidden rounded bg-surface2">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        {o.cover && <img src={o.cover} alt="" className="h-full w-full object-cover" />}
-                      </div>
-                      <div className="mt-1 truncate text-xs group-hover:text-accent2">{o.album}</div>
-                      <div className="truncate text-[10px] text-muted">{o.artist}</div>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+                  : `/go/mb?typ=album&nazwa=${encodeURIComponent(o.album)}&artysta=${encodeURIComponent(o.artist)}`,
+                cover: o.cover,
+                mbid: o.mbid,
+                title: o.album,
+                subtitle: o.artist,
+              }))}
+            />
           </section>
         )}
         <section>
@@ -317,14 +307,18 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
               </Link>
             </p>
           )}
-          <ul className="mt-4 space-y-3">
-            {poJednym.map((r) => (
-              <li key={r.id}>
-                <div className="label mb-1">{genreLabel(r.genre, t)}</div>
-                <ReleaseRow r={r} t={t} />
-              </li>
-            ))}
-          </ul>
+          <Kafelki
+            items={poJednym.map((r) => ({
+              key: r.id,
+              href: r.mbid
+                ? `/album/${r.mbid}`
+                : `/go/mb?typ=album&nazwa=${encodeURIComponent(r.album ?? "")}&artysta=${encodeURIComponent(r.artist ?? "")}`,
+              mbid: r.mbid,
+              title: r.album ?? "",
+              subtitle: r.artist ?? "",
+              meta: genreLabel(r.genre, t),
+            }))}
+          />
           {/* Podróż z premier zostaje, ale już tylko z najnowszego tygodnia —
               strona główna nie jest miejscem na archiwum. */}
           {user && sections[0] && poJednym.length > 0 && (
@@ -346,20 +340,23 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
               <h2 className="text-3xl">{t.home.favouritesTitle}</h2>
               <Link href="/ja" className="text-sm text-muted hover:text-accent2">{t.common.showAll} →</Link>
             </div>
-            <ul className="mt-3 flex flex-wrap gap-2">
-              {liked.slice(0, 6).map((a) => (
-                <li key={a.mbid}>
-                  <Link href={`/album/${a.mbid}`} className="chip hover:border-accent">
-                    {a.artistName} – {a.title}
-                  </Link>
-                </li>
-              ))}
-              {favs.slice(0, 6).map((a) => (
-                <li key={a.mbid}>
-                  <Link href={`/artist/${a.mbid}`} className="chip hover:border-accent">★ {a.name}</Link>
-                </li>
-              ))}
-            </ul>
+            <Kafelki
+              items={[
+                ...liked.slice(0, 6).map((a) => ({
+                  key: `l-${a.mbid}`,
+                  href: `/album/${a.mbid}`,
+                  mbid: a.mbid,
+                  title: a.title,
+                  subtitle: a.artistName,
+                })),
+                ...favs.slice(0, 6).map((a) => ({
+                  key: `f-${a.mbid}`,
+                  href: `/artist/${a.mbid}`,
+                  title: a.name,
+                  subtitle: "★",
+                })),
+              ]}
+            />
           </section>
         )}
 
