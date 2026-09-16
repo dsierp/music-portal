@@ -461,6 +461,32 @@ export async function listaDoPosluchania(userId: string, tytul: string) {
   return nowa;
 }
 
+/**
+ * Kolejka do podejrzenia — BEZ zakładania jej po drodze.
+ *
+ * Osobno od `listaDoPosluchania`, bo tamta zakłada listę przy pierwszym
+ * użyciu. Strona główna tylko patrzy; zakładanie pustej listy każdemu, kto
+ * wejdzie na portal, byłoby śmieciem w cudzych podróżach.
+ */
+export async function kolejkaDoPosluchania(userId: string, ile = 5) {
+  const lista = await db.query.lists.findFirst({
+    where: and(eq(schema.lists.userId, userId), eq(schema.lists.slot, "later")),
+  });
+  if (!lista) return null;
+  const items = await db
+    .select()
+    .from(schema.listItems)
+    .where(eq(schema.listItems.listId, lista.id))
+    .orderBy(desc(schema.listItems.createdAt))
+    .limit(ile);
+  if (!items.length) return null;
+  const [{ n }] = await db
+    .select({ n: count() })
+    .from(schema.listItems)
+    .where(eq(schema.listItems.listId, lista.id));
+  return { id: lista.id, title: lista.title, items, ile: Number(n) };
+}
+
 /** Czy to już leży w kolejce — do stanu przycisku. */
 export async function wDoPosluchania(userId: string, targetType: ListTarget, targetMbid: string): Promise<boolean> {
   const [row] = await db

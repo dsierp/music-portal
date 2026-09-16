@@ -9,7 +9,7 @@ import { Banner } from "@/components/banner";
 import { Suspense } from "react";
 import { SluchaszTeraz } from "@/components/teraz";
 import { lineupNews } from "@/lib/lineup-news";
-import { getFavoriteArtists, getGenres, getLikedAlbums, getMyLists, listsForMe, recentComments, travelJournal } from "@/lib/user-data";
+import { getFavoriteArtists, getGenres, getLikedAlbums, getMyLists, kolejkaDoPosluchania, listsForMe, recentComments, travelJournal } from "@/lib/user-data";
 import { TravelJournal } from "@/components/travel-journal";
 import { spotifyConfigured } from "@/lib/spotify";
 import { journeyFromReleases } from "@/app/actions";
@@ -94,6 +94,7 @@ export default async function Home() {
   let mojeListy: Awaited<ReturnType<typeof getMyLists>> = [];
   let dlaMnie: Awaited<ReturnType<typeof listsForMe>> = [];
   let dziennik: JournalEvent[] = [];
+  let kolejka: Awaited<ReturnType<typeof kolejkaDoPosluchania>> = null;
   if (user) {
     const genres = await getGenres(user.id);
     const s = new Set(genres.filter((g) => g.weight >= 3).map((g) => genreToSection(g.genre)).filter(Boolean) as string[]);
@@ -108,6 +109,7 @@ export default async function Home() {
       // strony głównej — najwyżej nie będzie tej jednej karty.
       travelJournal(user.id, 12).catch(() => []),
     ]);
+    kolejka = await kolejkaDoPosluchania(user.id).catch(() => null);
   }
   const stars = rel.filter((r) => r.star === 1 && (!prefSections || prefSections.has(r.genre)));
 
@@ -140,6 +142,36 @@ export default async function Home() {
           nie rusza szerokosci. */}
       <div className="grid gap-10 lg:grid-cols-[1fr_320px]">
         <div className="space-y-10">
+        {/* Kolejka PRZED premierami, bo to rzecz, po którą się tu wraca:
+            premiery są nowe co piątek, a to jest to, co człowiek sam sobie
+            odłożył i czego jeszcze nie posłuchał. */}
+        {kolejka && (
+          <section>
+            <div className="flex items-baseline justify-between">
+              <h2 className="text-3xl">{kolejka.title}</h2>
+              <Link href={`/podroz/${kolejka.id}`} className="text-sm text-muted hover:text-accent2">
+                {t.common.showAll} <span className="font-mono text-xs text-faint">({kolejka.ile})</span> →
+              </Link>
+            </div>
+            <ul className="mt-3 space-y-1">
+              {kolejka.items.map((i) => (
+                <li key={`${i.targetType}-${i.targetMbid}`} className="truncate text-sm">
+                  <span className="mr-2 text-accent2">↺</span>
+                  {i.targetType === "CONCERT" ? (
+                    i.label
+                  ) : (
+                    <Link
+                      href={i.targetType === "ARTIST" ? `/artist/${i.targetMbid}` : `/album/${i.targetMbid}`}
+                      className="hover:text-accent2"
+                    >
+                      {i.label}
+                    </Link>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         <section>
           <div className="flex items-baseline justify-between">
             <h2 className="text-3xl">{prefSections ? t.home.releasesForYou : t.home.releasesThisWeek}</h2>
