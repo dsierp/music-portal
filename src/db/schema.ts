@@ -409,6 +409,12 @@ export const plays = pgTable(
     album: text("album"),
     /** release-group, gdy znany — z kliknięcia w portalu albo dowiązany później */
     mbid: text("mbid"),
+    /**
+     * Okładka prosto od Spotify. Bez tego „ostatnio grane" byłoby listą
+     * napisów — a ludzie rozpoznają płyty po okładkach, nie po tytułach.
+     * Cover Art Archive wymaga MBID-u, którego przy odsłuchu zwykle nie mamy.
+     */
+    cover: text("cover"),
     source: playSource("source").notNull(),
     playedAt: timestamp("played_at", { mode: "date" }).defaultNow().notNull(),
   },

@@ -10,6 +10,7 @@ import { Suspense } from "react";
 import { SluchaszTeraz } from "@/components/teraz";
 import { lineupNews } from "@/lib/lineup-news";
 import { getFavoriteArtists, getGenres, getLikedAlbums, getMyLists, kolejkaDoPosluchania, listsForMe, recentComments, travelJournal } from "@/lib/user-data";
+import { ostatnieKafelki } from "@/lib/grane";
 import { TravelJournal } from "@/components/travel-journal";
 import { spotifyConfigured } from "@/lib/spotify";
 import { journeyFromReleases } from "@/app/actions";
@@ -18,7 +19,7 @@ import { genreToSection } from "@/lib/genres";
 import { SKIP_ONBOARDING } from "@/lib/onboarding";
 import { i18n } from "@/lib/t";
 import { ScreenHelp } from "@/components/screen-help";
-import { fmt, plural } from "@/lib/i18n";
+import { fmt, formatDate, plural, type Locale } from "@/lib/i18n";
 import { genreLabel } from "@/lib/dict";
 import type { Dict } from "@/lib/dict";
 
@@ -79,6 +80,51 @@ async function LineupNews({ bands, favorites, zalogowany, t }: { bands: { mbid: 
  * ścianę. Teraz: trzy rzeczy z własnej kolejki i po JEDNEJ premierze z każdej
  * kategorii. Reszta jest w Premierach, dwa kliknięcia stąd.
  */
+/**
+ * Koncerty jako zajawka — trzy najbliższe, osobnym strumieniem.
+ *
+ * Osobno, bo to pytanie do Ticketmastera i MusicBrainz: strona główna ma się
+ * pokazać od razu, a koncerty doklejają się, gdy przyjdą. Gdy nie ma czego
+ * pokazać, sekcja po prostu nie istnieje — pusta rubryka „koncerty" jest
+ * gorsza niż jej brak.
+ */
+async function KoncertyZajawka({ userId, t, locale }: { userId: string; t: Dict; locale: Locale }) {
+  const { getAreas, getGenres } = await import("@/lib/user-data");
+  const [areas, genres] = await Promise.all([
+    getAreas(userId).catch(() => []),
+    getGenres(userId).catch(() => []),
+  ]);
+  if (!areas.length) return null;
+  const { concertsByArea, concertsByAreaMb, dedupe } = await import("@/lib/concerts");
+  const kategorie = genres.map((g) => g.genre);
+  const [mb, tm] = await Promise.all([
+    concertsByAreaMb(areas).catch(() => []),
+    concertsByArea(areas, kategorie).catch(() => []),
+  ]);
+  const items = dedupe([...tm, ...mb]).slice(0, 3);
+  if (!items.length) return null;
+  return (
+    <section>
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-3xl">{t.home.concertsSoon}</h2>
+        <Link href="/koncerty" className="text-sm text-muted hover:text-accent2">{t.common.showAll} →</Link>
+      </div>
+      <ul className="mt-3 space-y-2 text-sm">
+        {items.map((c) => (
+          <li key={c.id} className="flex flex-wrap items-baseline gap-x-2">
+            <span className="font-mono text-[10px] text-faint">{formatDate(c.date, locale)}</span>
+            <span className="font-medium">{c.name}</span>
+            <span className="text-muted">{c.city}</span>
+            {c.url && (
+              <a href={c.url} target="_blank" rel="noopener" className="text-xs text-muted hover:text-accent2">→</a>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export default async function Home({ searchParams }: { searchParams: Promise<{ wszystko?: string }> }) {
   const wszystko = (await searchParams).wszystko === "1";
   const { locale, t } = await i18n();
@@ -100,15 +146,21 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
   let prefSections: Set<string> | null = null;
   let liked: Awaited<ReturnType<typeof getLikedAlbums>> = [];
   let favs: Awaited<ReturnType<typeof getFavoriteArtists>> = [];
+  let odrzucone: Awaited<ReturnType<typeof getLikedAlbums>> = [];
   let mojeListy: Awaited<ReturnType<typeof getMyLists>> = [];
   let dlaMnie: Awaited<ReturnType<typeof listsForMe>> = [];
   let dziennik: JournalEvent[] = [];
   let kolejka: Awaited<ReturnType<typeof kolejkaDoPosluchania>> = null;
+  let ostatnio: Awaited<ReturnType<typeof ostatnieKafelki>> = [];
   if (user) {
     const genres = await getGenres(user.id);
     const s = new Set(genres.filter((g) => g.weight >= 3).map((g) => genreToSection(g.genre)).filter(Boolean) as string[]);
     prefSections = s.size ? s : null;
-    [liked, favs] = await Promise.all([getLikedAlbums(user.id), getFavoriteArtists(user.id)]);
+    [liked, favs, odrzucone] = await Promise.all([
+      getLikedAlbums(user.id),
+      getFavoriteArtists(user.id),
+      getLikedAlbums(user.id, "dislike").catch(() => []),
+    ]);
     // Listy na stronie głównej: to jest to, po co człowiek tu wraca — własna
     // kolejka do posłuchania i to, co ktoś mu podsunął.
     [mojeListy, dlaMnie, dziennik] = await Promise.all([
@@ -119,7 +171,24 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
       travelJournal(user.id, 12).catch(() => []),
     ]);
     kolejka = await kolejkaDoPosluchania(user.id, 3).catch(() => null);
+    ostatnio = await ostatnieKafelki(user.id, 6).catch(() => []);
   }
+  /**
+   * Jedna zaczepka: coś z best of, czego jeszcze nie tykałeś.
+   *
+   * Bierzemy z rankingów portalu, a nie od modelu — zaczepka na stronie
+   * głównej ma być natychmiastowa i darmowa. Odsiewamy to, co już polubione
+   * albo odrzucone; reszta idzie po kolei, a nie losowo, żeby strona nie
+   * skakała przy każdym odświeżeniu.
+   */
+  const znane = new Set([...liked.map((a) => a.mbid), ...odrzucone.map((a) => a.mbid)]);
+  const sprobuj =
+    user && best
+      ? best.entries.filter((e) => e.rank === 1 && e.mbid && !znane.has(e.mbid))[
+          new Date().getUTCDate() % Math.max(1, best.entries.filter((e) => e.rank === 1 && e.mbid && !znane.has(e.mbid)).length)
+        ] ?? null
+      : null;
+
   const stars = rel.filter((r) => r.star === 1 && (!prefSections || prefSections.has(r.genre)));
 
   /**
@@ -201,6 +270,36 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
             </ul>
           </section>
         )}
+        {/* „Ostatnio" — kolejność jak w serwisach, do których ludzie są
+            przyzwyczajeni: najpierw to, co odłożyli, potem to, czego właśnie
+            słuchali. Okładki, bo płyty rozpoznaje się po nich, nie po tytule. */}
+        {ostatnio.length > 0 && (
+          <section>
+            <div className="flex items-baseline justify-between">
+              <h2 className="text-3xl">{t.home.recentTitle}</h2>
+              <Link href="/grane" className="text-sm text-muted hover:text-accent2">{t.common.showAll} →</Link>
+            </div>
+            <ul className="mt-4 grid grid-cols-3 gap-4 sm:grid-cols-6">
+              {ostatnio.map((o) => {
+                const gdzie = o.mbid
+                  ? `/album/${o.mbid}`
+                  : `/go/mb?typ=album&nazwa=${encodeURIComponent(o.album)}&artysta=${encodeURIComponent(o.artist)}`;
+                return (
+                  <li key={`${o.artist}-${o.album}`} className="min-w-0">
+                    <Link href={gdzie} className="group block">
+                      <div className="aspect-square overflow-hidden rounded bg-surface2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        {o.cover && <img src={o.cover} alt="" className="h-full w-full object-cover" />}
+                      </div>
+                      <div className="mt-1 truncate text-xs group-hover:text-accent2">{o.album}</div>
+                      <div className="truncate text-[10px] text-muted">{o.artist}</div>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
         <section>
           <div className="flex items-baseline justify-between">
             <h2 className="text-3xl">{prefSections ? t.home.releasesForYou : t.home.releasesThisWeek}</h2>
@@ -239,6 +338,61 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
           )}
           {!poJednym.length && <p className="mt-3 text-sm text-muted">{t.home.noReleasesBefore}<code>npm run import:pns</code>{t.home.noReleasesAfter}</p>}
         </section>
+
+        {/* Ulubione zaraz po premierach: to jest półka, do której się wraca. */}
+        {user && (liked.length > 0 || favs.length > 0) && (
+          <section>
+            <div className="flex items-baseline justify-between">
+              <h2 className="text-3xl">{t.home.favouritesTitle}</h2>
+              <Link href="/ja" className="text-sm text-muted hover:text-accent2">{t.common.showAll} →</Link>
+            </div>
+            <ul className="mt-3 flex flex-wrap gap-2">
+              {liked.slice(0, 6).map((a) => (
+                <li key={a.mbid}>
+                  <Link href={`/album/${a.mbid}`} className="chip hover:border-accent">
+                    {a.artistName} – {a.title}
+                  </Link>
+                </li>
+              ))}
+              {favs.slice(0, 6).map((a) => (
+                <li key={a.mbid}>
+                  <Link href={`/artist/${a.mbid}`} className="chip hover:border-accent">★ {a.name}</Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {/* „A może by tak spróbować" — jedna rzecz z best of, której jeszcze
+            nie tykałeś. Świadomie BEZ modelu językowego: to ma być zaczepka na
+            stronie głównej, a nie zapytanie, które kosztuje i trwa. */}
+        {sprobuj && (
+          <section className="card">
+            <h2 className="text-xl">{t.home.tryTitle}</h2>
+            <p className="mt-1 text-xs text-muted">{t.home.tryNote}</p>
+            <p className="mt-2">
+              <Link href={`/go/best/${sprobuj.id}`} className="text-lg hover:text-accent2">
+                {sprobuj.artist} – <i>{sprobuj.album}</i>
+              </Link>
+            </p>
+            <p className="mt-3">
+              <Link
+                href={`/rozmowa?opis=${encodeURIComponent(fmt(t.home.tryPrompt, { co: `${sprobuj.artist} – ${sprobuj.album}` }))}`}
+                className="btn text-xs"
+              >
+                {t.chat.findSimilar}
+              </Link>
+            </p>
+          </section>
+        )}
+
+        {/* Koncerty: osobnym strumieniem, bo to pytanie do Ticketmastera
+            i MusicBrainz — strona główna nie ma na nie czekać. */}
+        {user && (
+          <Suspense fallback={null}>
+            <KoncertyZajawka userId={user.id} t={t} locale={locale} />
+          </Suspense>
+        )}
 
         {/* Zmiany skladow POD premierami: to jest powod, zeby wrocic, ale nie
             pierwsza rzecz, po ktora sie tu przychodzi. */}

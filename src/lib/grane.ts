@@ -28,6 +28,7 @@ export interface Odsluch {
   title: string;
   album: string | null;
   mbid?: string | null;
+  cover?: string | null;
   source: "spotify" | "klik";
 }
 
@@ -56,6 +57,7 @@ export async function zapiszOdsluch(userId: string, o: Odsluch): Promise<void> {
       title,
       album: o.album?.trim().slice(0, 300) || null,
       mbid: o.mbid ?? null,
+      cover: o.cover ?? null,
       source: o.source,
     });
   } catch {
@@ -108,4 +110,28 @@ export async function ostatniePlyty(userId: string, dni = 30, ile = 20) {
     .orderBy(desc(sql`max(${schema.plays.playedAt})`))
     .limit(ile);
   return rows.filter((r) => r.album).map((r) => ({ ...r, album: r.album!, ile: Number(r.n) }));
+}
+
+/**
+ * Ostatnio grane jako KAFELKI — po jednym na płytę, z okładką.
+ *
+ * Ludzie rozpoznają płyty po okładkach; lista napisów na stronie głównej
+ * byłaby spisem, a nie zajawką. Grupujemy po płycie, bo trzy kawałki z tego
+ * samego albumu to jedno wspomnienie, nie trzy.
+ */
+export async function ostatnieKafelki(userId: string, ile = 6) {
+  const rows = await db
+    .select({
+      artist: schema.plays.artist,
+      album: schema.plays.album,
+      mbid: sql<string | null>`max(${schema.plays.mbid})`,
+      cover: sql<string | null>`max(${schema.plays.cover})`,
+      kiedy: sql<Date>`max(${schema.plays.playedAt})`,
+    })
+    .from(schema.plays)
+    .where(eq(schema.plays.userId, userId))
+    .groupBy(schema.plays.artist, schema.plays.album)
+    .orderBy(desc(sql`max(${schema.plays.playedAt})`))
+    .limit(ile);
+  return rows.filter((r) => r.album).map((r) => ({ ...r, album: r.album! }));
 }

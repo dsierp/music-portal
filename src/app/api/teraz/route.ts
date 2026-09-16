@@ -26,7 +26,7 @@ export async function GET() {
   // potem powiedzieć „w zeszłym tygodniu siedziałeś w tym".
   if (teraz) {
     const { zapiszOdsluch } = await import("@/lib/grane");
-    await zapiszOdsluch(user.id, { artist: teraz.artist, title: teraz.title, album: teraz.album, source: "spotify" });
+    await zapiszOdsluch(user.id, { artist: teraz.artist, title: teraz.title, album: teraz.album, cover: teraz.cover, source: "spotify" });
   }
   return NextResponse.json({ teraz }, { headers: { "cache-control": "no-store" } });
 }
