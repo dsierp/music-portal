@@ -71,7 +71,16 @@ async function LineupNews({ bands, favorites, zalogowany, t }: { bands: { mbid: 
   );
 }
 
-export default async function Home() {
+/**
+ * Strona główna jest ZAJAWKĄ, nie spisem treści.
+ *
+ * Wcześniej wywalała tu całe sekcje premier — po kilkanaście pozycji na
+ * tydzień. Kto wchodzi codziennie, przewijał to samo; kto pierwszy raz, dostawał
+ * ścianę. Teraz: trzy rzeczy z własnej kolejki i po JEDNEJ premierze z każdej
+ * kategorii. Reszta jest w Premierach, dwa kliknięcia stąd.
+ */
+export default async function Home({ searchParams }: { searchParams: Promise<{ wszystko?: string }> }) {
+  const wszystko = (await searchParams).wszystko === "1";
   const { locale, t } = await i18n();
   const user = await currentUser();
   // Pierwsze wejście po zalogowaniu: nikt nie ma jeszcze stylów, a bez nich
@@ -109,9 +118,29 @@ export default async function Home() {
       // strony głównej — najwyżej nie będzie tej jednej karty.
       travelJournal(user.id, 12).catch(() => []),
     ]);
-    kolejka = await kolejkaDoPosluchania(user.id).catch(() => null);
+    kolejka = await kolejkaDoPosluchania(user.id, 3).catch(() => null);
   }
   const stars = rel.filter((r) => r.star === 1 && (!prefSections || prefSections.has(r.genre)));
+
+  /**
+   * Łagodne wejście dla nieznajomego.
+   *
+   * Portal jest o metalu i progu i nie udaje inaczej — ale ktoś, kto trafia tu
+   * pierwszy raz, dostawał na dzień dobry ścianę bestial black metalu. To nie
+   * jest zaproszenie, tylko test na wytrzymałość. Więc dla niezalogowanego
+   * zaczynamy od spokojniejszych kategorii, a ciężkie są jedno kliknięcie obok
+   * — nie chowamy ich, tylko nie wpychamy w drzwiach.
+   */
+  const SPOKOJNE = new Set(["pop", "jazz", "folk", "classical", "country", "electronic"]);
+  const zajawka = user || wszystko ? stars : stars.filter((r) => SPOKOJNE.has(r.genre));
+
+  // Po JEDNEJ pozycji z kategorii: strona główna ma dawać próbkę, a nie spis.
+  const widzianeKategorie = new Set<string>();
+  const poJednym = (zajawka.length ? zajawka : stars).filter((r) => {
+    if (widzianeKategorie.has(r.genre)) return false;
+    widzianeKategorie.add(r.genre);
+    return true;
+  });
 
   // Zmiany składów sprawdzamy w Twoich ulubionych zespołach (★).
   // Premier tu nie doważamy: tabela premier trzyma MBID PŁYTY, nie zespołu, więc
@@ -177,31 +206,38 @@ export default async function Home() {
             <h2 className="text-3xl">{prefSections ? t.home.releasesForYou : t.home.releasesThisWeek}</h2>
             <Link href="/premiery" className="text-sm text-muted hover:text-accent2">{t.home.allReleases}</Link>
           </div>
-          {sections.map((s) => {
-            const items = stars.filter((r) => r.sectionId === s.id);
-            if (!items.length) return null;
-            return (
-              <div key={s.id} className="mt-4">
-                <h3 className="label mb-2">{s.title} {s.date}</h3>
-                <ul className="space-y-3">{items.map((r) => <ReleaseRow key={r.id} r={r} t={t} />)}</ul>
-                {/* Przycisk przy KAŻDYM tygodniu, nie tylko przy najnowszym:
-                    najnowsza sekcja to zwykle tydzień, który dopiero nadchodzi,
-                    a podróż układa się z tego, co już wyszło. */}
-                {user && items.some((r) => r.mbid) && (
-                  <form action={journeyFromReleases} className="mt-3">
-                    <input type="hidden" name="sectionId" value={s.id} />
-                    <input type="hidden" name="title" value={`${s.title} ${s.date}`} />
-                    {/* Strona główna pokazuje tylko wyróżnione i tylko w Twoich
-                        gatunkach — podróż ma być tym samym. */}
-                    <input type="hidden" name="star" value="1" />
-                    <input type="hidden" name="genres" value={prefSections ? [...prefSections].join(",") : ""} />
-                    <button className="btn text-xs">{t.releases.journeyFromReleases}</button>
-                  </form>
-                )}
-              </div>
-            );
-          })}
-          {!stars.length && <p className="mt-3 text-sm text-muted">{t.home.noReleasesBefore}<code>npm run import:pns</code>{t.home.noReleasesAfter}</p>}
+          <p className="mt-1 text-xs text-muted">{t.home.oneEach}</p>
+          {/* Gość dostaje łagodniejsze wejście. Portal jest o metalu i progu,
+              ale witanie kogoś z ulicy ścianą bestial black metalu to nie
+              zaproszenie, tylko test na wytrzymałość — a wybór jest obok. */}
+          {!user && (
+            <p className="mt-2 text-xs text-faint">
+              {wszystko ? "" : `${t.home.guestGenres} `}
+              <Link href={wszystko ? "/" : "/?wszystko=1"} className="underline hover:text-accent2">
+                {wszystko ? t.home.guestBack : t.home.guestShowAll}
+              </Link>
+            </p>
+          )}
+          <ul className="mt-4 space-y-3">
+            {poJednym.map((r) => (
+              <li key={r.id}>
+                <div className="label mb-1">{genreLabel(r.genre, t)}</div>
+                <ReleaseRow r={r} t={t} />
+              </li>
+            ))}
+          </ul>
+          {/* Podróż z premier zostaje, ale już tylko z najnowszego tygodnia —
+              strona główna nie jest miejscem na archiwum. */}
+          {user && sections[0] && poJednym.length > 0 && (
+            <form action={journeyFromReleases} className="mt-4">
+              <input type="hidden" name="sectionId" value={sections[0].id} />
+              <input type="hidden" name="title" value={`${sections[0].title} ${sections[0].date}`} />
+              <input type="hidden" name="star" value="1" />
+              <input type="hidden" name="genres" value={prefSections ? [...prefSections].join(",") : ""} />
+              <button className="btn text-xs">{t.releases.journeyFromReleases}</button>
+            </form>
+          )}
+          {!poJednym.length && <p className="mt-3 text-sm text-muted">{t.home.noReleasesBefore}<code>npm run import:pns</code>{t.home.noReleasesAfter}</p>}
         </section>
 
         {/* Zmiany skladow POD premierami: to jest powod, zeby wrocic, ale nie
