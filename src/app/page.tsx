@@ -171,7 +171,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
       travelJournal(user.id, 12).catch(() => []),
     ]);
     kolejka = await kolejkaDoPosluchania(user.id, 3).catch(() => null);
-    ostatnio = await ostatnieKafelki(user.id, 6).catch(() => []);
+    ostatnio = await ostatnieKafelki(user.id, 10).catch(() => []);
   }
   /**
    * Jedna zaczepka: coś z best of, czego jeszcze nie tykałeś.

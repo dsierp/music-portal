@@ -24,8 +24,11 @@ export async function GET() {
   // Przy okazji zapisujemy, co leciało. Pytanie i tak padło, więc dziennik
   // odsłuchań nie kosztuje ani jednego zapytania więcej — a to on pozwala
   // potem powiedzieć „w zeszłym tygodniu siedziałeś w tym".
+  // Historia ze Spotify — rzadko i w tle, żeby dziennik nie zaczynał się
+  // dopiero od dziś. Nie czekamy na nią: kafelek ma się pokazać od razu.
+  const { zapiszOdsluch, synchronizujHistorie } = await import("@/lib/grane");
+  void synchronizujHistorie(user.id).catch(() => {});
   if (teraz) {
-    const { zapiszOdsluch } = await import("@/lib/grane");
     await zapiszOdsluch(user.id, { artist: teraz.artist, title: teraz.title, album: teraz.album, cover: teraz.cover, source: "spotify" });
   }
   return NextResponse.json({ teraz }, { headers: { "cache-control": "no-store" } });

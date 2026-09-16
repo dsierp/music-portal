@@ -52,7 +52,16 @@ function wPauzie(): boolean {
 }
 
 /** Zakresy, o które prosimy przy łączeniu konta — patrz komentarz u góry. */
-export const SPOTIFY_SCOPES = ["user-read-currently-playing", "playlist-modify-private"].join(" ");
+/**
+ * `user-read-recently-played` doszło później i świadomie: bez niego dziennik
+ * odsłuchań zaczynał się w dniu, w którym ktoś pierwszy raz zostawił portal
+ * otwarty — a to wygląda jak zepsuta funkcja, nie jak nowa. Spotify oddaje
+ * ostatnie 50 utworów, więc historia jest od razu, a nie od jutra.
+ *
+ * Kto podłączył konto WCZEŚNIEJ, ma stary zakres i musi połączyć je od nowa;
+ * portal go o to nie zaczepia — po prostu historii nie ciągnie.
+ */
+export const SPOTIFY_SCOPES = ["user-read-currently-playing", "user-read-recently-played", "playlist-modify-private"].join(" ");
 
 export function spotifyConfigured(): boolean {
   return !!process.env.SPOTIFY_CLIENT_ID && !!process.env.SPOTIFY_CLIENT_SECRET;
@@ -218,6 +227,28 @@ export async function nowPlaying(userId: string): Promise<NowPlaying | null> {
     cover: item.album?.images?.[item.album.images.length - 1]?.url ?? null,
     playing: dane?.is_playing !== false,
   };
+}
+
+/**
+ * Ostatnie 50 odtworzeń prosto ze Spotify — jednorazowy zastrzyk do dziennika.
+ *
+ * Pytamy rzadko (patrz `synchronizujHistorie`), bo to jest uzupełnianie
+ * przeszłości, a nie śledzenie: przeszłość się nie zmienia.
+ */
+export async function recentlyPlayed(userId: string): Promise<{ artist: string; title: string; album: string; cover: string | null; at: Date }[]> {
+  const dane = await api<{ items?: { track?: SpTrack; played_at?: string }[] }>(
+    userId,
+    "/me/player/recently-played?limit=50",
+  ).catch(() => null);
+  return (dane?.items ?? [])
+    .filter((i) => i.track?.name)
+    .map((i) => ({
+      artist: (i.track!.artists ?? []).map((a) => a.name).join(", "),
+      title: i.track!.name,
+      album: i.track!.album?.name ?? "",
+      cover: i.track!.album?.images?.[i.track!.album.images.length - 1]?.url ?? null,
+      at: i.played_at ? new Date(i.played_at) : new Date(),
+    }));
 }
 
 // ---------- podróż → playlista ----------
