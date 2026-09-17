@@ -700,11 +700,28 @@ export async function findAlbumMbid(artist: string, album: string): Promise<Albu
 
 // ---------- płyta (release-group + wybrane wydanie) ----------
 
+/**
+ * Które wydanie pokazujemy jako „tę płytę".
+ *
+ * Braliśmy najwcześniejsze oficjalne — i to się mściło. Przy „Fear of a Blank
+ * Planet" najwcześniejsze wydanie w grupie to promo dla radia: dwa kawałki,
+ * „clean edit" i „dirty edit". Spis utworów wyglądał więc tak, jakby płyta
+ * miała dwie ścieżki, a ma sześć. To samo dotyczy singli promocyjnych
+ * doklejanych do grupy albumu w ogóle.
+ *
+ * Więc najpierw odsiewamy to, co nie jest zwykłym wydaniem (promo, bootleg,
+ * pseudo-wydanie), a potem WYCINAMY OGRYZKI: jeśli najobszerniejsze wydanie ma
+ * n ścieżek, wszystko poniżej 60% n to nie jest ta płyta, tylko wycinek z niej.
+ * Dopiero z tego, co zostało, bierzemy najwcześniejsze — bo pierwotne wydanie
+ * jest tym, co ludzie mają na myśli, mówiąc „ta płyta".
+ */
 function pickRelease(releases: MbReleaseStub[] | undefined): MbReleaseStub | null {
   if (!releases?.length) return null;
-  const official = releases.filter((r) => !r.status || r.status === "Official");
-  const pool = official.length ? official : releases;
-  return [...pool].sort((x, y) => {
+  const zwykle = releases.filter((r) => !r.status || r.status === "Official");
+  const pool = zwykle.length ? zwykle : releases;
+  const najwiecej = Math.max(...pool.map((r) => r["track-count"] ?? 0), 0);
+  const pelne = najwiecej > 0 ? pool.filter((r) => (r["track-count"] ?? 0) >= najwiecej * 0.6) : pool;
+  return [...(pelne.length ? pelne : pool)].sort((x, y) => {
     const dx = x.date || "9999", dy = y.date || "9999";
     if (dx !== dy) return dx < dy ? -1 : 1;
     return (y["track-count"] ?? 0) - (x["track-count"] ?? 0);
