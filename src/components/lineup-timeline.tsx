@@ -392,7 +392,9 @@ export function CareerTimeline({
     : null;
 
   const wszystkie = wlasnyWiersz ? [wlasnyWiersz, ...rows] : rows;
-  if (!wszystkie.length) return null;
+  // Tak samo jak przy zespole: brak danych mówimy wprost. Znikająca sekcja
+  // wygląda na awarię portalu, a to jest dziura w MusicBrainz.
+  if (!wszystkie.length) return <p className="mt-6 text-sm text-muted">{t.careerNone}</p>;
   return (
     <details className="mt-6" open>
       <summary className="cursor-pointer text-muted hover:text-accent2">
