@@ -22,6 +22,7 @@ import { AlbumCard, CreditLinks, typeLabel } from "@/components/cards";
 import { Cover } from "@/components/cover";
 import { YoutubeVideos } from "@/components/youtube";
 import { Teledyski } from "@/components/teledyski";
+import { LineupTimeline } from "@/components/lineup-timeline";
 import { Suspense } from "react";
 import type { Dict } from "@/lib/dict";
 import { i18n } from "@/lib/t";
@@ -299,6 +300,23 @@ export default async function AlbumPage({
           <section className="mt-6 text-sm text-text2">
             <p>{wiki.extract}</p>
             <a href={wiki.url} target="_blank" rel="noopener" className="text-xs text-muted hover:text-accent2">{fmt(t.common.wikipediaLink, { lang: wiki.lang })}</a>
+          </section>
+        )}
+
+        {/* Oś czasu składu zespołu — tu, przy płycie, bo pytanie „kto to
+            nagrywał" pada właśnie na tej stronie. Dane już mamy (skład zespołu
+            i dyskografia lecą w tym samym Promise.all), więc nic nie kosztuje;
+            pionowe kreski to płyty, więc widać, gdzie w historii zespołu
+            siedzi ta, na którą patrzysz. */}
+        {band && band.members.filter((m) => !m.supporting).length > 0 && (
+          <section className="mt-8">
+            <h2 className="mb-2 text-2xl">{t.album.lineupChartHeading}</h2>
+            <LineupTimeline
+              members={band.members.filter((m) => !m.supporting)}
+              albums={more}
+              locale={locale}
+              t={t.artist.timeline}
+            />
           </section>
         )}
 

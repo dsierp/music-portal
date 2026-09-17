@@ -325,9 +325,14 @@ function Chart({
 export function LineupTimeline({ members, albums, locale, t }: { members: Membership[]; albums: AlbumSummary[]; locale: Locale; t: TimelineLabels }) {
   // Bez odsiewania po datach: człowiek bez dat członkostwa to nadal część składu.
   const rows = fillMissingSpans(mergeSpans<Membership, Mark>(members));
-  if (!rows.length) return null;
+  // Pusto ≠ cicho. Wykres znikał bez słowa, gdy MusicBrainz nie miał składu —
+  // i wyglądało to na zepsutą funkcję, a nie na brak danych. Mówimy wprost.
+  if (!rows.length) return <p className="mt-6 text-sm text-muted">{t.lineupNone}</p>;
   return (
-    <details className="mt-6">
+    // Otwarta od razu. Zwinięta pod jednym szarym napisem była w praktyce
+    // niewidoczna — a to jest najciekawsza rzecz na stronie zespołu: kto grał
+    // i kiedy. Kto nie chce, zwinie.
+    <details className="mt-6" open>
       <summary className="cursor-pointer text-muted hover:text-accent2">{plural(locale, rows.length, t.lineupSummary)}</summary>
       <Chart rows={rows} albums={albums.map(markOf)} labelWidth={150} markLabel={t.markAlbumLabel} t={t} />
     </details>

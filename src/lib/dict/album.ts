@@ -18,6 +18,7 @@ const pl = {
   likesCount: { one: "{n} osoba lubi", few: "{n} osoby lubią", many: "{n} osób lubi" } as { one: string; few?: string; many: string },
 
   lineupHeading: "Muzycy",
+  lineupChartHeading: "Kto kiedy grał",
   trackCountSuffix: "utw.",
   wikiCreditsPrefix: "Źródło:",
   wikiCreditsSuffix: " — MusicBrainz nie ma jeszcze tego składu na poziomie nagrań. Nazwiska rozpoznane w MusicBrainz prowadzą do profilu; pozostałe (kropkowane) do wyszukiwarki portalu.",
@@ -63,6 +64,7 @@ const en: T = {
   likesCount: { one: "{n} person likes this", many: "{n} people like this" },
 
   lineupHeading: "Musicians",
+  lineupChartHeading: "Who played when",
   trackCountSuffix: "trk.",
   wikiCreditsPrefix: "Source:",
   wikiCreditsSuffix: " — MusicBrainz doesn't have this lineup at the recording level yet. Names MusicBrainz recognises link to their profile; the rest (dotted underline) link to the portal search.",
@@ -106,6 +108,7 @@ const es: T = {
   likesCount: { one: "{n} persona le da me gusta", many: "{n} personas le dan me gusta" },
 
   lineupHeading: "Músicos",
+  lineupChartHeading: "Quién tocó y cuándo",
   trackCountSuffix: "pistas",
   wikiCreditsPrefix: "Fuente:",
   wikiCreditsSuffix: " — MusicBrainz todavía no tiene esta formación a nivel de grabación. Los nombres que MusicBrainz reconoce enlazan a su perfil; el resto (subrayado punteado) enlaza al buscador del portal.",
@@ -149,6 +152,7 @@ const de: T = {
   likesCount: { one: "{n} Person gefällt das", many: "{n} Personen gefällt das" },
 
   lineupHeading: "Musiker",
+  lineupChartHeading: "Wer wann spielte",
   trackCountSuffix: "Titel",
   wikiCreditsPrefix: "Quelle:",
   wikiCreditsSuffix: " — MusicBrainz hat diese Besetzung auf Aufnahmeebene noch nicht erfasst. Namen, die MusicBrainz kennt, führen zum Profil; die übrigen (gepunktet unterstrichen) zur Portalsuche.",
