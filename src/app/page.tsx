@@ -110,16 +110,39 @@ async function KoncertyZajawka({ userId, t, locale }: { userId: string; t: Dict;
         <Link href="/koncerty" className="text-sm text-muted hover:text-accent2">{t.common.showAll} →</Link>
       </div>
       <ul className="mt-3 space-y-2 text-sm">
-        {items.map((c) => (
-          <li key={c.id} className="flex flex-wrap items-baseline gap-x-2">
-            <span className="font-mono text-[10px] text-faint">{formatDate(c.date, locale)}</span>
-            <span className="font-medium">{c.name}</span>
-            <span className="text-muted">{c.city}</span>
-            {c.url && (
-              <a href={c.url} target="_blank" rel="noopener" className="text-xs text-muted hover:text-accent2">→</a>
-            )}
-          </li>
-        ))}
+        {items.map((c) => {
+          // Kto gra — i od razu droga do posłuchania. Sam afisz („Tech It Easy
+          // Tour! 2026") nic nie mówi: żeby zdecydować, czy tam iść, trzeba
+          // usłyszeć. Nazwy zespołów prowadzą na ich strony u nas, a stamtąd
+          // w Spotify czy Tidala. Dokładnie to samo jest na /koncerty.
+          const kto = (c.lineup?.length ? c.lineup : c.artistName ? [c.artistName] : []).slice(0, 4);
+          return (
+            <li key={c.id}>
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <span className="font-mono text-[10px] text-faint">{formatDate(c.date, locale)}</span>
+                <span className="font-medium">{c.name}</span>
+                <span className="text-muted">{c.city}</span>
+                {c.url && (
+                  <a href={c.url} target="_blank" rel="noopener" className="text-xs text-muted hover:text-accent2">→</a>
+                )}
+              </div>
+              {kto.length > 0 && (
+                <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-xs">
+                  <span className="text-faint">{t.concerts.listenBefore}</span>
+                  {kto.map((nazwa) => (
+                    <Link
+                      key={nazwa}
+                      href={`/go/mb?typ=artist&nazwa=${encodeURIComponent(nazwa)}`}
+                      className="text-muted underline decoration-dotted hover:text-accent2"
+                    >
+                      {nazwa}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );
