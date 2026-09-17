@@ -1,37 +1,28 @@
 import { i18n } from "@/lib/t";
 
 /**
- * Filmiki z YouTube dla artysty — bez klucza API: osadzamy wyniki wyszukiwania
- * jako "playlistę" (parametr listType=search), więc nie trzeba nic pobierać
- * z YouTube Data API. Domyślnie zwinięte (<details>), żeby nie ładować
- * zewnętrznej ramki na każdej wizycie.
+ * Wyjście w YouTube — zwykły odnośnik, nie odtwarzacz.
+ *
+ * WCZEŚNIEJ była tu osadzona ramka z „playlistą wyszukiwania"
+ * (`listType=search`). To była sztuczka na obejście YouTube Data API i
+ * przestała działać: ramka pokazuje dziś „Ten film jest niedostępny" i tyle.
+ * Zepsuty odtwarzacz jest gorszy niż jego brak — wygląda, jakby popsuł się
+ * portal, a nie cudza wtyczka. Konkretne klipy są wyżej, w „Teledyskach";
+ * to tutaj jest zwykłe „zobacz resztę u nich".
  */
 export async function YoutubeVideos({ query }: { query: string }) {
   const { t } = await i18n();
   const q = encodeURIComponent(query);
   return (
-    <details className="mt-8 group">
-      <summary className="cursor-pointer text-2xl text-text hover:text-accent2" style={{ fontFamily: "var(--font-display)" }}>
-        {t.common.ytHeading}
-      </summary>
-      <div className="mt-3 aspect-video w-full overflow-hidden rounded-lg border border-rule bg-surface2">
-        <iframe
-          className="h-full w-full"
-          src={`https://www.youtube-nocookie.com/embed/videoseries?listType=search&list=${q}`}
-          title={`${t.common.ytHeading}: ${query}`}
-          loading="lazy"
-          allow="accelerometer; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-        />
-      </div>
+    <p className="mt-6">
       <a
         href={`https://www.youtube.com/results?search_query=${q}`}
         target="_blank"
         rel="noopener"
-        className="mt-2 inline-block text-xs text-muted hover:text-accent2"
+        className="text-sm text-muted hover:text-accent2"
       >
-        {t.common.ytMore}
+        {t.common.ytMore} →
       </a>
-    </details>
+    </p>
   );
 }
