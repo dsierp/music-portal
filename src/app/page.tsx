@@ -218,12 +218,25 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
    * skakała przy każdym odświeżeniu.
    */
   const znane = new Set([...liked.map((a) => a.mbid), ...odrzucone.map((a) => a.mbid)]);
-  const sprobuj =
-    user && best
-      ? best.entries.filter((e) => e.rank === 1 && e.mbid && !znane.has(e.mbid))[
-          new Date().getUTCDate() % Math.max(1, best.entries.filter((e) => e.rank === 1 && e.mbid && !znane.has(e.mbid)).length)
-        ] ?? null
-      : null;
+  /**
+   * Kategorie best of trzymają death i black osobno, a preferencje użytkownika
+   * schodzą przez genreToSection do wspólnego "db" — stąd to jedno przejście.
+   */
+  const bestCatToSection = (cat: string) => (cat === "death" || cat === "black" ? "db" : cat);
+  const kandydaci =
+    user && best ? best.entries.filter((e) => e.rank === 1 && e.mbid && !znane.has(e.mbid)) : [];
+  /**
+   * Najpierw z gatunków, które człowiek ma w profilu. Bez tego karta pokazywała
+   * po prostu #1 rankingu roku — a #1 rankingu roku bywa indie folkiem u kogoś,
+   * kto słucha death metalu. Gdy w jego gatunkach nie ma już nic nietkniętego,
+   * wracamy do całej puli: lepiej podsunąć coś z boku niż nie pokazać nic.
+   */
+  const swoje = prefSections
+    ? kandydaci.filter((e) => prefSections.has(bestCatToSection(e.category)))
+    : [];
+  const pula = swoje.length ? swoje : kandydaci;
+  const sprobuj = pula.length ? pula[new Date().getUTCDate() % pula.length] ?? null : null;
+  const sprobujWSwoim = swoje.length > 0;
 
   const stars = rel.filter((r) => r.star === 1 && (!prefSections || prefSections.has(r.genre)));
 
@@ -408,6 +421,16 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
               <Link href={`/go/best/${sprobuj.id}`} className="text-lg hover:text-accent2">
                 {sprobuj.artist} – <i>{sprobuj.album}</i>
               </Link>
+            </p>
+            {/* Dlaczego akurat to: skąd się wzięło w rankingu i czy trafia w
+                Twoje gatunki. Bez tej linijki karta wyglądała jak losowanie. */}
+            <p className="mt-1 text-xs text-muted">
+              {fmt(t.home.tryWhy, {
+                miejsce: genreLabel(sprobuj.category, t, BEST_CATS[sprobuj.category] ?? sprobuj.category),
+                rok: best?.year?.label ?? "",
+              })}
+              {" · "}
+              {sprobujWSwoim ? t.home.tryWhyYours : t.home.tryWhyOutside}
             </p>
             <p className="mt-3">
               <Link
