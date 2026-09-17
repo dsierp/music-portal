@@ -235,6 +235,13 @@ export interface Track {
   title: string;
   lengthMs: number | null;
   recordingMbid: string;
+  /**
+   * Teledysk, gdy MusicBrainz go zna — przy nagraniu wisi wtedy odnośnik do
+   * YouTube'a. Bierzemy go z tego samego zapytania, które i tak robimy po
+   * ścieżki, więc nic nie kosztuje. Bez tego zostaje wyszukiwarka, a ta czasem
+   * podaje cover z garażu zamiast oficjalnego klipu.
+   */
+  youtube?: string | null;
 }
 export interface Credit {
   mbid: string;
@@ -732,7 +739,10 @@ export async function getAlbum(mbid: string): Promise<Album> {
   for (const m of rel?.media ?? []) {
     for (const t of m.tracks) {
       const key = `${m.position}-${t.position}`;
-      tracks.push({ disc: m.position, position: t.position, number: t.number, title: t.title, lengthMs: t.length ?? t.recording.length ?? null, recordingMbid: t.recording.id });
+      const klip = (t.recording.relations ?? [])
+        .map((r) => r.url?.resource)
+        .find((u) => u && /(?:youtube\.com|youtu\.be)/i.test(u));
+      tracks.push({ disc: m.position, position: t.position, number: t.number, title: t.title, lengthMs: t.length ?? t.recording.length ?? null, recordingMbid: t.recording.id, youtube: klip ?? null });
       for (const r of t.recording.relations ?? []) addCredit(r, key);
     }
   }

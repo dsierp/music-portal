@@ -87,6 +87,8 @@ const pl = {
 
   // --- Filmiki z YouTube (youtube.tsx) ---
   ytHeading: "Filmiki (YouTube)",
+  videosTitle: "Teledyski",
+  videosSearch: "szukanie w YouTube — MusicBrainz nie zna odnośnika do tego klipu",
   ytMore: "więcej wyników na YouTube ↗",
 
   // --- Odnośnik do artykułu Wikipedii (artist/album page) ---
@@ -168,6 +170,8 @@ const en: T = {
   partFailSearch: "Couldn't load results from MusicBrainz.",
 
   ytHeading: "Videos (YouTube)",
+  videosTitle: "Music videos",
+  videosSearch: "YouTube search — MusicBrainz has no direct link for this clip",
   ytMore: "more results on YouTube ↗",
 
   wikipediaLink: "Wikipedia ({lang}) →",
@@ -247,6 +251,8 @@ const es: T = {
   partFailSearch: "No se pudieron cargar los resultados de MusicBrainz.",
 
   ytHeading: "Vídeos (YouTube)",
+  videosTitle: "Videoclips",
+  videosSearch: "búsqueda en YouTube — MusicBrainz no tiene enlace directo a este clip",
   ytMore: "más resultados en YouTube ↗",
 
   wikipediaLink: "Wikipedia ({lang}) →",
@@ -326,6 +332,8 @@ const de: T = {
   partFailSearch: "Die Ergebnisse von MusicBrainz ließen sich nicht laden.",
 
   ytHeading: "Videos (YouTube)",
+  videosTitle: "Musikvideos",
+  videosSearch: "YouTube-Suche — MusicBrainz kennt keinen direkten Link zu diesem Clip",
   ytMore: "weitere Ergebnisse auf YouTube ↗",
 
   wikipediaLink: "Wikipedia ({lang}) →",

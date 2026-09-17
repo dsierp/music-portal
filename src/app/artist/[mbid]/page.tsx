@@ -18,6 +18,7 @@ import { RatingBadge, RatingPanel } from "@/components/rating";
 import { Comments } from "@/components/comments";
 import { AlbumCard } from "@/components/cards";
 import { YoutubeVideos } from "@/components/youtube";
+import { Teledyski } from "@/components/teledyski";
 import { relatedBands } from "@/lib/related";
 import { INSTRUMENT_GROUPS, groupsOf } from "@/lib/instruments";
 import { concertsForArtist } from "@/lib/concerts";
@@ -835,6 +836,11 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
         <RelatedSection artist={artist} t={t} />
       </Suspense>
 
+      {/* Teledyski zespołu — osobnym strumieniem, jedno pytanie do MusicBrainz. */}
+      <Suspense fallback={null}>
+        <TeledyskiArtysty mbid={mbid} nazwa={artist.name} t={t} />
+      </Suspense>
+
       <YoutubeVideos query={artist.isPerson ? artist.name : `${artist.name} band`} />
     </>
   );
@@ -1071,4 +1077,12 @@ function ConcertsSection(p: { mbid: string; name: string; locale: Locale; t: Dic
 }
 function ArtistDeepContent(p: { artist: Artist; mbid: string; locale: Locale; t: Dict; stron: number }) {
   return osłona("Dyskografia i skład", () => ArtistDeepContentWewn(p), p.t);
+}
+
+/** Teledyski artysty — nagrania oznaczone w MusicBrainz jako wideo. */
+async function TeledyskiArtysty({ mbid, nazwa, t }: { mbid: string; nazwa: string; t: Dict }) {
+  const { teledyskiArtysty } = await import("@/lib/teledyski");
+  const items = await teledyskiArtysty(mbid).catch(() => []);
+  if (!items.length) return null;
+  return <Teledyski items={items} artysta={nazwa} t={{ title: t.common.videosTitle, search: t.common.videosSearch }} />;
 }

@@ -21,6 +21,9 @@ import { Comments } from "@/components/comments";
 import { AlbumCard, CreditLinks, typeLabel } from "@/components/cards";
 import { Cover } from "@/components/cover";
 import { YoutubeVideos } from "@/components/youtube";
+import { Teledyski } from "@/components/teledyski";
+import { Suspense } from "react";
+import type { Dict } from "@/lib/dict";
 import { i18n } from "@/lib/t";
 import { fmt, formatDate, formatNumber, plural, wikiLangs } from "@/lib/i18n";
 
@@ -390,6 +393,12 @@ export default async function AlbumPage({
           </section>
         )}
 
+        {/* Teledyski z tej płyty. Osobnym strumieniem, bo to jedno dodatkowe
+            pytanie do MusicBrainz, a strona ma się pokazać bez czekania. */}
+        <Suspense fallback={null}>
+          <TeledyskiPlyty rgMbid={mbid} artysta={album.artistText} tracks={album.tracks} t={t} />
+        </Suspense>
+
         <YoutubeVideos query={`${album.artistText} ${album.title}`} />
 
         {others.length > 0 && mainArtist && (
@@ -415,4 +424,39 @@ export default async function AlbumPage({
     </div>
     </>
   );
+}
+
+/**
+ * Teledyski przypisane do tej płyty.
+ *
+ * Dwa źródła zlewamy w jedno: odnośniki wiszące przy ścieżkach (przychodzą
+ * z tym samym zapytaniem, co lista utworów — za darmo) i nagrania oznaczone
+ * w MusicBrainz jako wideo. Klucz to tytuł, bo to ten sam kawałek widziany
+ * z dwóch stron.
+ */
+async function TeledyskiPlyty({
+  rgMbid,
+  artysta,
+  tracks,
+  t,
+}: {
+  rgMbid: string;
+  artysta: string;
+  tracks: { title: string; recordingMbid: string; youtube?: string | null }[];
+  t: Dict;
+}) {
+  const { teledyskiPlyty } = await import("@/lib/teledyski");
+  const zMb = await teledyskiPlyty(rgMbid).catch(() => []);
+  const wg = new Map<string, { mbid: string; title: string; rok: string | null; url: string | null }>();
+  for (const v of zMb) wg.set(v.title.toLowerCase(), v);
+  for (const tr of tracks) {
+    if (!tr.youtube) continue;
+    const k = tr.title.toLowerCase();
+    const jest = wg.get(k);
+    if (jest) wg.set(k, { ...jest, url: jest.url ?? tr.youtube });
+    else wg.set(k, { mbid: tr.recordingMbid, title: tr.title, rok: null, url: tr.youtube });
+  }
+  const items = [...wg.values()];
+  if (!items.length) return null;
+  return <Teledyski items={items} artysta={artysta} t={{ title: t.common.videosTitle, search: t.common.videosSearch }} />;
 }
