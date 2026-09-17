@@ -129,3 +129,11 @@ a:hover { color: var(--accent2); }
 .lineup[data-filter="drums"] .lineup-group:not(:has(li[data-i~="drums"])),
 .lineup[data-filter="keys"] .lineup-group:not(:has(li[data-i~="keys"])),
 .lineup[data-filter="other"] .lineup-group:not(:has(li[data-i~="other"])) { display: none; }
+
+/* Półka z okładkami — pasek przewijania tylko przy najechaniu, jak w serwisach
+   muzycznych. Sam pasek zostaje dostępny dla klawiatury i czytników. */
+.polka { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+.polka:hover { scrollbar-color: var(--color-rule) transparent; }
+.polka::-webkit-scrollbar { height: 6px; }
+.polka::-webkit-scrollbar-thumb { background: transparent; border-radius: 3px; }
+.polka:hover::-webkit-scrollbar-thumb { background: var(--color-rule); }

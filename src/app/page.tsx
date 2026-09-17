@@ -170,7 +170,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
       // strony głównej — najwyżej nie będzie tej jednej karty.
       travelJournal(user.id, 12).catch(() => []),
     ]);
-    kolejka = await kolejkaDoPosluchania(user.id, 3).catch(() => null);
+    kolejka = await kolejkaDoPosluchania(user.id, 12).catch(() => null);
     ostatnio = await ostatnieKafelki(user.id, 10).catch(() => []);
   }
   /**
@@ -342,14 +342,14 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
             </div>
             <Kafelki
               items={[
-                ...liked.slice(0, 6).map((a) => ({
+                ...liked.slice(0, 10).map((a) => ({
                   key: `l-${a.mbid}`,
                   href: `/album/${a.mbid}`,
                   mbid: a.mbid,
                   title: a.title,
                   subtitle: a.artistName,
                 })),
-                ...favs.slice(0, 6).map((a) => ({
+                ...favs.slice(0, 10).map((a) => ({
                   key: `f-${a.mbid}`,
                   href: `/artist/${a.mbid}`,
                   title: a.name,
