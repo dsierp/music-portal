@@ -201,6 +201,15 @@ export default async function RozmowaPage({ params }: { params: Promise<{ id: st
                   <span className="mt-0.5 shrink-0 text-lg leading-none text-warn" aria-hidden>!</span>
                   <div className="min-w-0">
                     <p className="font-medium text-warn">{bledy[r.blad ?? "nieznany"] ?? bledy.nieznany}</p>
+                    {/* Co POWIEDZIAŁ dostawca modelu. „Nie udało się nic
+                        wyszukać" nie mówi nic: to samo zdanie pada przy złym
+                        kluczu, nieistniejącej nazwie modelu i przy chwilowej
+                        awarii — a to trzy różne rzeczy do zrobienia. Rozmowa
+                        jest prywatna (widzi ją tylko właściciel), więc surowy
+                        komunikat od dostawcy może tu stać. */}
+                    {r.szczegol && (
+                      <p className="mt-1 break-words font-mono text-[11px] text-faint">{r.szczegol.slice(0, 300)}</p>
+                    )}
                     
                   </div>
                 </div>
