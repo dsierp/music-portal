@@ -165,7 +165,16 @@ export async function spotifyBlocked(userId: string): Promise<boolean> {
   return cacheHasNote(kluczBlokady(userId));
 }
 
-async function api<T>(userId: string, sciezka: string, init?: RequestInit): Promise<T | null> {
+/**
+ * `bezBlokady` — odmowa dotyczy TEJ funkcji, nie całego konta.
+ *
+ * Boleśnie ważne przy historii odsłuchań: kto podłączył Spotify przed
+ * dołożeniem zakresu `user-read-recently-played`, dostaje na nią 403. Gdyby
+ * liczyło się to jak odmowa dla konta, portal schowałby mu WSZYSTKO
+ * spotifajowe — łącznie z „słuchasz teraz", które działa bez zarzutu — i to
+ * na godzinę. Jedna nowa funkcja nie ma prawa wyłączyć działających.
+ */
+async function api<T>(userId: string, sciezka: string, init?: RequestInit & { bezBlokady?: boolean }): Promise<T | null> {
   const token = await tokenDla(userId);
   if (!token) return null;
   if (wPauzie()) return null;
@@ -183,7 +192,7 @@ async function api<T>(userId: string, sciezka: string, init?: RequestInit): Prom
     return null;
   }
   if (res.status === 403 || res.status === 401) {
-    await cacheNote(kluczBlokady(userId), BLOKADA_TTL);
+    if (!init?.bezBlokady) await cacheNote(kluczBlokady(userId), BLOKADA_TTL);
     return null;
   }
   if (res.status === 204 || res.status === 202) return null; // „nic teraz nie gra"
@@ -239,6 +248,8 @@ export async function recentlyPlayed(userId: string): Promise<{ artist: string; 
   const dane = await api<{ items?: { track?: SpTrack; played_at?: string }[] }>(
     userId,
     "/me/player/recently-played?limit=50",
+    // Stary zakres uprawnień to nie jest odmowa dla konta — patrz `api`.
+    { bezBlokady: true },
   ).catch(() => null);
   return (dane?.items ?? [])
     .filter((i) => i.track?.name)
