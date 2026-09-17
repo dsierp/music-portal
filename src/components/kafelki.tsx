@@ -49,10 +49,13 @@ export function Kafelki({ items }: { items: Kafelek[] }) {
             ) : k.mbid ? (
               <Cover mbid={k.mbid} size={150} />
             ) : (
-              <div
-                className="h-[150px] w-[150px] rounded bg-cover bg-center"
-                style={{ backgroundImage: "linear-gradient(rgba(0,0,0,.65),rgba(0,0,0,.65)), url(/img/winyl.jpg)" }}
-              />
+              // Brak okładki: znak portalu na płaskim tle. Zdjęcie winyla
+              // powtórzone w pięciu kafelkach z rzędu wyglądało jak treść,
+              // a jest tylko zapchajdziurą.
+              <div className="flex h-[150px] w-[150px] items-center justify-center rounded bg-surface2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/img/pns/logo.webp" alt="" className="w-1/2 opacity-20" />
+              </div>
             )}
             <div className="mt-2 truncate text-sm group-hover:text-accent2" title={k.title}>{k.title}</div>
             {k.subtitle && <div className="truncate text-xs text-muted" title={k.subtitle}>{k.subtitle}</div>}

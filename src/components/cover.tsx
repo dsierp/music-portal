@@ -14,13 +14,17 @@ export function Cover({ mbid, size = 64, className = "", noCoverLabel = "brak ok
   return (
     <div className={`shrink-0 overflow-hidden rounded bg-surface2 ${className}`} style={{ width: size, height: size }}>
       {failed ? (
-        // Zamiast pustego prostokąta — przygaszone zdjęcie winyla, żeby lista płyt
-        // bez okładek nie wyglądała na zepsutą.
+        // Znak portalu zamiast zdjęcia. Fotografia winyla wyglądała dobrze
+        // pojedynczo, ale przy pięciu płytach bez okładki obok siebie robiła
+        // się ściana tego samego obrazka — oko czytało ją jako treść, choć
+        // treścią był tylko jej brak. Płaskie tło ze znakiem jest cicho
+        // i od razu widać, że tu okładki po prostu nie ma.
         <div
-          className="flex h-full w-full items-center justify-center bg-cover bg-center font-mono text-[10px] text-faint"
-          style={{ backgroundImage: "linear-gradient(rgba(0,0,0,.65),rgba(0,0,0,.65)), url(/img/winyl.jpg)" }}
+          className="flex h-full w-full items-center justify-center bg-surface2"
+          title={noCoverLabel}
         >
-          {noCoverLabel}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/img/pns/logo.webp" alt={noCoverLabel} className="w-1/2 opacity-20" />
         </div>
       ) : (
         <img
