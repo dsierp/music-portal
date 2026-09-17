@@ -171,7 +171,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
       travelJournal(user.id, 12).catch(() => []),
     ]);
     kolejka = await kolejkaDoPosluchania(user.id, 12).catch(() => null);
-    ostatnio = await ostatnieKafelki(user.id, 10).catch(() => []);
+    // Suma obu źródeł: to, co właśnie leci, i to, co puszczone z portalu —
+    // przy kafelku widać, skąd jest. Rozdzielone są na /grane.
+    ostatnio = await ostatnieKafelki(user.id, 12).catch(() => []);
   }
   /**
    * Jedna zaczepka: coś z best of, czego jeszcze nie tykałeś.
@@ -286,6 +288,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
                 mbid: o.mbid,
                 title: o.album,
                 subtitle: o.artist,
+                meta: o.zPortalu ? t.lists.playedFrom : null,
               }))}
             />
           </section>

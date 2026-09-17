@@ -66,12 +66,25 @@ export async function zapiszOdsluch(userId: string, o: Odsluch): Promise<void> {
   }
 }
 
-/** Ostatnie odsłuchania, od najnowszego. */
-export async function ostatnieOdsluchy(userId: string, limit = 100) {
+/**
+ * Dwa różne dzienniki, nie jeden.
+ *
+ * „Co grałem" znaczy: co PUŚCIŁEM STĄD — wyszedłem z portalu w Spotify albo
+ * w Tidala, bo coś tu zobaczyłem. To jest ślad po tym miejscu i to jest
+ * historia portalu. To, co akurat leciało w Spotify w tle, jest czymś innym:
+ * ciekawym, ale cudzym — portal tego nie wywołał. Mieszanie obu dawało listę,
+ * w której nie wiadomo, co się z czego wzięło.
+ */
+export type Zrodlo = "klik" | "spotify";
+const zZrodla = (userId: string, zrodlo?: Zrodlo) =>
+  zrodlo ? and(eq(schema.plays.userId, userId), eq(schema.plays.source, zrodlo)) : eq(schema.plays.userId, userId);
+
+/** Ostatnie odsłuchania, od najnowszego. Bez `zrodlo` — wszystko razem. */
+export async function ostatnieOdsluchy(userId: string, limit = 100, zrodlo?: Zrodlo) {
   return db
     .select()
     .from(schema.plays)
-    .where(eq(schema.plays.userId, userId))
+    .where(zZrodla(userId, zrodlo))
     .orderBy(desc(schema.plays.playedAt))
     .limit(limit);
 }
@@ -119,8 +132,14 @@ export async function ostatniePlyty(userId: string, dni = 30, ile = 20) {
  * Ludzie rozpoznają płyty po okładkach; lista napisów na stronie głównej
  * byłaby spisem, a nie zajawką. Grupujemy po płycie, bo trzy kawałki z tego
  * samego albumu to jedno wspomnienie, nie trzy.
+ *
+ * Na stronie głównej idzie SUMA obu źródeł: to, co właśnie leci, jest z natury
+ * pierwsze (najświeższy zapis), a zaraz za nim to, co puszczone stąd. Rozdział
+ * na dwa dzienniki ma sens na `/grane`, gdzie się w to patrzy; na półce liczy
+ * się jedno pytanie — „co ostatnio" — a nie którędy to poszło. Skąd co jest,
+ * mówi podpis przy kafelku.
  */
-export async function ostatnieKafelki(userId: string, ile = 6) {
+export async function ostatnieKafelki(userId: string, ile = 6, zrodlo?: Zrodlo) {
   const rows = await db
     .select({
       artist: schema.plays.artist,
@@ -128,9 +147,10 @@ export async function ostatnieKafelki(userId: string, ile = 6) {
       mbid: sql<string | null>`max(${schema.plays.mbid})`,
       cover: sql<string | null>`max(${schema.plays.cover})`,
       kiedy: sql<Date>`max(${schema.plays.playedAt})`,
+      zPortalu: sql<boolean>`bool_or(${schema.plays.source} = 'klik')`,
     })
     .from(schema.plays)
-    .where(eq(schema.plays.userId, userId))
+    .where(zZrodla(userId, zrodlo))
     .groupBy(schema.plays.artist, schema.plays.album)
     .orderBy(desc(sql`max(${schema.plays.playedAt})`))
     .limit(ile);
