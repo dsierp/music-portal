@@ -93,7 +93,7 @@ function ConcertList({
               {c.lineup!.map((nazwa) => (
                 <Link
                   key={nazwa}
-                  href={`/go/mb?typ=artist&nazwa=${encodeURIComponent(nazwa)}`}
+                  href={c.lineupIds?.[nazwa] ? `/artist/${c.lineupIds[nazwa]}` : `/go/mb?typ=artist&nazwa=${encodeURIComponent(nazwa)}`}
                   className="text-muted underline decoration-dotted hover:text-accent2"
                 >
                   {nazwa}

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { findAlbumMbid, searchArtists } from "@/lib/musicbrainz";
+import { findAlbumMbid, searchArtists, tenSamArtysta } from "@/lib/musicbrainz";
 
 /**
  * Trafienie z szybkiego źródła → strona w portalu.
@@ -28,8 +28,17 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const znalezieni = await searchArtists(nazwa, 1).catch(() => []);
+  // Nie bierzemy pierwszego z brzegu.
+  //
+  // MusicBrainz zawsze coś odda: przy nazwie z afisza koncertowego („Tech It
+  // Easy", „Innern") pierwszym trafieniem bywa zupełnie inny wykonawca, a
+  // człowiek ląduje na stronie kogoś, kogo nie szukał — gorzej niż gdyby nie
+  // trafił wcale, bo nie wie, że to pomyłka. Więc sprawdzamy NAZWĘ: bierzemy
+  // pierwszego, który naprawdę tak się nazywa, a gdy żaden — wyniki szukania,
+  // gdzie widać wszystkich kandydatów i decyduje człowiek.
+  const znalezieni = await searchArtists(nazwa, 8).catch(() => []);
+  const pasuje = znalezieni.find((a) => tenSamArtysta(a.name, nazwa));
   return NextResponse.redirect(
-    znalezieni[0] ? new URL(`/artist/${znalezieni[0].mbid}`, req.nextUrl) : naSzukanie,
+    pasuje ? new URL(`/artist/${pasuje.mbid}`, req.nextUrl) : naSzukanie,
   );
 }

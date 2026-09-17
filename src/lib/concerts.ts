@@ -48,6 +48,12 @@ export interface Concert {
    * w portalu.
    */
   lineup?: string[];
+  /**
+   * MBID wykonawców, gdy źródło je zna (MusicBrainz zna — relacja wskazuje
+   * konkretnego artystę). Wtedy odnośnik prowadzi prosto na jego stronę,
+   * zamiast szukać go po nazwie i ryzykować, że trafi się imiennik.
+   */
+  lineupIds?: Record<string, string>;
   genres: string[];
 }
 
@@ -339,6 +345,13 @@ function mbToConcert(e: MbEvent, artist?: { mbid: string; name: string }): Conce
     artistName: artist?.name,
     artistMbid: artist?.mbid,
     lineup: grajacy.length ? grajacy : undefined,
+    lineupIds: grajacy.length
+      ? Object.fromEntries(
+          (e.relations ?? [])
+            .filter((r) => r.artist?.name && r.artist?.id)
+            .map((r) => [r.artist!.name!.trim(), r.artist!.id!]),
+        )
+      : undefined,
     genres: [],
   };
 }
