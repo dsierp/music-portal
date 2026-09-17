@@ -384,28 +384,39 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
         </section>
 
         {/* Ulubione zaraz po premierach: to jest półka, do której się wraca. */}
-        {user && (liked.length > 0 || favs.length > 0) && (
+        {/* Płyty i zespoły OSOBNO. W jednej półce mieszały się dwie różne
+            rzeczy: kafelek z okładką i kafelek bez okładki, podpisany gwiazdką.
+            Oko czytało to jako jedną listę z dziurami, a to są dwie listy. */}
+        {user && liked.length > 0 && (
           <section>
             <div className="flex items-baseline justify-between">
-              <h2 className="text-3xl">{t.home.favouritesTitle}</h2>
+              <h2 className="text-3xl">{t.home.favouriteAlbums}</h2>
               <Link href="/ja" className="text-sm text-muted hover:text-accent2">{t.common.showAll} →</Link>
             </div>
             <Kafelki
-              items={[
-                ...liked.slice(0, 10).map((a) => ({
-                  key: `l-${a.mbid}`,
-                  href: `/album/${a.mbid}`,
-                  mbid: a.mbid,
-                  title: a.title,
-                  subtitle: a.artistName,
-                })),
-                ...favs.slice(0, 10).map((a) => ({
-                  key: `f-${a.mbid}`,
-                  href: `/artist/${a.mbid}`,
-                  title: a.name,
-                  subtitle: "★",
-                })),
-              ]}
+              items={liked.slice(0, 12).map((a) => ({
+                key: `l-${a.mbid}`,
+                href: `/album/${a.mbid}`,
+                mbid: a.mbid,
+                title: a.title,
+                subtitle: a.artistName,
+              }))}
+            />
+          </section>
+        )}
+        {user && favs.length > 0 && (
+          <section>
+            <div className="flex items-baseline justify-between">
+              <h2 className="text-3xl">{t.home.favouriteArtists}</h2>
+              <Link href="/ja" className="text-sm text-muted hover:text-accent2">{t.common.showAll} →</Link>
+            </div>
+            <Kafelki
+              items={favs.slice(0, 12).map((a) => ({
+                key: `f-${a.mbid}`,
+                href: `/artist/${a.mbid}`,
+                title: a.name,
+                subtitle: null,
+              }))}
             />
           </section>
         )}
