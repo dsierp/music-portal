@@ -496,6 +496,41 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
     artist.isPerson && disco.length + played.length + produced.length + artist.sessionOn.length < 8;
   const wikiDisco = chudaStrona ? await wikiDiscography(artist.links).catch(() => null) : null;
   const playedByBand = artist.isPerson ? groupByBand(played) : undefined;
+  /**
+   * Ostatnia furtka pod oś kariery: zespoły wyczytane z płyt, na których grał.
+   *
+   * Przy sesyjnym perkusiście MusicBrainz często nie ma ŻADNEJ relacji
+   * członkostwa — ma za to kredyt przy płycie („Diablo Swing Orchestra —
+   * Pacifisticuffs, drums, 2017"). To jest ta sama informacja, tylko zapisana
+   * z drugiej strony: skoro nagrał ich płytę, to u nich grał. Daty bierze
+   * z płyt sama oś (pasek wychodzi wtedy przerywany, jako wywnioskowany),
+   * więc nie udajemy, że wiemy więcej niż wiemy.
+   */
+  const zespolyZPlyt: Membership[] = [];
+  const plytyZespolowZPlyt = new Map<string, typeof albums>();
+  if (artist.isPerson && !artist.memberOf.length) {
+    const wg = new Map<string, { name: string; albums: typeof albums; roles: Set<string> }>();
+    for (const p of played) {
+      const zespol = p.album.credit[0];
+      if (!zespol?.mbid || zespol.mbid === mbid) continue;
+      const e = wg.get(zespol.mbid) ?? { name: zespol.name, albums: [], roles: new Set<string>() };
+      e.albums.push(p.album);
+      p.roles.forEach((r) => e.roles.add(r));
+      wg.set(zespol.mbid, e);
+    }
+    for (const [id, e] of wg) {
+      zespolyZPlyt.push({
+        mbid: id,
+        name: e.name,
+        type: null,
+        roles: [...e.roles].slice(0, 6),
+        begin: null,
+        end: null,
+        current: false,
+      });
+      plytyZespolowZPlyt.set(id, e.albums);
+    }
+  }
   // Płyty pod oś czasu muzyka. NIE z „Grał(a) na płytach": to relacje przy
   // nagraniach, a MusicBrainz ma je tylko dla części zespołów (dla Atheist —
   // wcale). Bierzemy więc dyskografie samych zespołów, dokładnie tak jak
@@ -811,7 +846,15 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
         <>
           {/* Odwrotność osi zespołu: po lewej zespoły, na paskach płyty nagrane
               w danym okresie. Sidemani też — u nich to często najważniejsze granie. */}
-          <CareerTimeline name={artist.name} mbid={mbid} bands={artist.memberOf} albumsByBand={bandAlbums} own={albums} locale={locale} t={t.artist.timeline} />
+          <CareerTimeline
+            name={artist.name}
+            mbid={mbid}
+            bands={artist.memberOf.length ? artist.memberOf : zespolyZPlyt}
+            albumsByBand={artist.memberOf.length ? bandAlbums : plytyZespolowZPlyt}
+            own={albums}
+            locale={locale}
+            t={t.artist.timeline}
+          />
           {/* Solista to też zespół: Ozzy Osbourne wydaje pod własnym nazwiskiem,
               ale te płyty ktoś z nim nagrał i te składy się zmieniały. Skoro
               MusicBrainz wie kto i kiedy, rysujemy mu zwykłą oś składu — obok
