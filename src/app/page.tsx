@@ -95,7 +95,7 @@ async function KoncertyZajawka({ userId, t, locale }: { userId: string; t: Dict;
     getGenres(userId).catch(() => []),
   ]);
   if (!areas.length) return null;
-  const { concertsByArea, concertsByAreaMb, dedupe } = await import("@/lib/concerts");
+  const { concertsByArea, concertsByAreaMb, dedupe, zgadnijZespol } = await import("@/lib/concerts");
   const kategorie = genres.map((g) => g.genre);
   const [mb, tm] = await Promise.all([
     concertsByAreaMb(areas).catch(() => []),
@@ -116,6 +116,9 @@ async function KoncertyZajawka({ userId, t, locale }: { userId: string; t: Dict;
           // usłyszeć. Nazwy zespołów prowadzą na ich strony u nas, a stamtąd
           // w Spotify czy Tidala. Dokładnie to samo jest na /koncerty.
           const kto = (c.lineup?.length ? c.lineup : c.artistName ? [c.artistName] : []).slice(0, 4);
+          // Gdy źródło nie podało składu, zgadujemy zespół z tytułu i dajemy
+          // wyszukanie — lepsze to niż afisz, z którego nie da się nic kliknąć.
+          const zgadniety = kto.length ? null : zgadnijZespol(c.name);
           return (
             <li key={c.id}>
               <div className="flex flex-wrap items-baseline gap-x-2">
@@ -126,6 +129,14 @@ async function KoncertyZajawka({ userId, t, locale }: { userId: string; t: Dict;
                   <a href={c.url} target="_blank" rel="noopener" className="text-xs text-muted hover:text-accent2">→</a>
                 )}
               </div>
+              {kto.length === 0 && zgadniety && (
+                <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-xs">
+                  <span className="text-faint">{t.concerts.listenBefore}</span>
+                  <Link href={`/szukaj?q=${encodeURIComponent(zgadniety)}`} className="text-muted underline decoration-dotted hover:text-accent2">
+                    {zgadniety}
+                  </Link>
+                </div>
+              )}
               {kto.length > 0 && (
                 <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-xs">
                   <span className="text-faint">{t.concerts.listenBefore}</span>

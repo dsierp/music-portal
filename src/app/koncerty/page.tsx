@@ -6,7 +6,7 @@ import { AddToList } from "@/components/add-to-list";
 import { heroArt, leadStyle } from "@/lib/lead-style";
 import { currentUser } from "@/lib/auth";
 import { getAreas, getFavoriteArtists, getGenres, getUserLocale, getMyLists } from "@/lib/user-data";
-import { acceptedLabels, concertWindow, concertsByArea, concertsByAreaMb, concertsForFavorites, dedupe, hasTicketmasterKey, matchesGenres, offGenre, type Concert } from "@/lib/concerts";
+import { acceptedLabels, concertWindow, concertsByArea, concertsByAreaMb, concertsForFavorites, dedupe, hasTicketmasterKey, matchesGenres, offGenre, zgadnijZespol, type Concert } from "@/lib/concerts";
 import { dbSafe } from "@/lib/db-safe";
 import { i18n } from "@/lib/t";
 import { ScreenHelp } from "@/components/screen-help";
@@ -79,6 +79,14 @@ function ConcertList({
           {/* Kto gra — i od razu droga do posłuchania. Bilet kupuje się raz,
               a przed wyjściem chce się wiedzieć, na co się idzie: te odnośniki
               prowadzą na strony zespołów u nas (a stamtąd w Spotify/Tidala). */}
+          {(c.lineup?.length ?? 0) === 0 && !c.artistName && zgadnijZespol(c.name) && (
+            <div className="mt-1 flex flex-wrap items-baseline gap-x-2 text-xs">
+              <span className="text-faint">{t.concerts.listenBefore}</span>
+              <Link href={`/szukaj?q=${encodeURIComponent(zgadnijZespol(c.name)!)}`} className="text-muted underline decoration-dotted hover:text-accent2">
+                {zgadnijZespol(c.name)}
+              </Link>
+            </div>
+          )}
           {(c.lineup?.length ?? 0) > 0 && (
             <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs">
               <span className="text-faint">{t.concerts.listenBefore}</span>

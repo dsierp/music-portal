@@ -155,6 +155,27 @@ export function offGenre(c: Concert, wanted: string[]): boolean {
   return wanted.length > 0 && c.genres.length > 0 && !matchesGenres(c, wanted);
 }
 
+/**
+ * Zgadywany wykonawca z tytułu afisza — ostatnia deska ratunku.
+ *
+ * Gdy źródło nie poda składu (MusicBrainz często nie ma relacji z artystą,
+ * Ticketmaster czasem nie dołącza „attractions"), zostaje sam tytuł:
+ * „Innern - Tour 2026 - Kraków". Człowiek czyta z niego zespół w ćwierć
+ * sekundy, więc bierzemy pierwszy człon przed myślnikiem czy dwukropkiem
+ * i dajemy go jako WYSZUKANIE, nie jako pewny odnośnik — jeśli zgadliśmy
+ * źle, wynik wyszukiwarki to powie, a nie pusta strona zespołu.
+ */
+export function zgadnijZespol(nazwa: string): string | null {
+  const pierwszy = nazwa.split(/\s+[–—-]\s+|:|\s+\|\s+/)[0]?.trim() ?? "";
+  const czysty = pierwszy
+    .replace(/\s*\(.*?\)\s*/g, " ")
+    .replace(/\b(tour|trasa|koncert|live|festival|festiwal|show|20\d\d)\b/gi, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  if (czysty.length < 2 || czysty.length > 60) return null;
+  return czysty;
+}
+
 export const hasTicketmasterKey = () => Boolean((process.env.TICKETMASTER_API_KEY ?? "").trim());
 
 interface TmEvent {
@@ -278,7 +299,13 @@ interface MbEvent {
   "life-span"?: { begin?: string | null; end?: string | null };
   time?: string | null;
   cancelled?: boolean;
-  relations?: { type: string; place?: { name?: string; area?: { name?: string } }; url?: { resource: string } }[];
+  relations?: {
+    type: string;
+    place?: { name?: string; area?: { name?: string } };
+    url?: { resource: string };
+    /** Kto gra — MusicBrainz wiesza wykonawców przy wydarzeniu jako relacje. */
+    artist?: { id?: string; name?: string };
+  }[];
 }
 
 /**
@@ -288,6 +315,17 @@ interface MbEvent {
 function mbToConcert(e: MbEvent, artist?: { mbid: string; name: string }): Concert {
   const place = e.relations?.find((r) => r.place)?.place;
   const link = e.relations?.find((r) => r.url)?.url?.resource ?? null;
+  // Skład z MusicBrainz — to samo, co Ticketmaster daje w `attractions`.
+  // Bez tego koncerty z MB były ślepym zaułkiem: tytuł afisza („Innern —
+  // Tour 2026") nie mówi, czego się słucha, a kliknąć nie było w co.
+  const grajacy = [
+    ...new Set(
+      (e.relations ?? [])
+        .filter((r) => r.artist?.name && !/promoter|organi[sz]er|graphic|catering/i.test(r.type))
+        .map((r) => r.artist!.name!.trim())
+        .filter(Boolean),
+    ),
+  ].slice(0, 4);
   return {
     id: `mb:${e.id}`,
     name: e.name,
@@ -300,6 +338,7 @@ function mbToConcert(e: MbEvent, artist?: { mbid: string; name: string }): Conce
     source: "musicbrainz" as const,
     artistName: artist?.name,
     artistMbid: artist?.mbid,
+    lineup: grajacy.length ? grajacy : undefined,
     genres: [],
   };
 }
