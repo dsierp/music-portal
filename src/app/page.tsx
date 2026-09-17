@@ -405,20 +405,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
           </section>
         )}
         {user && favs.length > 0 && (
-          <section>
-            <div className="flex items-baseline justify-between">
-              <h2 className="text-3xl">{t.home.favouriteArtists}</h2>
-              <Link href="/ja" className="text-sm text-muted hover:text-accent2">{t.common.showAll} →</Link>
-            </div>
-            <Kafelki
-              items={favs.slice(0, 12).map((a) => ({
-                key: `f-${a.mbid}`,
-                href: `/artist/${a.mbid}`,
-                title: a.name,
-                subtitle: null,
-              }))}
-            />
-          </section>
+          <Suspense fallback={null}>
+            <UlubieniArtysci artysci={favs.slice(0, 12)} t={t} />
+          </Suspense>
         )}
 
         {/* „A może by tak spróbować" — jedna rzecz z best of, której jeszcze
@@ -560,5 +549,39 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
         </aside>
       </div>
     </div>
+  );
+}
+
+/**
+ * Półka ulubionych zespołów — ze zdjęciami albo logotypami.
+ *
+ * Kafelek artysty był pusty: płyta ma okładkę, a zespół u nas nie miał nic,
+ * więc dziesięć kafelków wyglądało jak dziesięć dziur ze znakiem portalu.
+ * Wikidane trzymają przy zespole plik na Commons — logo albo zdjęcie — i to
+ * wystarczy, żeby półkę dało się skanować wzrokiem tak samo jak płyty.
+ *
+ * Osobnym strumieniem, bo to dwa zapytania na zespół: strona ma się pokazać
+ * od razu, a obrazki dochodzą, gdy przyjdą. Zespoły bez wpisu w Wikidanych
+ * zostają ze znakiem portalu — to nadal lepsze niż brak kafelka.
+ */
+async function UlubieniArtysci({ artysci, t }: { artysci: { mbid: string; name: string }[]; t: Dict }) {
+  const { wdObrazArtysty } = await import("@/lib/wikidata");
+  const obrazy = await Promise.all(artysci.map((a) => wdObrazArtysty(a.mbid).catch(() => null)));
+  return (
+    <section>
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-3xl">{t.home.favouriteArtists}</h2>
+        <Link href="/ja" className="text-sm text-muted hover:text-accent2">{t.common.showAll} →</Link>
+      </div>
+      <Kafelki
+        items={artysci.map((a, i) => ({
+          key: `f-${a.mbid}`,
+          href: `/artist/${a.mbid}`,
+          cover: obrazy[i],
+          title: a.name,
+          subtitle: null,
+        }))}
+      />
+    </section>
   );
 }

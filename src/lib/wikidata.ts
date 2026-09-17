@@ -323,3 +323,34 @@ export function addMissing<T extends Datable>(
     .map(make);
   return [...items, ...nowe];
 }
+
+/**
+ * Zdjęcie albo logo zespołu z Wikidanych.
+ *
+ * DLACZEGO STĄD: kafelki artystów były puste — znak portalu w kółko, bo płyty
+ * mają okładki, a zespoły u nas nie miały nic. Wikidane trzymają przy encji
+ * plik na Commons: P18 to zdjęcie (skład, koncert, portret), P154 to logo
+ * (przy metalowych zespołach częściej niż zdjęcie — i to właśnie logo ludzie
+ * rozpoznają). Commons oddaje plik pod stałym adresem `Special:FilePath`,
+ * z przeskalowaniem po stronie serwera, więc nie trzymamy u siebie nic.
+ *
+ * Licencje są na Commons różne, ale to są pliki UDOSTĘPNIONE do ponownego
+ * użycia; pokazujemy je jako miniatury, tak jak robi to Wikipedia.
+ */
+export async function wdObrazArtysty(mbid: string, links?: Links, szerokosc = 300): Promise<string | null> {
+  return cached(`wd:obraz:v1:${mbid}:${szerokosc}`, TTL.wiki, async () => {
+    const qid = await resolveQid(links ?? ({} as Links), mbid).catch(() => null);
+    if (!qid) return null;
+    const data = await getJson<{ entities?: Record<string, WdEntity> }>(
+      `https://www.wikidata.org/wiki/Special:EntityData/${qid}.json`,
+    );
+    const claims = data?.entities?.[qid]?.claims ?? {};
+    // Logo przed zdjęciem: przy zespole to ono jest znakiem rozpoznawczym,
+    // a zdjęcie bywa przypadkową fotką z festiwalu sprzed dwunastu lat.
+    const plik = ["P154", "P18"]
+      .map((p) => claims[p]?.[0]?.mainsnak?.datavalue?.value)
+      .find((v): v is string => typeof v === "string" && !!v);
+    if (!plik) return null;
+    return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(plik)}?width=${szerokosc}`;
+  }).catch(() => null);
+}
