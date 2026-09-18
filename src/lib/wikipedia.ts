@@ -223,12 +223,41 @@ export async function wikiDiscography(
       const body = await getJson<{ parse?: { wikitext?: string } }>(
         `https://${lang}.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}&section=${section.index}&prop=wikitext&format=json&formatversion=2`,
       );
-      return (body?.parse?.wikitext ?? "")
-        .split("\n")
-        .filter((l) => /^\*/.test(l.trim()))
-        .map(parseDiscographyLine)
-        .filter((l): l is DiscoLine => !!l)
-        .slice(0, 80);
+      // ZESPÓŁ Z NAGŁÓWKA PODSEKCJI.
+      //
+      // Na stronie muzyka dyskografia jest pogrupowana: „=== with Mastodon ===",
+      // a pod spodem gołe tytuły płyt. Czytając same wiersze listy, gubiliśmy
+      // to, co w tej liście najważniejsze — u perkusisty sesyjnego „Leviathan"
+      // bez nazwy zespołu nic nie mówi, a i klikanie prowadziło wtedy w płytę
+      // szukaną pod nazwiskiem człowieka, nie zespołu. Nagłówek niesie tę
+      // informację, więc go trzymamy i podstawiamy wierszom, które same jej
+      // nie podają.
+      const czysc = (h: string) =>
+        cleanWikitext(h)
+          .replace(/^(with|w\/|z|wraz z|jako|as)\s+/i, "")
+          .replace(/\s*\(.*?\)\s*$/, "")
+          .trim();
+      const out: DiscoLine[] = [];
+      let zespol: string | null = null;
+      for (const surowa of (body?.parse?.wikitext ?? "").split("\n")) {
+        const l = surowa.trim();
+        const naglowek = l.match(/^(={2,6})\s*(.+?)\s*\1$/);
+        if (naglowek) {
+          const nazwa = czysc(naglowek[2]);
+          // Nagłówki w rodzaju „Dyskografia", „Albumy studyjne", „Solo" nie są
+          // nazwą zespołu — przy nich wracamy do braku przypisania.
+          zespol = /^(disco|dyskograf|albumy|studio|solo|single|ep|gościnn|guest|as a|inne|other)/i.test(nazwa) || nazwa.length > 60
+            ? null
+            : nazwa;
+          continue;
+        }
+        if (!/^\*/.test(l)) continue;
+        const wiersz = parseDiscographyLine(l);
+        if (!wiersz) continue;
+        out.push({ ...wiersz, band: wiersz.band ?? zespol });
+        if (out.length >= 80) break;
+      }
+      return out;
     }).catch(() => [] as DiscoLine[]);
     if (items.length) {
       return { lang, title, url: `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}`, items };
