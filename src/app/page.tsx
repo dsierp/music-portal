@@ -360,9 +360,14 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
           <Kafelki
             items={poJednym.map((r) => ({
               key: r.id,
-              href: r.mbid
-                ? `/album/${r.mbid}`
-                : `/go/mb?typ=album&nazwa=${encodeURIComponent(r.album ?? "")}&artysta=${encodeURIComponent(r.artist ?? "")}`,
+              // Zawsze przez `/go/release`, nawet gdy MBID jest zapisany.
+              //
+              // Zapisane dowiązanie bywa BŁĘDNE — pochodzi z dopasowania po
+              // nazwie i przy „Sure Grand Out" Myry Melford potrafiło wskazać
+              // cudzą płytę. Ta trasa sprawdza dowiązanie przed przekierowaniem
+              // i, gdy nie pasuje, szuka od nowa; kafelek z gołym `/album/…`
+              // szedł prosto w pomyłkę.
+              href: `/go/release/${encodeURIComponent(r.id)}`,
               mbid: r.mbid,
               title: r.album ?? "",
               subtitle: r.artist ?? "",
