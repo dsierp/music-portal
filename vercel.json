@@ -1,3 +1,13 @@
 {
-  "buildCommand": "npm run build && npx tsx scripts/post-deploy.ts"
+  "buildCommand": "npm run build && npx tsx scripts/post-deploy.ts",
+  "crons": [
+    {
+      "path": "/api/cron/premiery",
+      "schedule": "0 7 * * 5"
+    },
+    {
+      "path": "/api/cron/premiery",
+      "schedule": "0 7 * * 0"
+    }
+  ]
 }
