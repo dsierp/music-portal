@@ -575,14 +575,17 @@ export async function spotifyFindAlbum(
   // Koszt zapamiętywania jest niewspółmierny do zysku: adres ustalamy dopiero
   // przy KLIKNIĘCIU, więc jedna nieudana próba to jedno zapytanie, a nie
   // kilkadziesiąt przy rysowaniu strony.
-  // Trafienie trzymamy TRZY MIESIĄCE, nie tydzień.
+  // Trafienie trzymamy BEZ TERMINU.
   //
-  // Tydzień był liczbą z sufitu. Identyfikator płyty w Spotify jest stały —
-  // „Deadwing" Porcupine Tree ma ten sam adres od lat i nie ma powodu pytać
-  // o niego co siedem dni. Nie trzymamy tego bezterminowo tylko dlatego, że
-  // wydania czasem znikają z katalogu (licencje, reedycje) i wtedy odnośnik
-  // prowadziłby w martwą stronę aż do końca świata.
-  const znalezione = await cached(klucz, 60 * 60 * 24 * 90, async () => {
+  // Identyfikator płyty w Spotify jest stały: „Deadwing" ma ten sam adres od
+  // lat. Kolejne terminy ważności (tydzień, potem kwartał) były liczbami
+  // z sufitu — za każdym razem kupowały to samo, czyli ponowne zapytanie
+  // o coś, co się nie zmieniło. Owszem, wydania czasem znikają z katalogu
+  // (licencje, reedycje) — ale to rzadkie, kosztem jest jeden martwy odnośnik,
+  // a nie zepsuta funkcja, i mamy na to wytrych: `/api/diag/spotify?wyczysc=1`.
+  // Gdyby zaczęło się to zdarzać częściej, wtedy pomyślimy o odświeżaniu.
+  const NA_ZAWSZE = 60 * 60 * 24 * 3650;
+  const znalezione = await cached(klucz, NA_ZAWSZE, async () => {
     const proba = async (q: string) => {
       const dane = await katalog<{ albums?: { items?: SpAlbumRaw[] } }>(
         `/search?type=album&limit=5&q=${encodeURIComponent(q)}`,
