@@ -86,4 +86,25 @@ if (d.status !== 0) {
   console.warn("post-deploy: dowiązywanie MBID się nie udało — linki dowiążą się przy kliknięciu. Build leci dalej.");
 }
 
+/**
+ * Druga połowa premier: style spoza Pure New Shit, prosto z MusicBrainz.
+ *
+ * Publikacja była rozjechana na dwa mechanizmy — PNS jechał sam z każdym
+ * piątkowym buildem, a „Nowe wydania" czekały, aż ktoś odpali skrypt z maca.
+ * Skoro build i tak dzieje się w piątek i i tak pisze do bazy, robimy to
+ * w tym samym miejscu: jedno zdarzenie, jeden komplet premier.
+ *
+ * Build się przez to NIE wywala. Import PNS jest tym, co musi się udać;
+ * MusicBrainz bywa wolny albo nie ma jeszcze tagów dla świeżych wydań,
+ * a od tego jest jeszcze niedzielna powtórka (zadanie w tle w vercel.json),
+ * która tę samą sekcję nadpisuje pełniejszą listą.
+ */
+const m = spawnSync("npx", ["tsx", "scripts/fetch-releases.ts"], {
+  stdio: "inherit",
+  shell: process.platform === "win32",
+});
+if (m.status !== 0) {
+  console.warn("post-deploy: premiery z MusicBrainz się nie zaciągnęły — zostaje niedzielna powtórka. Build leci dalej.");
+}
+
 console.log("post-deploy: gotowe.");
