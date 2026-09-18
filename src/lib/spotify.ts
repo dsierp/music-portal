@@ -575,7 +575,14 @@ export async function spotifyFindAlbum(
   // Koszt zapamiętywania jest niewspółmierny do zysku: adres ustalamy dopiero
   // przy KLIKNIĘCIU, więc jedna nieudana próba to jedno zapytanie, a nie
   // kilkadziesiąt przy rysowaniu strony.
-  const znalezione = await cached(klucz, 60 * 60 * 24 * 7, async () => {
+  // Trafienie trzymamy TRZY MIESIĄCE, nie tydzień.
+  //
+  // Tydzień był liczbą z sufitu. Identyfikator płyty w Spotify jest stały —
+  // „Deadwing" Porcupine Tree ma ten sam adres od lat i nie ma powodu pytać
+  // o niego co siedem dni. Nie trzymamy tego bezterminowo tylko dlatego, że
+  // wydania czasem znikają z katalogu (licencje, reedycje) i wtedy odnośnik
+  // prowadziłby w martwą stronę aż do końca świata.
+  const znalezione = await cached(klucz, 60 * 60 * 24 * 90, async () => {
     const proba = async (q: string) => {
       const dane = await katalog<{ albums?: { items?: SpAlbumRaw[] } }>(
         `/search?type=album&limit=5&q=${encodeURIComponent(q)}`,
