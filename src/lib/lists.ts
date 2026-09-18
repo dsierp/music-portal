@@ -106,9 +106,14 @@ export async function latestSections(limit = 2) {
   const secs = await db.select().from(schema.releaseSections).orderBy(desc(schema.releaseSections.sortDate), asc(schema.releaseSections.kind));
   const terminy = [...new Set(secs.map((s) => s.sortDate.getTime()))].slice(0, limit);
   const wybrane = secs.filter((s) => terminy.includes(s.sortDate.getTime()));
-  // chronologicznie, a w obrębie jednego terminu: najpierw sekcja główna
+  // NAJNOWSZE NA GÓRZE, a w obrębie jednego terminu: najpierw sekcja główna.
+  //
+  // Było chronologicznie, od najstarszego — i to był błąd widoczny gołym okiem:
+  // nagłówek Premier bierze datę z pierwszej sekcji, więc w piątek 18.09 strona
+  // witała napisem „Piątek 11.09.2026", a świeże premiery leżały niżej. Kto
+  // wchodzi w piątek, przychodzi po TEN tydzień; zeszły jest tłem.
   return wybrane.sort(
-    (a, b) => a.sortDate.getTime() - b.sortDate.getTime() || Number(a.id.endsWith("-poza")) - Number(b.id.endsWith("-poza")),
+    (a, b) => b.sortDate.getTime() - a.sortDate.getTime() || Number(a.id.endsWith("-poza")) - Number(b.id.endsWith("-poza")),
   );
 }
 
