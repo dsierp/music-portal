@@ -23,10 +23,14 @@ export async function GET(req: NextRequest) {
   if (req.headers.get("authorization") !== `Bearer ${sekret}`) {
     return NextResponse.json({ blad: "Nie." }, { status: 401 });
   }
-  const { zaciagnijPremiery } = await import("@/lib/premiery-tygodnia");
+  const { zaciagnijPremiery, zaTydzien } = await import("@/lib/premiery-tygodnia");
   try {
-    const wynik = await zaciagnijPremiery();
-    return NextResponse.json({ ok: true, ...wynik });
+    // Ten tydzień i następny. Portal ma odpowiadać na dwa pytania naraz:
+    // „co wyszło dziś" i „co wychodzi w przyszły piątek" — MusicBrainz zna
+    // zapowiedzi, więc nie ma powodu czekać z nimi do premiery.
+    const teraz = await zaciagnijPremiery();
+    const nastepny = await zaciagnijPremiery(zaTydzien()).catch(() => null);
+    return NextResponse.json({ ok: true, ...teraz, nastepnyTydzien: nastepny });
   } catch (e) {
     return NextResponse.json({ ok: false, blad: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }

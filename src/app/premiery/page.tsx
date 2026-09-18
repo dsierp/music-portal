@@ -25,8 +25,14 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
   const { t } = await i18n();
   const user = await currentUser();
   const prefs = user ? await getGenres(user.id) : [];
-  const sections = sp.sekcja === "archiwum" ? await allSections() : await latestSections(2);
-  const rel = await releasesFor(sections.map((s) => s.id));
+  const wszystkieSekcje = sp.sekcja === "archiwum" ? await allSections() : await latestSections(2);
+  const rel = await releasesFor(wszystkieSekcje.map((s) => s.id));
+  // Sekcja bez ani jednej pozycji to nie jest informacja, tylko pusty afisz
+  // z napisem „0 tytułów" i „Nic nie pasuje do filtrów" pod spodem. Zdarza się,
+  // gdy MusicBrainz nie ma jeszcze otagowanych wydań danego tygodnia — wtedy
+  // po prostu jej nie pokazujemy, zamiast udawać, że coś się nie załadowało.
+  const zPozycjami = new Set(rel.map((r) => r.sectionId));
+  const sections = wszystkieSekcje.filter((s) => zPozycjami.has(s.id));
 
   const lead = leadStyle(prefs);
   // Kategorie: style użytkownika (nawet te bez premier w tym tygodniu — inaczej

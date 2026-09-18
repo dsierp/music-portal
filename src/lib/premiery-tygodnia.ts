@@ -20,6 +20,13 @@ export interface WynikPremier {
   wgStylu: { styl: string; ile: number }[];
 }
 
+/** Piątek za tydzień — do zaciągania zapowiedzi. */
+export function zaTydzien(od = new Date()): Date {
+  const d = new Date(od);
+  d.setDate(d.getDate() + 7);
+  return d;
+}
+
 export async function zaciagnijPremiery(kiedy?: Date): Promise<WynikPremier> {
   const { db, schema } = await import("@/db");
   const { eq } = await import("drizzle-orm");
@@ -47,7 +54,13 @@ export async function zaciagnijPremiery(kiedy?: Date): Promise<WynikPremier> {
       title: "Nowe wydania",
       date: `${d}.${m}.${y}`,
       sortDate: new Date(week.friday),
-      sub: "z MusicBrainz — style spoza zestawienia Pure New Shit",
+      // Tydzień, który dopiero nadejdzie, to ZAPOWIEDZI, nie premiery — i tak
+      // trzeba to nazwać, bo inaczej człowiek klika w płytę, której jeszcze
+      // nie ma w żadnym serwisie.
+      sub:
+        week.friday > new Date().toISOString().slice(0, 10)
+          ? `zapowiedzi na piątek ${week.friday.slice(8)}.${week.friday.slice(5, 7)} — z MusicBrainz`
+          : "z MusicBrainz — style spoza zestawienia Pure New Shit",
       pickId: null,
     })
     .onConflictDoUpdate({ target: schema.releaseSections.id, set: { importedAt: new Date() } });

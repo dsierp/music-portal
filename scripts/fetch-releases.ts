@@ -16,9 +16,14 @@
 import "dotenv/config";
 
 async function main() {
-  const { zaciagnijPremiery } = await import("../src/lib/premiery-tygodnia");
+  const { zaciagnijPremiery, zaTydzien } = await import("../src/lib/premiery-tygodnia");
   const arg = process.argv[2];
   const w = await zaciagnijPremiery(arg ? new Date(arg) : new Date());
+  // Bez argumentu bierzemy też następny tydzień — zapowiedzi.
+  if (!arg) {
+    const n = await zaciagnijPremiery(zaTydzien()).catch(() => null);
+    if (n?.ile) console.log(`Zapowiedzi na ${n.piatek}: ${n.ile} pozycji (sekcja ${n.sekcja}).`);
+  }
   if (!w.ile) {
     console.log(`Brak premier dla tych stylow w tygodniu ${w.piatek} — nic nie zapisuje.`);
     console.log("(tagi w MusicBrainz bywaja dodawane z opoznieniem; sprobuj za kilka dni)");
