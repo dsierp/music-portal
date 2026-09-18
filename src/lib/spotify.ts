@@ -566,6 +566,15 @@ export async function spotifyFindAlbum(
 ): Promise<{ id: string; url: string; title: string; artists: string } | null> {
   if (!spotifyConfigured() || !title) return null;
   const klucz = `spotify:album:v1:${artist.toLowerCase()}|${title.toLowerCase()}`;
+  // BRAKU NIE PAMIĘTAMY W OGÓLE — pamiętamy tylko trafienie.
+  //
+  // Premiery pokazujemy ZAPOWIEDZIAMI, więc pierwsze kliknięcie w płytę pada
+  // zwykle kilka dni PRZED wydaniem: wtedy w Spotify jej jeszcze nie ma. Gdy
+  // pustka lądowała w buforze, w dniu premiery odnośnik dalej prowadził do
+  // wyszukiwarki, choć płyta była już na miejscu (Anthrax, „Cursum Perficio").
+  // Koszt zapamiętywania jest niewspółmierny do zysku: adres ustalamy dopiero
+  // przy KLIKNIĘCIU, więc jedna nieudana próba to jedno zapytanie, a nie
+  // kilkadziesiąt przy rysowaniu strony.
   const znalezione = await cached(klucz, 60 * 60 * 24 * 7, async () => {
     const proba = async (q: string) => {
       const dane = await katalog<{ albums?: { items?: SpAlbumRaw[] } }>(
@@ -597,7 +606,7 @@ export async function spotifyFindAlbum(
   // pusty wynik zostaje w buforze — inaczej każde wejście na stronę pytałoby od
   // nowa, a kwota aplikacji w trybie deweloperskim jest mała i wspólna dla
   // wszystkich odwiedzających.
-  if (!znalezione && wPauzie()) await zapomnij(klucz);
+  if (!znalezione) await zapomnij(klucz).catch(() => {});
   return znalezione;
 }
 
