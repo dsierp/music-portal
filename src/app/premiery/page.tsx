@@ -36,14 +36,25 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
    * scalona ze wszystkich źródeł.
    */
   const wszystkieSekcje = await allSections();
-  const terminy = [...new Map(wszystkieSekcje.map((s) => [s.date, s.sortDate.getTime()])).entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([date]) => date);
-  const wybranaData = sp.piatek && terminy.includes(sp.piatek) ? sp.piatek : terminy[0];
-  const zTegoDnia = wszystkieSekcje.filter((s) => s.date === wybranaData);
+  // Terminem jest PIĄTEK, a nie napis z importu.
+  //
+  // Źródła podpisują się różnie: zestawienie datą tygodnia („12.09 – 18.09.2026"),
+  // MusicBrainz samym piątkiem. To ten sam termin, więc bierzemy go z `sortDate`
+  // i sami układamy napis — inaczej przełącznik miał dwa guziki na jeden tydzień.
+  const piatek = (d: Date) => d.toISOString().slice(0, 10);
+  const naPolski = (iso: string) => `${iso.slice(8)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
+  const terminy = [...new Set(wszystkieSekcje.map((s) => piatek(s.sortDate)))].sort().reverse();
+  // Domyślnie OSTATNI PIĄTEK, KTÓRY JUŻ BYŁ — nie ten, który dopiero będzie.
+  // Zapowiedzi na przyszły tydzień są w przełączniku obok; wchodząc na premiery
+  // człowiek pyta „co wyszło", a nie „co wyjdzie".
+  const dzis = new Date().toISOString().slice(0, 10);
+  const domyslny = terminy.find((d) => d <= dzis) ?? terminy[0];
+  const wybrany = sp.piatek && terminy.includes(sp.piatek) ? sp.piatek : domyslny;
+  const wybranaData = wybrany ? naPolski(wybrany) : undefined;
+  const zTegoDnia = wszystkieSekcje.filter((s) => piatek(s.sortDate) === wybrany);
   const rel = await releasesFor(zTegoDnia.map((s) => s.id));
   // Wszystkie pozycje dnia lądują w jednej, scalonej sekcji.
-  const SCALONA = `dzien:${wybranaData ?? "brak"}`;
+  const SCALONA = `dzien:${wybrany ?? "brak"}`;
   const glowna = zTegoDnia.find((s) => s.kind !== "mb") ?? zTegoDnia[0];
   const sections = glowna && rel.length ? [{ ...glowna, id: SCALONA }] : [];
 
@@ -95,8 +106,8 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
       moje.find((r) => r.star === 1);
     return {
       id: s.id,
-      title: t.releases.fridayPrefix,
-      date: s.date,
+      title: t.releases.fridayUpTo,
+      date: wybranaData ?? s.date,
       sub: null,
       pickId: pick?.id ?? null,
       pickNode: pick ? <PickCard r={pick} t={t} odKiedy={kiedy(pick)} /> : null,
@@ -113,7 +124,7 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
         title="Pure New Shit"
         meta={
           <>
-            {wybranaData && <span>{t.releases.fridayPrefix} {wybranaData}</span>}
+            {wybranaData && <span>{t.releases.fridayUpTo} {wybranaData}</span>}
             {lead && <span className="ml-4">{t.releases.leadGenre} <b className="text-accent2">{lead.genre}</b></span>}
             {!lead && <span className="ml-4"><Link href="/ja#style" className="underline">{t.releases.setStyles}</Link>{t.releases.setStylesRest}</span>}
           </>
@@ -123,11 +134,11 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
       {/* Przełącznik piątków — dokładnie jak roczniki w Best of. */}
       {terminy.length > 1 && (
         <div className="mt-6">
-          <div className="label mb-2">{t.releases.fridayPrefix}</div>
+          <div className="label mb-2">{t.releases.fridayUpTo}</div>
           <div className="flex flex-wrap gap-1.5">
             {terminy.slice(0, 12).map((d) => (
-              <Link key={d} href={`?piatek=${encodeURIComponent(d)}`} className={`chip ${d === wybranaData ? "chip-on" : ""}`}>
-                {d}
+              <Link key={d} href={`?piatek=${d}`} className={`chip ${d === wybrany ? "chip-on" : ""}`}>
+                {naPolski(d)}
               </Link>
             ))}
           </div>
