@@ -585,6 +585,66 @@ export async function podrozZPlaylisty(formData: FormData) {
   redirect(`/podroz/${lista.id}`);
 }
 
+/** Podłączenie i odłączenie Tidala — bliźniaki tego, co robi Spotify. */
+export async function connectTidal(callbackUrl = "/podroze/z-tidala") {
+  await signIn("tidal", { redirectTo: callbackUrl });
+}
+export async function disconnectTidal() {
+  const u = await requireUser();
+  const { tidalRozlacz } = await import("@/lib/tidal");
+  await tidalRozlacz(u.id);
+  revalidatePath("/ja");
+  revalidatePath("/podroze/z-tidala");
+}
+
+/**
+ * Playlista z Tidala → podróż. Ta sama zasada co przy Spotify: bierzemy PŁYTY,
+ * dowiązujemy je do MusicBrainz z zegarkiem w ręku, a czego nie zdążymy —
+ * mówimy wprost w opisie listy, zamiast po cichu uciąć.
+ */
+export async function podrozZPlaylistyTidal(formData: FormData) {
+  const u = await requireUser();
+  const id = String(formData.get("id") ?? "").trim();
+  const nazwa = String(formData.get("nazwa") ?? "").trim();
+  if (!id) redirect("/podroze/z-tidala");
+  const { albumyZTidala } = await import("@/lib/tidal");
+  const { findAlbumMbid } = await import("@/lib/musicbrainz");
+  const plyty = await albumyZTidala(u.id, id).catch(() => []);
+  if (!plyty.length) redirect("/podroze/z-tidala?pusto=1");
+
+  const koniec = Date.now() + 40_000;
+  const gotowe: { mbid: string; label: string; url: string | null }[] = [];
+  let pominiete = 0;
+  for (const p of plyty) {
+    if (Date.now() > koniec) {
+      pominiete += 1;
+      continue;
+    }
+    const mb = await findAlbumMbid(p.artist, p.album).catch(() => null);
+    if (!mb?.mbid) {
+      pominiete += 1;
+      continue;
+    }
+    gotowe.push({ mbid: mb.mbid, label: `${p.artist} – ${p.album}`.trim(), url: p.url ?? null });
+  }
+  if (!gotowe.length) redirect("/podroze/z-tidala?pusto=1");
+
+  const { i18n } = await import("@/lib/t");
+  const { fmt } = await import("@/lib/i18n");
+  const { t } = await i18n();
+  const opis = pominiete
+    ? `${t.lists.fromTidalIntro} ${fmt(t.lists.fromSpotifySkipped, { n: pominiete })}`
+    : t.lists.fromTidalIntro;
+  const lista = await ud.createList(u.id, nazwa || t.lists.fromTidalTitle, opis);
+  for (const g of gotowe) {
+    await ud
+      .addToList(u.id, lista.id, { targetType: "ALBUM", targetMbid: g.mbid, label: g.label, url: g.url })
+      .catch(() => {});
+  }
+  revalidatePath("/podroze");
+  redirect(`/podroz/${lista.id}`);
+}
+
 export async function podrozZRozmowy(formData: FormData) {
   const u = await requireUser();
   const id = String(formData.get("id") ?? "");

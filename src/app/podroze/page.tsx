@@ -160,6 +160,11 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
                 {t.lists.spotifyImport} →
               </Link>
             </p>
+            <p className="mt-1 text-sm">
+              <Link href="/podroze/z-tidala" className="text-muted hover:text-accent2">
+                {t.lists.tidalImport} →
+              </Link>
+            </p>
           </section>
 
           <section className="card">

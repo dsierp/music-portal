@@ -10,6 +10,7 @@ import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { SPOTIFY_SCOPES } from "@/lib/spotify";
+import { TIDAL_SCOPES } from "@/lib/tidal";
 
 /** Dostawca jest włączony tylko, gdy ma ustawione klucze w env. */
 function enabled(...keys: string[]) {
@@ -55,6 +56,55 @@ if (enabled("SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET")) {
       },
     }),
   );
+}
+
+/**
+ * Tidal — tak jak Spotify, dostawca logowania użyty do PODŁĄCZENIA konta.
+ *
+ * Nie ma gotowej wtyczki w Auth.js, więc opisujemy go ręcznie. Trzy rzeczy,
+ * które trzeba tu wiedzieć:
+ * - Tidal chodzi na OAuth 2.1, czyli PKCE jest OBOWIĄZKOWE (stąd `checks`);
+ * - adres logowania stoi na innym serwerze (`login.tidal.com`) niż wymiana
+ *   tokenu (`auth.tidal.com`) — to nie pomyłka;
+ * - dane o użytkowniku przychodzą w formacie JSON:API, więc identyfikator
+ *   siedzi w `data.id`, a nie w zwykłym polu `id`.
+ */
+if (enabled("TIDAL_CLIENT_ID", "TIDAL_CLIENT_SECRET")) {
+  providers.push({
+    id: "tidal",
+    name: "TIDAL",
+    type: "oauth",
+    clientId: process.env.TIDAL_CLIENT_ID,
+    clientSecret: process.env.TIDAL_CLIENT_SECRET,
+    allowDangerousEmailAccountLinking: true,
+    checks: ["pkce", "state"],
+    authorization: {
+      url: "https://login.tidal.com/authorize",
+      params: { scope: TIDAL_SCOPES },
+    },
+    token: "https://auth.tidal.com/v1/oauth2/token",
+    userinfo: {
+      url: "https://openapi.tidal.com/v2/users/me",
+      async request({ tokens }: { tokens: { access_token?: string } }) {
+        const res = await fetch("https://openapi.tidal.com/v2/users/me", {
+          headers: { Authorization: `Bearer ${tokens.access_token}`, Accept: "application/vnd.api+json" },
+        });
+        return (await res.json()) as unknown;
+      },
+    },
+    profile(p: { data?: { id?: string; attributes?: { username?: string; firstName?: string; email?: string } } }) {
+      const d = p?.data;
+      return {
+        id: d?.id ?? "tidal",
+        name: d?.attributes?.username ?? d?.attributes?.firstName ?? "TIDAL",
+        // E-mail bywa pusty (zakres `user.read` go nie gwarantuje). Puste pole
+        // jest tu lepsze niż zmyślone: konto w portalu i tak już istnieje,
+        // bo Tidala podpina się będąc zalogowanym.
+        email: d?.attributes?.email ?? null,
+        image: null,
+      };
+    },
+  } as Provider);
 }
 
 if (process.env.AUTH_DEV_LOGIN === "true" && process.env.NODE_ENV !== "production") {
