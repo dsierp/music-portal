@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { InferSelectModel } from "drizzle-orm";
 import { schema } from "@/db";
-import { searchLinks } from "./links";
+import { SerwisyPills } from "./serwisy";
 import { genreLabel as genreLabelFallback } from "@/lib/lists";
 import { genreLabel } from "@/lib/dict";
 import type { Dict } from "@/lib/dict";
@@ -19,7 +19,6 @@ type Release = InferSelectModel<typeof schema.releases>;
 const CAA = (mbid: string, px: 250 | 500) => `https://coverartarchive.org/release-group/${mbid}/front-${px}`;
 
 export function PickCard({ r, t, odKiedy }: { r: Release; t: Dict; odKiedy?: string | null }) {
-  const links = searchLinks(r.artist ?? "", r.album ?? "");
   const href = `/go/release/${encodeURIComponent(r.id)}`;
   return (
     <article className="pick has-cover">
@@ -46,7 +45,7 @@ export function PickCard({ r, t, odKiedy }: { r: Release; t: Dict; odKiedy?: str
           </p>
         )}
         <div className="row">
-          <Actions links={links} href={href} t={t} odKiedy={odKiedy} />
+          <Actions r={r} href={href} t={t} odKiedy={odKiedy} />
         </div>
       </div>
     </article>
@@ -67,7 +66,6 @@ export function ReleaseCard({ r, t, odKiedy }: { r: Release; t: Dict; odKiedy?: 
       </li>
     );
   }
-  const links = searchLinks(r.artist ?? "", r.album ?? "");
   const href = `/go/release/${encodeURIComponent(r.id)}`;
   const flagKey = r.flag ? FLAG_KEYS[r.flag] : undefined;
   return (
@@ -92,7 +90,7 @@ export function ReleaseCard({ r, t, odKiedy }: { r: Release; t: Dict; odKiedy?: 
         )}
       </div>
       <div className="side">
-        <Actions links={links} href={href} t={t} small odKiedy={odKiedy} />
+        <Actions r={r} href={href} t={t} small odKiedy={odKiedy} />
       </div>
     </li>
   );
@@ -107,7 +105,7 @@ export function ReleaseCard({ r, t, odKiedy }: { r: Release; t: Dict; odKiedy?: 
  * wynik wyszukiwania. Zamiast niego mówimy wprost, od kiedy będzie czego słuchać;
  * „podróż" zostaje, bo strona płyty i skład działają niezależnie od wydania.
  */
-function Actions({ links, href, t, small = false, odKiedy }: { links: { spotify: string; tidal: string }; href: string; t: Dict; small?: boolean; odKiedy?: string | null }) {
+function Actions({ r, href, t, small = false, odKiedy }: { r: { artist?: string | null; album?: string | null; mbid?: string | null }; href: string; t: Dict; small?: boolean; odKiedy?: string | null }) {
   const pill = "rounded-full border px-3 py-1 font-mono transition-colors";
   return (
     <div className={`flex flex-wrap items-center gap-2 ${small ? "text-[11px]" : "text-xs"}`}>
@@ -115,8 +113,11 @@ function Actions({ links, href, t, small = false, odKiedy }: { links: { spotify:
         <span className={`${pill} border-rule text-faint`}>{fmt(t.releases.outOn, { date: odKiedy })}</span>
       ) : (
         <>
-          <a href={links.spotify} target="_blank" rel="noopener" className={`${pill} border-spotify/40 text-spotify hover:bg-spotify/10`}>▸ Spotify</a>
-          <a href={links.tidal} target="_blank" rel="noopener" className={`${pill} border-tidal/40 text-tidal hover:bg-tidal/10`}>⌕ Tidal</a>
+          <SerwisyPills
+            etykieta={`${r.artist ?? ""} – ${r.album ?? ""}`.trim()}
+            mbid={r.mbid}
+            small={small}
+          />
         </>
       )}
       <Link href={href} className={`${pill} border-rule text-muted hover:border-accent2 hover:text-accent2`}>{t.releases.travelCta}</Link>

@@ -335,6 +335,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
                 mbid: o.mbid,
                 title: o.album,
                 subtitle: o.artist,
+                etykieta: `${o.artist} – ${o.album}`,
                 meta: o.zPortalu ? t.lists.playedFrom : null,
               }))}
             />
@@ -371,6 +372,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
               mbid: r.mbid,
               title: r.album ?? "",
               subtitle: r.artist ?? "",
+              etykieta: r.album ? `${r.artist ?? ""} – ${r.album}`.trim() : null,
               meta: genreLabel(r.genre, t),
             }))}
           />
@@ -405,6 +407,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
                 mbid: a.mbid,
                 title: a.title,
                 subtitle: a.artistName,
+                etykieta: `${a.artistName} – ${a.title}`,
               }))}
             />
           </section>

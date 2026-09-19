@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Cover } from "./cover";
+import { SerwisyPills } from "./serwisy";
 
 export interface Kafelek {
   key: string;
@@ -12,6 +13,12 @@ export interface Kafelek {
   subtitle?: string | null;
   /** jedno słowo z boku: gatunek, data, cokolwiek — trzeci wiersz, przygaszony */
   meta?: string | null;
+  /**
+   * „Artysta – Tytuł" — gdy jest, pod kafelkiem pojawiają się przyciski
+   * wyjścia w Spotify i Tidala. Półka bez nich wymaga dwóch kliknięć na to,
+   * po co człowiek tu przyszedł: żeby tego posłuchać.
+   */
+  etykieta?: string | null;
 }
 
 /**
@@ -61,6 +68,9 @@ export function Kafelki({ items }: { items: Kafelek[] }) {
             {k.subtitle && <div className="truncate text-xs text-muted" title={k.subtitle}>{k.subtitle}</div>}
             {k.meta && <div className="truncate font-mono text-[10px] text-faint">{k.meta}</div>}
           </Link>
+          {/* Poza <Link>, bo odnośnik w odnośniku to niepoprawny HTML —
+              przeglądarka rozrywa taki kafelek na kawałki. */}
+          {k.etykieta && <SerwisyPills etykieta={k.etykieta} mbid={k.mbid} small className="mt-1.5" />}
         </li>
       ))}
     </ul>

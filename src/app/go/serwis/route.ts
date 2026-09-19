@@ -26,11 +26,19 @@ export async function GET(req: NextRequest) {
     ? await linkSerwisu(typ, mbid, serwis === "tidal" ? HOST_TIDAL : HOST_SPOTIFY).catch(() => null)
     : null;
 
-  // Spotify ma jeszcze własne szukanie po nazwie — działa dla płyt.
-  if (!cel && serwis === "spotify" && typ === "release-group" && etykieta) {
-    const { rozbijEtykiete, spotifyAlbumUrl } = await import("@/lib/spotify");
+  // Oba serwisy mają jeszcze własne szukanie po nazwie — działa dla płyt.
+  // Tidal doszedł, gdy portal dostał u nich własną aplikację; wcześniej jego
+  // odnośniki z definicji prowadziły do wyszukiwarki.
+  if (!cel && typ === "release-group" && etykieta) {
+    const { rozbijEtykiete } = await import("@/lib/spotify");
     const { artist, title } = rozbijEtykiete(etykieta);
-    cel = await spotifyAlbumUrl(artist, title).catch(() => null);
+    if (serwis === "spotify") {
+      const { spotifyAlbumUrl } = await import("@/lib/spotify");
+      cel = await spotifyAlbumUrl(artist, title).catch(() => null);
+    } else {
+      const { tidalAlbumUrl } = await import("@/lib/tidal");
+      cel = await tidalAlbumUrl(artist, title).catch(() => null);
+    }
   }
 
   const fraza = encodeURIComponent(etykieta.replace(/\s+[–—-]\s+/, " "));

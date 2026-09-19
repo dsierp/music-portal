@@ -245,3 +245,101 @@ export async function albumyZTidala(userId: string, playlistId: string): Promise
   }
   return [...wg.values()].sort((a, b) => b.ile - a.ile);
 }
+
+// ---------- katalog: adres KONKRETNEJ płyty w Tidalu ----------
+
+/**
+ * Token aplikacji (client credentials) — do katalogu, bez niczyjego konta.
+ *
+ * Po co osobno od tokenu użytkownika: adres płyty ustalamy przy KLIKNIĘCIU,
+ * także dla gościa, który nie ma i nie będzie miał konta Tidala. Katalog jest
+ * wspólny, więc wystarczy, że portal przedstawi się jako on sam.
+ */
+async function tokenAplikacji(): Promise<string | null> {
+  if (!tidalConfigured()) return null;
+  const { cached } = await import("./cache");
+  // Token żyje dobę; trzymamy go krócej, żeby nie trafić w moment wygaśnięcia.
+  const dane = await cached<{ t: string } | null>("tidal:app-token:v1", 60 * 60 * 20, async () => {
+    const basic = Buffer.from(`${process.env.TIDAL_CLIENT_ID}:${process.env.TIDAL_CLIENT_SECRET}`).toString("base64");
+    const res = await fetch(TOKEN_URL, {
+      method: "POST",
+      headers: { Authorization: `Basic ${basic}`, "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ grant_type: "client_credentials" }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) throw new Error(`tidal token ${res.status}`);
+    const j = (await res.json()) as { access_token?: string };
+    if (!j.access_token) throw new Error("tidal token bez access_token");
+    return { t: j.access_token };
+  }).catch(() => null);
+  return dane?.t ?? null;
+}
+
+/** Uproszczony tytuł do porównań — reedycje i „(Remastered)" nie mogą mylić. */
+function uproszcz(t: string): string {
+  return t
+    .toLowerCase()
+    .replace(/\((?:deluxe|remaster(?:ed)?|reissue|edition|expanded)[^)]*\)/g, "")
+    .replace(/\s*[-–—]\s*(?:deluxe|remaster(?:ed)?|reissue|.*edition).*$/g, "")
+    .replace(/[^a-z0-9]+/g, "")
+    .trim();
+}
+
+/**
+ * Adres KONKRETNEJ płyty w Tidalu — albo nic.
+ *
+ * Dotąd każdy odnośnik do Tidala prowadził do wyszukiwarki, bo portal nie miał
+ * jak zapytać ich katalogu. Teraz ma. Zasady te same co przy Spotify, wyuczone
+ * na własnych błędach:
+ * - TRAFIENIE pamiętamy bez terminu (płyta nie zmieni adresu),
+ * - BRAKU nie pamiętamy w ogóle (premiery klikamy przed wydaniem, gdy płyty
+ *   jeszcze tam nie ma — zapamiętana pustka zostawałaby na zawsze),
+ * - nie zgadujemy: gdy tytuł się nie zgadza, wolimy wyszukiwarkę niż wysłanie
+ *   człowieka pod cudzą płytę.
+ */
+export async function tidalAlbumUrl(artist: string, title: string): Promise<string | null> {
+  if (!tidalConfigured() || !title) return null;
+  const { cached, cacheForget } = await import("./cache");
+  const klucz = `tidal:album:v1:${artist.toLowerCase()}|${title.toLowerCase()}`;
+  const NA_ZAWSZE = 60 * 60 * 24 * 3650;
+
+  const znalezione = await cached<string | null>(klucz, NA_ZAWSZE, async () => {
+    const token = await tokenAplikacji();
+    if (!token) return null;
+    const fraza = [artist, title].filter(Boolean).join(" ");
+    const url =
+      `${API}/searchResults/${encodeURIComponent(fraza)}` +
+      `?countryCode=${kraj()}&include=albums,albums.artists`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.api+json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) return null;
+    type Atr = { title?: string; name?: string; externalLinks?: { href?: string }[] };
+    const dane = (await res.json()) as JsonApiDoc<Atr, Atr>;
+    const dolaczone = dane.included ?? [];
+    const artysci = new Map(dolaczone.filter((x) => x.type === "artists").map((x) => [x.id, x.attributes?.name ?? ""]));
+    const szukanyTytul = uproszcz(title);
+    const szukanyArtysta = uproszcz(artist);
+    for (const al of dolaczone.filter((x) => x.type === "albums")) {
+      const tytul = al.attributes?.title ?? "";
+      if (uproszcz(tytul) !== szukanyTytul) continue;
+      if (szukanyArtysta) {
+        const rel = al.relationships?.artists?.data;
+        const ids = Array.isArray(rel) ? rel.map((r) => r.id) : rel ? [rel.id] : [];
+        const nazwy = ids.map((i) => uproszcz(artysci.get(i) ?? "")).filter(Boolean);
+        // Wystarczy, że któraś ze stron zawiera drugą: „Mastodon" vs
+        // „Mastodon & Friends" to ta sama płyta, „Sleep" vs „Sleep Token" nie.
+        const pasuje = nazwy.some((n) => n === szukanyArtysta || n.includes(szukanyArtysta) || szukanyArtysta.includes(n));
+        if (nazwy.length && !pasuje) continue;
+      }
+      return al.attributes?.externalLinks?.find((l) => l.href)?.href ?? `https://tidal.com/album/${al.id}`;
+    }
+    return null;
+  }).catch(() => null);
+
+  if (!znalezione) await cacheForget(klucz).catch(() => {});
+  return znalezione;
+}
