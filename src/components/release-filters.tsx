@@ -56,7 +56,15 @@ export interface TekstyFiltru {
   none: string;
   mine: string;
   jump: string;
+  topLabel: string;
+  showMore: string;
+  showLess: string;
 }
+
+/** Ile pozycji pokazujemy w gatunku, zanim trzeba kliknąć „pokaż resztę". */
+const NA_GATUNEK = 5;
+/** Ile płyt trafia do „topu tygodnia" ponad podziałem na gatunki. */
+const TOP_ILE = 10;
 
 export function ReleaseFilters({
   cats,
@@ -89,6 +97,9 @@ export function ReleaseFilters({
   // portalowi, czego słucha, i tak dostawał pełną listę do ręcznego zawężania.
   const [wybrane, setWybrane] = useState<Set<string>>(() => new Set(domyslne.length ? domyslne : cats));
   const [tylkoGwiazdki, setTylkoGwiazdki] = useState(false);
+  // Które gatunki są rozwinięte ponad piątkę. Domyślnie żaden: pięć pozycji
+  // to tyle, ile człowiek ogarnia wzrokiem, a reszta jest o jeden klik dalej.
+  const [rozwiniete, setRozwiniete] = useState<Set<string>>(() => new Set());
   const [zReedycjami, setZReedycjami] = useState(false);
 
   const liczniki = useMemo(() => {
@@ -135,9 +146,14 @@ export function ReleaseFilters({
       <div>
         {sections.map((s) => {
           const moje = widoczne.filter((i) => i.sectionId === s.id);
+          // Top tygodnia idzie na górę i NIE powtarza się niżej w gatunkach —
+          // ta sama płyta dwa razy na jednym ekranie to nie jest wyróżnienie.
+          const top = moje.filter((i) => i.star === 1 && i.id !== s.pickId).slice(0, TOP_ILE);
+          const wTopie = new Set(top.map((i) => i.id));
+          const reszta = moje.filter((i) => !wTopie.has(i.id));
           const grupy = cats
-            .filter((g) => moje.some((i) => i.g === g))
-            .map((g) => ({ g, items: moje.filter((i) => i.g === g) }));
+            .filter((g) => reszta.some((i) => i.g === g))
+            .map((g) => ({ g, items: reszta.filter((i) => i.g === g) }));
           // Tło nagłówka bierzemy z gatunku, który po odfiltrowaniu został
           // w sekcji na pierwszym miejscu — tak jak przed przejściem na klienta.
           const lead = grupy[0]?.g ?? "db";
@@ -154,6 +170,15 @@ export function ReleaseFilters({
                   variant={lead === "db" || lead === "death" ? "red" : lead === "black" || lead === "other" ? "morgue" : "other"}
                 />
                 {pickWidoczny && s.pickNode}
+                {/* TOP TYGODNIA — wyróżnienia z całego piątku, ponad podziałem
+                    na gatunki. To jest odpowiedź na pytanie „co dziś wyszło
+                    ważnego", której lista po kategoriach sama nie daje. */}
+                {top.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="label mb-3 text-xs">{teksty.topLabel}</h3>
+                    <ul className="space-y-3">{top.map((i) => i.node)}</ul>
+                  </div>
+                )}
                 {grupy.map(({ g, items: wiersze }) => (
                   <div key={g} data-kat={g} className="mt-6 scroll-mt-24">
                     <h3 className="label relative mb-3 overflow-hidden rounded border border-rule px-3 py-2 text-xs">
@@ -164,7 +189,27 @@ export function ReleaseFilters({
                       <span className="absolute inset-0 bg-gradient-to-r from-bg via-bg/80 to-transparent" />
                       <span className="relative">{catLabels[g] ?? g}</span>
                     </h3>
-                    <ul className="space-y-3">{wiersze.map((i) => i.node)}</ul>
+                    <ul className="space-y-3">
+                      {(rozwiniete.has(g) ? wiersze : wiersze.slice(0, NA_GATUNEK)).map((i) => i.node)}
+                    </ul>
+                    {wiersze.length > NA_GATUNEK && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setRozwiniete((poprzednie) => {
+                            const n = new Set(poprzednie);
+                            if (n.has(g)) n.delete(g);
+                            else n.add(g);
+                            return n;
+                          })
+                        }
+                        className="mt-2 text-xs text-muted underline hover:text-accent2"
+                      >
+                        {rozwiniete.has(g)
+                          ? teksty.showLess
+                          : teksty.showMore.replace("{n}", String(wiersze.length - NA_GATUNEK))}
+                      </button>
+                    )}
                   </div>
                 ))}
                 {!grupy.length && !pickWidoczny && <p className="mt-3 text-sm text-muted">{teksty.noMatch}</p>}

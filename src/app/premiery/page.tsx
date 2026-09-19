@@ -25,14 +25,27 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
   const { t } = await i18n();
   const user = await currentUser();
   const prefs = user ? await getGenres(user.id) : [];
-  const wszystkieSekcje = sp.sekcja === "archiwum" ? await allSections() : await latestSections(2);
-  const rel = await releasesFor(wszystkieSekcje.map((s) => s.id));
-  // Sekcja bez ani jednej pozycji to nie jest informacja, tylko pusty afisz
-  // z napisem „0 tytułów" i „Nic nie pasuje do filtrów" pod spodem. Zdarza się,
-  // gdy MusicBrainz nie ma jeszcze otagowanych wydań danego tygodnia — wtedy
-  // po prostu jej nie pokazujemy, zamiast udawać, że coś się nie załadowało.
-  const zPozycjami = new Set(rel.map((r) => r.sectionId));
-  const sections = wszystkieSekcje.filter((s) => zPozycjami.has(s.id));
+  /**
+   * JEDEN PIĄTEK NA EKRANIE — tak jak Best of pokazuje jeden rocznik.
+   *
+   * Było inaczej i to był bałagan: każde źródło zakładało własną sekcję, więc
+   * na jeden piątek wypadały dwa afisze („Tydzień 12–18.09" z zestawienia
+   * i „Nowe wydania 18.09" z MusicBrainz), a pod nimi jeszcze poprzedni
+   * tydzień. Cztery nagłówki, z czego połowa z napisem „Nic nie pasuje do
+   * filtrów". Teraz: przełącznik dat u góry, pod nim JEDNA sekcja z tego dnia,
+   * scalona ze wszystkich źródeł.
+   */
+  const wszystkieSekcje = await allSections();
+  const terminy = [...new Map(wszystkieSekcje.map((s) => [s.date, s.sortDate.getTime()])).entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([date]) => date);
+  const wybranaData = sp.piatek && terminy.includes(sp.piatek) ? sp.piatek : terminy[0];
+  const zTegoDnia = wszystkieSekcje.filter((s) => s.date === wybranaData);
+  const rel = await releasesFor(zTegoDnia.map((s) => s.id));
+  // Wszystkie pozycje dnia lądują w jednej, scalonej sekcji.
+  const SCALONA = `dzien:${wybranaData ?? "brak"}`;
+  const glowna = zTegoDnia.find((s) => s.kind !== "mb") ?? zTegoDnia[0];
+  const sections = glowna && rel.length ? [{ ...glowna, id: SCALONA }] : [];
 
   const lead = leadStyle(prefs);
   // Kategorie: style użytkownika (nawet te bez premier w tym tygodniu — inaczej
@@ -58,7 +71,7 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
 
   // Data premiery per wiersz — potrzebna, żeby nie proponować Spotify przy
   // płycie, która wychodzi dopiero w przyszły piątek.
-  const dataSekcji = new Map(sections.map((s) => [s.id, s.date]));
+  const dataSekcji = new Map(zTegoDnia.map((s) => [s.id, s.date]));
   const kiedy = (r: (typeof rel)[number]) => {
     const d = dataPozycji(r.dayLabel, dataSekcji.get(r.sectionId) ?? "");
     return jeszczeNieWyszla(d) ? (r.dayLabel?.replace(/^\D+/, "") ?? d!.toLocaleDateString("pl-PL")) : null;
@@ -66,7 +79,7 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
 
   const items: PozycjaFiltru[] = rel.map((r) => ({
     id: r.id,
-    sectionId: r.sectionId,
+    sectionId: SCALONA,
     g: splitDb(r.genre, r.description),
     star: r.star,
     flagged: !!r.flag && ["comp", "reissue", "live", "ep"].includes(r.flag),
@@ -74,14 +87,17 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
   }));
 
   const sekcje: SekcjaFiltru[] = sections.map((s) => {
-    const moje = rel.filter((r) => r.sectionId === s.id);
-    // Płyta tygodnia: wskazana w imporcie, a gdy jej nie ma — pierwsze wyróżnienie.
-    const pick = moje.find((r) => r.id === `${s.id}:${s.pickId}`) ?? moje.find((r) => r.star === 1);
+    const moje = rel;
+    // Płyta tygodnia: wskazana w imporcie (id ma prefiks SWOJEJ sekcji, nie
+    // scalonej), a gdy jej nie ma — pierwsze wyróżnienie.
+    const pick =
+      moje.find((r) => zTegoDnia.some((x) => r.id === `${x.id}:${x.pickId}`)) ??
+      moje.find((r) => r.star === 1);
     return {
       id: s.id,
-      title: s.title,
+      title: t.releases.fridayPrefix,
       date: s.date,
-      sub: s.sub,
+      sub: null,
       pickId: pick?.id ?? null,
       pickNode: pick ? <PickCard r={pick} t={t} odKiedy={kiedy(pick)} /> : null,
       podroz: !!user && moje.some((r) => r.mbid),
@@ -97,13 +113,26 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
         title="Pure New Shit"
         meta={
           <>
-            {sections[0]?.date && <span>{t.releases.fridayPrefix} {sections[0].date}</span>}
+            {wybranaData && <span>{t.releases.fridayPrefix} {wybranaData}</span>}
             {lead && <span className="ml-4">{t.releases.leadGenre} <b className="text-accent2">{lead.genre}</b></span>}
             {!lead && <span className="ml-4"><Link href="/ja#style" className="underline">{t.releases.setStyles}</Link>{t.releases.setStylesRest}</span>}
           </>
         }
       />
       <ScreenHelp screen="premiery" />
+      {/* Przełącznik piątków — dokładnie jak roczniki w Best of. */}
+      {terminy.length > 1 && (
+        <div className="mt-6">
+          <div className="label mb-2">{t.releases.fridayPrefix}</div>
+          <div className="flex flex-wrap gap-1.5">
+            {terminy.slice(0, 12).map((d) => (
+              <Link key={d} href={`?piatek=${encodeURIComponent(d)}`} className={`chip ${d === wybranaData ? "chip-on" : ""}`}>
+                {d}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
       {sections.length ? (
         <ReleaseFilters
           cats={cats}
@@ -127,6 +156,9 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
             none: t.common.selectNone,
             mine: t.common.selectMine,
             jump: t.common.jumpTo,
+            topLabel: t.releases.topLabel,
+            showMore: t.releases.showMore,
+            showLess: t.releases.showLess,
           }}
         />
       ) : (
