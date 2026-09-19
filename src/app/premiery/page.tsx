@@ -52,7 +52,26 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
   const wybrany = sp.piatek && terminy.includes(sp.piatek) ? sp.piatek : domyslny;
   const wybranaData = wybrany ? naPolski(wybrany) : undefined;
   const zTegoDnia = wszystkieSekcje.filter((s) => piatek(s.sortDate) === wybrany);
-  const rel = await releasesFor(zTegoDnia.map((s) => s.id));
+  const wszystkieZDnia = await releasesFor(zTegoDnia.map((s) => s.id));
+  /**
+   * Jeden piątek to kilka źródeł (nasz import + MusicBrainz), więc ta sama
+   * płyta potrafi przyjść dwa razy pod różnymi identyfikatorami. Na ekranie
+   * wyglądało to jak kpina: „pokaż pozostałe (5)" rozwijało te same pozycje,
+   * które już były widać. Scalamy po zespole i tytule, a z duplikatów
+   * zostawiamy ten BOGATSZY: z identyfikatorem MusicBrainz, z wyróżnieniem,
+   * z dłuższym opisem — czyli ten, w który da się wejść.
+   */
+  const rel = (() => {
+    const waga = (r: (typeof wszystkieZDnia)[number]) =>
+      (r.mbid ? 4 : 0) + (r.star === 1 ? 2 : 0) + (r.description ? 1 : 0);
+    const wg = new Map<string, (typeof wszystkieZDnia)[number]>();
+    for (const r of wszystkieZDnia) {
+      const klucz = `${(r.artist ?? "").trim().toLowerCase()}|${(r.album ?? "").trim().toLowerCase()}`;
+      const juz = wg.get(klucz);
+      if (!juz || waga(r) > waga(juz)) wg.set(klucz, r);
+    }
+    return [...wg.values()];
+  })();
   // Wszystkie pozycje dnia lądują w jednej, scalonej sekcji.
   const SCALONA = `dzien:${wybrany ?? "brak"}`;
   const glowna = zTegoDnia.find((s) => s.kind !== "mb") ?? zTegoDnia[0];

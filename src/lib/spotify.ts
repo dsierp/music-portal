@@ -61,7 +61,23 @@ function wPauzie(): boolean {
  * Kto podłączył konto WCZEŚNIEJ, ma stary zakres i musi połączyć je od nowa;
  * portal go o to nie zaczepia — po prostu historii nie ciągnie.
  */
-export const SPOTIFY_SCOPES = ["user-read-currently-playing", "user-read-recently-played", "playlist-modify-private"].join(" ");
+/**
+ * `playlist-read-private` i `playlist-read-collaborative` doszły po to i tylko
+ * po to, żeby dało się ŚCIĄGNĄĆ własne listy ze Spotify do portalu. To odczyt
+ * cudzych playlist? Nie — wyłącznie swoich, i tylko wtedy, gdy ktoś sam kliknie
+ * „ściągnij". Publiczne playlisty widać bez żadnego zakresu, ale człowiek
+ * trzyma swoje po cichu i bez tych dwóch nie zobaczyłby nic.
+ *
+ * Kto podłączył konto WCZEŚNIEJ, ma stary zestaw zakresów i musi połączyć je
+ * od nowa — inaczej lista playlist przyjdzie pusta.
+ */
+export const SPOTIFY_SCOPES = [
+  "user-read-currently-playing",
+  "user-read-recently-played",
+  "playlist-modify-private",
+  "playlist-read-private",
+  "playlist-read-collaborative",
+].join(" ");
 
 export function spotifyConfigured(): boolean {
   return !!process.env.SPOTIFY_CLIENT_ID && !!process.env.SPOTIFY_CLIENT_SECRET;
@@ -260,6 +276,127 @@ export async function recentlyPlayed(userId: string): Promise<{ artist: string; 
       cover: i.track!.album?.images?.[i.track!.album.images.length - 1]?.url ?? null,
       at: i.played_at ? new Date(i.played_at) : new Date(),
     }));
+}
+
+// ---------- playlista ze Spotify → podróż ----------
+
+export interface SpPlaylista {
+  id: string;
+  nazwa: string;
+  opis: string | null;
+  ile: number;
+  okladka: string | null;
+  url: string;
+  /** Czyja jest — własne pokazujemy pierwsze, cudze obserwowane niżej. */
+  czyja: string | null;
+  moja: boolean;
+}
+
+/**
+ * Playlisty tego człowieka — jego własne i te, które obserwuje.
+ *
+ * Spotify oddaje po 50 na stronę; bierzemy najwyżej cztery strony (200 list),
+ * bo dalej to już nie jest „moje listy", tylko archiwum, a każda strona to
+ * kolejne zapytanie w kolejce.
+ */
+export async function spotifyPlaylisty(userId: string): Promise<SpPlaylista[]> {
+  interface SpPl {
+    id: string;
+    name: string;
+    description?: string;
+    tracks?: { total?: number };
+    images?: { url: string }[];
+    external_urls?: { spotify?: string };
+    owner?: { id?: string; display_name?: string };
+  }
+  const ja = await api<{ id?: string }>(userId, "/me", { bezBlokady: true }).catch(() => null);
+  const out: SpPlaylista[] = [];
+  for (let strona = 0; strona < 4; strona++) {
+    const dane = await api<{ items?: SpPl[]; next?: string | null }>(
+      userId,
+      `/me/playlists?limit=50&offset=${strona * 50}`,
+      // Brak zakresu to nie jest odmowa dla konta — patrz `api`.
+      { bezBlokady: true },
+    ).catch(() => null);
+    for (const p of dane?.items ?? []) {
+      if (!p?.id || !p.name) continue;
+      out.push({
+        id: p.id,
+        nazwa: p.name,
+        opis: p.description?.trim() || null,
+        ile: p.tracks?.total ?? 0,
+        okladka: p.images?.[0]?.url ?? null,
+        url: p.external_urls?.spotify ?? `https://open.spotify.com/playlist/${p.id}`,
+        czyja: p.owner?.display_name ?? p.owner?.id ?? null,
+        moja: !!ja?.id && p.owner?.id === ja.id,
+      });
+    }
+    if (!dane?.next) break;
+  }
+  return out;
+}
+
+export interface PlytaZPlaylisty {
+  artist: string;
+  album: string;
+  cover: string | null;
+  url: string | null;
+  /** Ile utworów z tej płyty leży na playliście — po tym ją ważymy. */
+  ile: number;
+}
+
+/**
+ * Płyty z jednej playlisty — NIE utwory.
+ *
+ * Portal chodzi wokół płyt, więc playlista „50 kawałków" staje się tu listą
+ * kilkunastu albumów, po jednym wpisie na album. Kolejność: najpierw te, z
+ * których jest najwięcej utworów — bo to one są w tej playliście naprawdę,
+ * a pojedynczy singiel bywa przypadkiem.
+ */
+export async function albumyZPlaylisty(userId: string, playlistId: string, maks = 400): Promise<PlytaZPlaylisty[]> {
+  interface SpItem {
+    track?: {
+      name?: string;
+      artists?: { name: string }[];
+      album?: {
+        name?: string;
+        album_type?: string;
+        images?: { url: string }[];
+        external_urls?: { spotify?: string };
+        artists?: { name: string }[];
+      };
+    };
+  }
+  const wg = new Map<string, PlytaZPlaylisty>();
+  for (let offset = 0; offset < maks; offset += 100) {
+    const dane = await api<{ items?: SpItem[]; next?: string | null }>(
+      userId,
+      `/playlists/${encodeURIComponent(playlistId)}/tracks?limit=100&offset=${offset}` +
+        `&fields=next,items(track(name,artists(name),album(name,album_type,images,external_urls,artists(name))))`,
+      { bezBlokady: true },
+    ).catch(() => null);
+    for (const i of dane?.items ?? []) {
+      const al = i.track?.album;
+      const tytul = al?.name?.trim();
+      if (!al || !tytul) continue;
+      const artysta = (al.artists?.length ? al.artists : i.track?.artists)?.map((a) => a.name).join(", ").trim() ?? "";
+      const klucz = `${artysta.toLowerCase()}|${tytul.toLowerCase()}`;
+      const juz = wg.get(klucz);
+      if (juz) {
+        juz.ile += 1;
+        continue;
+      }
+      wg.set(klucz, {
+        artist: artysta,
+        album: tytul,
+        cover: al.images?.[al.images.length - 1]?.url ?? null,
+        url: al.external_urls?.spotify ?? null,
+        ile: 1,
+      });
+    }
+    if (!dane?.next) break;
+  }
+  return [...wg.values()].sort((a, b) => b.ile - a.ile);
 }
 
 // ---------- podróż → playlista ----------

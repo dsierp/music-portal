@@ -529,6 +529,62 @@ export async function podrozZGranych() {
   redirect(`/podroz/${lista.id}`);
 }
 
+/**
+ * Playlista ze Spotify → podróż w portalu.
+ *
+ * Ściągamy PŁYTY, nie utwory: playlista na pięćdziesiąt kawałków to zwykle
+ * kilkanaście albumów i to one są tu treścią. Każdy trzeba dowiązać do
+ * MusicBrainz, bo bez identyfikatora nie ma w co wejść — a MusicBrainz
+ * przyjmuje jedno pytanie na sekundę, więc pracujemy z zegarkiem w ręku:
+ * co się zdąży, to wchodzi, reszta idzie do licznika pominiętych. Lepiej
+ * oddać dwadzieścia płyt i powiedzieć „resztę puść jeszcze raz", niż dać
+ * się uciąć serwerowi w połowie i nie oddać nic.
+ */
+export async function podrozZPlaylisty(formData: FormData) {
+  const u = await requireUser();
+  const id = String(formData.get("id") ?? "").trim();
+  const nazwa = String(formData.get("nazwa") ?? "").trim();
+  if (!id) redirect("/podroze/ze-spotify");
+  const { albumyZPlaylisty } = await import("@/lib/spotify");
+  const { findAlbumMbid } = await import("@/lib/musicbrainz");
+  const plyty = await albumyZPlaylisty(u.id, id).catch(() => []);
+  if (!plyty.length) redirect("/podroze/ze-spotify?pusto=1");
+
+  // Najpierw dowiązujemy, dopiero potem zakładamy listę — dzięki temu w opisie
+  // stoi prawda o tym, czego na niej NIE ma, a nie obietnica sprzed roboty.
+  const koniec = Date.now() + 40_000; // niżej niż `maxDuration` strony
+  const gotowe: { mbid: string; label: string; url: string | null }[] = [];
+  let pominiete = 0;
+  for (const p of plyty) {
+    if (Date.now() > koniec) {
+      pominiete += 1;
+      continue;
+    }
+    const mb = await findAlbumMbid(p.artist, p.album).catch(() => null);
+    if (!mb?.mbid) {
+      pominiete += 1;
+      continue;
+    }
+    gotowe.push({ mbid: mb.mbid, label: `${p.artist} – ${p.album}`.trim(), url: p.url ?? null });
+  }
+  if (!gotowe.length) redirect("/podroze/ze-spotify?pusto=1");
+
+  const { i18n } = await import("@/lib/t");
+  const { fmt } = await import("@/lib/i18n");
+  const { t } = await i18n();
+  const opis = pominiete
+    ? `${t.lists.fromSpotifyIntro} ${fmt(t.lists.fromSpotifySkipped, { n: pominiete })}`
+    : t.lists.fromSpotifyIntro;
+  const lista = await ud.createList(u.id, nazwa || t.lists.fromSpotifyTitle, opis);
+  for (const g of gotowe) {
+    await ud
+      .addToList(u.id, lista.id, { targetType: "ALBUM", targetMbid: g.mbid, label: g.label, url: g.url })
+      .catch(() => {});
+  }
+  revalidatePath("/podroze");
+  redirect(`/podroz/${lista.id}`);
+}
+
 export async function podrozZRozmowy(formData: FormData) {
   const u = await requireUser();
   const id = String(formData.get("id") ?? "");

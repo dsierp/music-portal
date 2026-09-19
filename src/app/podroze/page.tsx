@@ -154,6 +154,12 @@ export default async function ListsPage({ searchParams }: { searchParams: Promis
               <input name="description" placeholder={t.lists.newListDescription} className="input py-1 text-sm" autoComplete="off" />
               <button className="btn">{t.lists.createList}</button>
             </form>
+            {/* Druga droga do podróży: gotowa playlista ze Spotify. */}
+            <p className="mt-3 text-sm">
+              <Link href="/podroze/ze-spotify" className="text-muted hover:text-accent2">
+                {t.lists.spotifyImport} →
+              </Link>
+            </p>
           </section>
 
           <section className="card">

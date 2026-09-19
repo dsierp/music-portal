@@ -93,6 +93,11 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
               {/* Odłączenie jest jedyną drogą do podpięcia innego konta —
                   stąd obok od razu wyjaśnienie, po co miałby to robić. */}
               <p className="mt-1 text-xs text-faint">{t.profile.spotifySwitchNote}</p>
+              <p className="mt-2 text-sm">
+                <Link href="/podroze/ze-spotify" className="text-muted hover:text-accent2">
+                  {t.lists.spotifyImport} →
+                </Link>
+              </p>
               <form action={disconnectSpotify} className="mt-2">
                 <button className="btn">{t.profile.spotifyDisconnect}</button>
               </form>
