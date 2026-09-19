@@ -9,7 +9,7 @@ import { i18n } from "@/lib/t";
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await i18n();
   return {
-    title: { default: "Pure New Shit — portal", template: "%s · Pure New Shit" },
+    title: { default: "Pure New Shit", template: "%s · Pure New Shit" },
     description: t.nav.siteDescription,
   };
 }
