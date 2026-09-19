@@ -259,11 +259,52 @@ async function tmSearch(area: Area, genre: string | null, size = 40): Promise<Co
  * Traktujemy je jako darmową podstawę, którą Ticketmaster (jeśli jest klucz)
  * uzupełnia o duże sale i festiwale.
  */
+/**
+ * Nazwy zamienne miast — bo jedno miasto nazywa się w dwóch serwisach inaczej.
+ *
+ * Skąd to się wzięło: ktoś wpisuje „Kraków" i „Warszawę", a dostaje koncerty
+ * tylko z Krakowa. Powód nie jest w kodzie pytającym, tylko w nazwach:
+ * MusicBrainz trzyma miasta po lokalnemu („Warszawa"), Ticketmaster po
+ * angielsku („Warsaw"). Jedno zapytanie z jedną pisownią trafia więc w jedno
+ * źródło i mija się z drugim — a Kraków działa przypadkiem, bo po zdjęciu
+ * ogonków wygląda w obu tak samo.
+ *
+ * Lista jest krótka i celowo: miasta, w których realnie gra się tę muzykę
+ * w naszej części Europy. Nie budujemy słownika geograficznego — od tego są
+ * bazy w sieci.
+ */
+const NAZWY_ZAMIENNE: Record<string, string[]> = {
+  warszawa: ["Warsaw"],
+  warsaw: ["Warszawa"],
+  krakow: ["Cracow", "Kraków"],
+  cracow: ["Kraków", "Krakow"],
+  poznan: ["Posen", "Poznań"],
+  wroclaw: ["Breslau", "Wrocław"],
+  gdansk: ["Danzig", "Gdańsk"],
+  praha: ["Prague", "Prag"],
+  prague: ["Praha"],
+  wien: ["Vienna"],
+  vienna: ["Wien"],
+  koln: ["Cologne", "Köln"],
+  cologne: ["Köln", "Koln"],
+  munchen: ["Munich", "München"],
+  munich: ["München", "Munchen"],
+};
+
+/** Pisownie tego samego miasta: ta wpisana plus znane odpowiedniki. */
+export function pisownie(miasto: string): string[] {
+  const bez = bezOgonkow(miasto.trim());
+  return [...new Set([miasto.trim(), ...(NAZWY_ZAMIENNE[bez] ?? [])])];
+}
+
 export async function concertsByAreaMb(areas: Area[]): Promise<Concert[]> {
   const { from, to } = concertWindow();
   const out: Concert[] = [];
   for (const area of areas.slice(0, 5)) {
-    const where = area.city ? `area:"${area.city}"` : `area:"${area.country}"`;
+    // Wszystkie pisownie naraz — jedno zapytanie, nie trzy.
+    const where = area.city
+      ? pisownie(area.city).map((n) => `area:"${n}"`).join(" OR ")
+      : `area:"${area.country}"`;
     const url = new URL(`${MB_BASE}/event`);
     url.searchParams.set("query", `${where} AND begin:[${from} TO ${to}]`);
     url.searchParams.set("limit", "50");
@@ -287,7 +328,16 @@ export async function concertsByArea(areas: Area[], categories: string[]): Promi
   for (const area of areas.slice(0, 5)) {
     // Bez wybranych gatunków pytamy o wszystko, co gra w okolicy.
     for (const g of (genres.length ? genres : [null]).slice(0, 4)) {
-      out.push(...(await tmSearch(area, g).catch(() => [])));
+      // Ticketmaster zna miasto pod JEDNĄ nazwą i przy innej oddaje pustkę
+      // bez słowa wyjaśnienia. Próbujemy po kolei i przerywamy na pierwszej,
+      // która cokolwiek zwróci.
+      for (const nazwa of area.city ? pisownie(area.city) : [null]) {
+        const wynik = await tmSearch(nazwa === null ? area : { ...area, city: nazwa }, g).catch(() => []);
+        if (wynik.length) {
+          out.push(...wynik);
+          break;
+        }
+      }
     }
   }
   return dedupe(out);
@@ -479,8 +529,10 @@ function bezOgonkow(s: string): string {
 export function inAnyArea(c: Concert, areas: Area[]): boolean {
   const hay = bezOgonkow([c.city, c.country, c.venue].filter(Boolean).join(" "));
   return areas.some((a) => {
-    const needle = bezOgonkow(a.city ?? a.country);
-    return hay.includes(needle) || (!a.city && c.country?.toLowerCase() === a.country.toLowerCase());
+    // Miasto wpisane przez człowieka ORAZ jego znane odpowiedniki: koncert
+    // opisany jako „Warsaw" ma pasować do wpisanej „Warszawy" i odwrotnie.
+    const igly = (a.city ? pisownie(a.city) : [a.country]).map(bezOgonkow);
+    return igly.some((n) => hay.includes(n)) || (!a.city && c.country?.toLowerCase() === a.country.toLowerCase());
   });
 }
 
