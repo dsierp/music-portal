@@ -14,6 +14,7 @@
  * kosztowałoby dwanaście sekund czekania — za drogo jak na dodatek.
  */
 import { cached, TTL } from "./cache";
+import { mbBase, mbRawFetch } from "./musicbrainz";
 
 export interface Teledysk {
   /** MBID nagrania — po nim da się wejść głębiej w MusicBrainz. */
@@ -25,14 +26,8 @@ export interface Teledysk {
   url: string | null;
 }
 
-const MB_BASE = "https://musicbrainz.org/ws/2";
-
-function mbHeaders(): HeadersInit {
-  return {
-    "User-Agent": (process.env.MUSICBRAINZ_USER_AGENT || "PureNewShit/0.1 ( https://music-travel.app )").trim(),
-    Accept: "application/json",
-  };
-}
+/** Adres bazy bierzemy z jednego miejsca — patrz `mbBase` (własna kopia!). */
+const MB_BASE = mbBase();
 
 interface MbVideoRec {
   id: string;
@@ -56,7 +51,7 @@ async function szukajNagran(query: string, klucz: string, limit = 25): Promise<T
     url.searchParams.set("query", query);
     url.searchParams.set("limit", String(limit));
     url.searchParams.set("fmt", "json");
-    const res = await fetch(url, { headers: mbHeaders(), cache: "no-store" });
+    const res = await mbRawFetch(url);
     if (!res.ok) throw new Error(`MusicBrainz recording ${res.status}`);
     return (await res.json()) as { recordings?: MbVideoRec[] };
   }).catch(() => ({ recordings: [] as MbVideoRec[] }));

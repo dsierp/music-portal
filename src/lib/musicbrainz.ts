@@ -15,7 +15,30 @@ import { czytelnaRola } from "./instruments";
 
 /** Ile czekamy na jedną odpowiedź MusicBrainz (potem próba od nowa). */
 const MB_TIMEOUT_MS = 8000;
-const MB_BASE = "https://musicbrainz.org/ws/2";
+
+/**
+ * DOKĄD pytamy i JAK CZĘSTO — jedno i drugie z konfiguracji.
+ *
+ * Publiczny MusicBrainz przyjmuje jedno zapytanie na sekundę NA CAŁĄ APLIKACJĘ,
+ * nie na użytkownika. Przy kilkuset osobach naraz to jest sufit, którego nie da
+ * się podnieść żadną sztuczką — i nie wolno go obchodzić podszywaniem się pod
+ * cudzą aplikację: limit liczą po adresie IP, więc nic by to nie dało, a groziło
+ * odcięciem portalu. Rozwiązanie, które sami przewidzieli, to WŁASNA KOPIA bazy
+ * (musicbrainz-docker z replikacją). Wtedy wystarczy wskazać jej adres:
+ *
+ *   MUSICBRAINZ_BASE_URL=http://mirror.wewnetrzny:5000/ws/2
+ *   MUSICBRAINZ_MIN_GAP_MS=0
+ *
+ * Bez tych zmiennych nic się nie zmienia: idziemy do musicbrainz.org z odstępem
+ * 1,1 s, tak jak dotąd. Odstęp jest osobną zmienną, a nie wnioskiem z adresu,
+ * bo własna kopia na słabym serwerze też może chcieć oddechu — a to już decyzja
+ * gospodarza, nie nasza.
+ */
+export function mbBase(): string {
+  const v = (process.env.MUSICBRAINZ_BASE_URL ?? "").trim().replace(/^["']|["']$/g, "").replace(/\/+$/, "");
+  return v || "https://musicbrainz.org/ws/2";
+}
+const MB_BASE = mbBase();
 
 /**
  * MusicBrainz wymaga, żeby aplikacja się przedstawiła — bez tego odpowiada 403
@@ -35,10 +58,36 @@ export function normalizeUserAgent(raw: string | undefined): string {
 const UA = normalizeUserAgent(process.env.MUSICBRAINZ_USER_AGENT);
 
 // ---------- rate limiter ----------
-// Odstęp między wysłaniami zapytań (MusicBrainz: 1/s; 1,1 s daje zapas na
-// nierówności sieci). Szczegóły działania kolejki: throttle.ts.
-const MIN_GAP_MS = 1100;
+// Odstęp między wysłaniami zapytań (publiczny MusicBrainz: 1/s; 1,1 s daje
+// zapas na nierówności sieci). Własna kopia limitu nie ma — patrz `mbBase`.
+// Szczegóły działania kolejki: throttle.ts.
+export function mbMinGapMs(): number {
+  const raw = (process.env.MUSICBRAINZ_MIN_GAP_MS ?? "").trim();
+  if (!raw) return 1100;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : 1100;
+}
+const MIN_GAP_MS = mbMinGapMs();
 const throttle = createThrottle(MIN_GAP_MS);
+
+/**
+ * Wspólne wyjście do MusicBrainz dla modułów, które mają własne zapytania
+ * (koncerty, teledyski). Wcześniej miały własny adres i własny `fetch` — czyli
+ * omijały kolejkę i przy ruchu potrafiły wyprzedzić limit ustawiony tutaj.
+ * Jeden portal to jedna kolejka i jeden adres bazy.
+ */
+export function mbUserAgent(): string {
+  return UA;
+}
+export async function mbRawFetch(url: URL | string): Promise<Response> {
+  return throttle(() =>
+    fetch(url, {
+      headers: { "User-Agent": UA, Accept: "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(MB_TIMEOUT_MS),
+    }),
+  );
+}
 
 export class MbError extends Error {
   constructor(message: string, public status?: number) {

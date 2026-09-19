@@ -20,10 +20,11 @@
  * strona mówi wtedy wprost, czego brakuje, zamiast udawać pustkę.
  */
 import { cached, TTL } from "./cache";
-import { MbError } from "./musicbrainz";
+import { MbError, mbBase, mbRawFetch } from "./musicbrainz";
 
 const TM_BASE = "https://app.ticketmaster.com/discovery/v2/events.json";
-const MB_BASE = "https://musicbrainz.org/ws/2";
+/** Adres bazy bierzemy z jednego miejsca — patrz `mbBase` (własna kopia!). */
+const MB_BASE = mbBase();
 
 export interface Concert {
   id: string;
@@ -269,7 +270,7 @@ export async function concertsByAreaMb(areas: Area[]): Promise<Concert[]> {
     url.searchParams.set("fmt", "json");
     const key = `mb:events-area:v1:${area.country}:${area.city ?? "*"}:${from}`;
     const data = await cached<{ events?: MbEvent[] }>(key, TTL.search, async () => {
-      const res = await fetch(url, { headers: mbHeaders(), cache: "no-store" });
+      const res = await mbRawFetch(url);
       if (!res.ok) throw new MbError(`MusicBrainz events ${res.status}`, res.status);
       return (await res.json()) as { events?: MbEvent[] };
     }).catch(() => ({ events: [] as MbEvent[] }));
@@ -290,13 +291,6 @@ export async function concertsByArea(areas: Area[], categories: string[]): Promi
     }
   }
   return dedupe(out);
-}
-
-function mbHeaders() {
-  return {
-    "User-Agent": (process.env.MUSICBRAINZ_USER_AGENT || "PureNewShit/0.1 ( https://music-travel.app )").trim(),
-    Accept: "application/json",
-  };
 }
 
 interface MbEvent {
@@ -378,7 +372,7 @@ export async function concertsByArtist(artist: { mbid: string; name: string }): 
   url.searchParams.set("fmt", "json");
 
   const data = await cached<{ events?: MbEvent[] }>(`mb:events:v1:${artist.mbid}:${from}`, TTL.search, async () => {
-    const res = await fetch(url, { headers: mbHeaders(), cache: "no-store" });
+    const res = await mbRawFetch(url);
     if (!res.ok) throw new MbError(`MusicBrainz events ${res.status}`, res.status);
     return (await res.json()) as { events?: MbEvent[] };
   });
