@@ -185,6 +185,11 @@ async function jedenStrzal(system: string, tresc: string, model: string): Promis
         {
           model,
           max_tokens: 4000,
+          // `max_completion_tokens` to nowsza nazwa tego samego u dostawców
+          // zgodnych z OpenAI; część nowszych bramek nie zna już starej i ucina
+          // odpowiedź na domyślnym, bardzo niskim limicie. Wysłanie obu nic
+          // nie psuje — nieznane pole jest ignorowane.
+          max_completion_tokens: 4000,
           messages: [
             { role: "system", content: system },
             { role: "user", content: tresc },
@@ -224,14 +229,30 @@ async function jedenStrzal(system: string, tresc: string, model: string): Promis
         },
       ];
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: naglowki as Record<string, string>,
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(60_000),
-  }).catch((e) => {
-    throw new AiError(`Nie udało się połączyć z modelem: ${e instanceof Error ? e.message : e}`);
-  });
+  const wyslij = async (cialo: unknown) =>
+    fetch(url, {
+      method: "POST",
+      headers: naglowki as Record<string, string>,
+      body: JSON.stringify(cialo),
+      signal: AbortSignal.timeout(60_000),
+    }).catch((e) => {
+      throw new AiError(`Nie udało się połączyć z modelem: ${e instanceof Error ? e.message : e}`);
+    });
+
+  let res = await wyslij(body);
+  /**
+   * Drugie podejście z uboższym zapytaniem, gdy dostawca odrzuci pierwsze.
+   *
+   * Dostawcy zgodni „z OpenAI" są zgodni w różnym stopniu: jedni wymagają
+   * `max_completion_tokens`, drudzy znają tylko `max_tokens`, a niektórzy
+   * odrzucają całe zapytanie za jedno nieznane pole. Zamiast zgadywać, który
+   * to przypadek, przy 400 wysyłamy raz jeszcze samo to, co niezbędne.
+   */
+  if (res.status === 400 && wlasny) {
+    const { max_completion_tokens: _pomin, ...bezDodatku } = body as Record<string, unknown>;
+    void _pomin;
+    res = await wyslij(bezDodatku);
+  }
 
   if (!res.ok) {
     const tekst = await res.text().catch(() => "");
@@ -245,12 +266,52 @@ async function jedenStrzal(system: string, tresc: string, model: string): Promis
     throw new AiError(`Model odpowiedział błędem ${res.status}. ${tekst.slice(0, 200)}`);
   }
 
+  /**
+   * Wyciągnięcie TEKSTU z odpowiedzi — miejsce, w którym dostawcy różnią się
+   * najbardziej, a portal przez to mówił „odpowiedź nie jest poprawnym
+   * JSON-em" wtedy, gdy tekstu w ogóle nie dostał.
+   *
+   * Co się zdarza naprawdę: `content` bywa tablicą kawałków zamiast napisu
+   * (tak robi część bramek zgodnych z OpenAI), modele „rozumujące" wkładają
+   * odpowiedź w `reasoning`/`reasoning_content`, a przy ucięciu na limicie
+   * tokenów `content` potrafi przyjść pusty przy `finish_reason: "length"`.
+   * Każdy z tych przypadków to co innego i każdy trzeba nazwać, bo inaczej
+   * diagnozuje się je po omacku, wdrożenie po wdrożeniu.
+   */
   const dane = (await res.json()) as {
     content?: { type: string; text?: string }[];
-    choices?: { message?: { content?: string } }[];
+    choices?: {
+      finish_reason?: string;
+      message?: { content?: string | { type?: string; text?: string }[]; reasoning?: string; reasoning_content?: string };
+    }[];
   };
-  if (dane.choices) return dane.choices[0]?.message?.content ?? "";
-  return (dane.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("");
+
+  const zKawalkow = (v: unknown): string =>
+    typeof v === "string"
+      ? v
+      : Array.isArray(v)
+      ? v.map((c) => (typeof c === "string" ? c : ((c as { text?: string })?.text ?? ""))).join("")
+      : "";
+
+  if (dane.choices) {
+    const wybor = dane.choices[0];
+    const tekst =
+      zKawalkow(wybor?.message?.content) ||
+      zKawalkow(wybor?.message?.reasoning) ||
+      zKawalkow(wybor?.message?.reasoning_content);
+    if (!tekst.trim()) {
+      throw new AiError(
+        wybor?.finish_reason === "length"
+          ? `Model „${model}" urwał odpowiedź na limicie tokenów, nie zdążywszy nic napisać.`
+          : `Model „${model}" odpowiedział bez treści (finish_reason: ${wybor?.finish_reason ?? "brak"}).`,
+        true,
+      );
+    }
+    return tekst;
+  }
+  const tekst = (dane.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("");
+  if (!tekst.trim()) throw new AiError(`Model „${model}" odpowiedział bez treści.`, true);
+  return tekst;
 }
 
 export class AiError extends Error {
@@ -328,7 +389,7 @@ function sprobuj(t: string): unknown {
  */
 export function parsujPropozycje(tekst: string): Propozycja[] {
   const dane = wyluskaj(tekst);
-  if (dane === null) throw new AiError("Odpowiedź modelu nie jest poprawnym JSON-em.", true);
+  if (dane === null) throw new AiError(bezJsonu(tekst), true);
   const lista = pierwszaTablica(dane);
   if (!lista) throw new AiError("Model nie zwrócił listy.", true);
   return lista
@@ -357,6 +418,20 @@ function pole(x: Record<string, unknown>, nazwy: string[]): string {
  * modele psują to na trzy różne sposoby: opakowują w ```json, dopisują zdanie
  * przed listą albo po prostu urywają się w połowie, gdy skończą im się znaki.
  */
+/**
+ * Komunikat o odpowiedzi, z której nie da się wyłuskać JSON-a — Z POCZĄTKIEM
+ * TEGO, CO MODEL NAPRAWDĘ PRZYSŁAŁ.
+ *
+ * Samo „odpowiedź nie jest poprawnym JSON-em" nie mówi nic: tak samo wygląda
+ * model, który grzecznie odmówił, model gadający prozą i model, któremu
+ * urwało się w połowie. Pierwsze dwieście znaków rozstrzyga to od razu,
+ * a zobaczy je tylko właściciel portalu — pod ramką błędu, małym drukiem.
+ */
+function bezJsonu(tekst: string): string {
+  const poczatek = tekst.trim().replace(/\s+/g, " ").slice(0, 200);
+  return `Odpowiedź modelu nie jest poprawnym JSON-em.${poczatek ? ` Model napisał: „${poczatek}…"` : ""}`;
+}
+
 function wyluskaj(tekst: string): unknown {
   const czysty = tekst.replace(/^\s*```(?:json)?/i, "").replace(/```\s*$/, "").trim();
   const caly = sprobuj(czysty);
@@ -471,7 +546,7 @@ export async function porozmawiaj(
 
   const tekst = await zapytaj(system, czesci.join("\n\n"));
   const dane = wyluskaj(tekst);
-  if (dane === null) throw new AiError("Odpowiedź modelu nie jest poprawnym JSON-em.", true);
+  if (dane === null) throw new AiError(bezJsonu(tekst), true);
   const obj = (dane && typeof dane === "object" && !Array.isArray(dane) ? dane : {}) as Record<string, unknown>;
   const odpowiedz = pole(obj, ["odpowiedz", "answer", "text", "reply", "message"]).slice(0, 2000);
   const lista = pierwszaTablica(dane) ?? [];
@@ -534,7 +609,7 @@ export async function wybierzKawalki(
 
   const tekst = await zapytaj(system, opis);
   const dane = wyluskaj(tekst);
-  if (dane === null) throw new AiError("Odpowiedź modelu nie jest poprawnym JSON-em.", true);
+  if (dane === null) throw new AiError(bezJsonu(tekst), true);
   const lista = pierwszaTablica(dane);
   if (!lista) throw new AiError("Model nie zwrócił listy.", true);
   return lista
