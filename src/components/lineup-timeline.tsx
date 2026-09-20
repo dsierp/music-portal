@@ -92,17 +92,56 @@ function toYear(date: string | null | undefined, fallback: number): number {
 }
 
 /** Znacznik płyty na osi — przy wierszu (płyta danego zespołu) albo globalny. */
+/**
+ * Rodzaj wydawnictwa — bo pionowa kreska „płyta" kłamała przez zrównanie.
+ *
+ * Na osi zespołu z trzydziestoletnim stażem połowa kresek to koncertówki,
+ * składanki i EP-ki. Wyglądały identycznie jak albumy studyjne, więc wykres
+ * sugerował tempo pracy, którego nie było. Teraz studyjne są jasne i grube,
+ * reszta cichnie i dostaje własny kolor.
+ */
+type RodzajWydania = "studio" | "live" | "ep" | "kompilacja" | "inne";
+
 interface Mark {
   mbid: string;
   title: string;
   artistText: string;
   year: string | null;
   date: string | null;
+  rodzaj: RodzajWydania;
+  /** czy to TA płyta, którą właśnie czytamy — wyróżniamy ją na osi */
+  biezaca?: boolean;
+}
+
+const STYL_WYDANIA: Record<RodzajWydania, { kolor: string; szer: number; krycie: number }> = {
+  studio: { kolor: "var(--text)", szer: 2, krycie: 0.75 },
+  live: { kolor: "#5b8fd6", szer: 1.5, krycie: 0.5 },
+  ep: { kolor: "#e0913f", szer: 1.5, krycie: 0.5 },
+  kompilacja: { kolor: "#7c8296", szer: 1.2, krycie: 0.4 },
+  inne: { kolor: "#7c8296", szer: 1.2, krycie: 0.35 },
+};
+
+function rodzajWydania(a: AlbumSummary): RodzajWydania {
+  const drugie = (a.secondaryTypes ?? []).map((x) => x.toLowerCase());
+  if (drugie.includes("live")) return "live";
+  if (drugie.includes("compilation")) return "kompilacja";
+  const pierwszy = (a.primaryType ?? "").toLowerCase();
+  if (pierwszy === "ep") return "ep";
+  if (pierwszy === "album" && !drugie.length) return "studio";
+  return pierwszy === "album" ? "inne" : "inne";
 }
 type Row = TimelineRow<Mark>;
 
-function markOf(a: AlbumSummary): Mark {
-  return { mbid: a.mbid, title: a.title, artistText: a.artistText, year: a.year, date: a.firstReleaseDate };
+function markOf(a: AlbumSummary, biezacaMbid?: string | null): Mark {
+  return {
+    mbid: a.mbid,
+    title: a.title,
+    artistText: a.artistText,
+    year: a.year,
+    date: a.firstReleaseDate,
+    rodzaj: rodzajWydania(a),
+    biezaca: !!biezacaMbid && a.mbid === biezacaMbid,
+  };
 }
 
 function Chart({
@@ -168,16 +207,28 @@ function Chart({
         <svg viewBox={`0 0 ${W} ${H}`} width={W} className="min-w-[680px] max-w-full" role="img" aria-label={t.axisAriaLabel}>
           {/* Pionowe kreski = płyty. Kółko na górze jest klikalne i ma podpowiedź
               (SVG <title> = natywny dymek przeglądarki, bez javascriptu). */}
-          {globalPoints.map((p, i) => (
-            <a key={`al-${i}`} href={`/album/${p.album.mbid}`} className="album-mark">
-              <title>{`${p.album.artistText} – ${p.album.title}${p.album.year ? ` (${p.album.year})` : ""}`}</title>
-              <line x1={x(p.year)} x2={x(p.year)} y1={10} y2={baseY} stroke="var(--text)" strokeWidth={1.5} opacity={0.5} />
-              <circle cx={x(p.year)} cy={7} r={5} fill="var(--bg)" stroke="var(--text)" strokeWidth={1.5} />
-              <circle cx={x(p.year)} cy={7} r={1.7} fill="var(--text)" />
-              {/* powiększone pole trafienia — w 5-pikselowe kółko trudno celować */}
-              <rect x={x(p.year) - 9} y={0} width={18} height={baseY} fill="transparent" />
-            </a>
-          ))}
+          {globalPoints.map((p, i) => {
+            const st = STYL_WYDANIA[p.album.rodzaj];
+            // TA płyta: akcentem portalu, grubiej i bez przygaszenia — żeby
+            // od razu było widać, w którym miejscu historii zespołu stoisz.
+            const kolor = p.album.biezaca ? "var(--accent2)" : st.kolor;
+            const szer = p.album.biezaca ? 3 : st.szer;
+            const krycie = p.album.biezaca ? 1 : st.krycie;
+            return (
+              <a key={`al-${i}`} href={`/album/${p.album.mbid}`} className="album-mark">
+                <title>
+                  {`${p.album.artistText} – ${p.album.title}${p.album.year ? ` (${p.album.year})` : ""}${
+                    p.album.biezaca ? ` — ${t.markThisOne}` : ""
+                  }`}
+                </title>
+                <line x1={x(p.year)} x2={x(p.year)} y1={10} y2={baseY} stroke={kolor} strokeWidth={szer} opacity={krycie} />
+                <circle cx={x(p.year)} cy={7} r={p.album.biezaca ? 6 : 5} fill="var(--bg)" stroke={kolor} strokeWidth={szer} />
+                <circle cx={x(p.year)} cy={7} r={p.album.biezaca ? 2.6 : 1.7} fill={kolor} />
+                {/* powiększone pole trafienia — w 5-pikselowe kółko trudno celować */}
+                <rect x={x(p.year) - 9} y={0} width={18} height={baseY} fill="transparent" />
+              </a>
+            );
+          })}
           {rows.map((row, i) => {
             const s = roleStyle(rowRoles(row), t);
             const y = i * ROW_H + 12;
@@ -272,10 +323,25 @@ function Chart({
               {label}
             </span>
           ))}
-          {globalPoints.length > 0 && (
+          {/* Legenda rodzajów — tylko te, które naprawdę są na wykresie.
+              Pokazywanie „koncertówka" przy zespole bez koncertówki to
+              zaśmiecanie podpisu rzeczami, których nie ma. */}
+          {globalPoints.length > 0 &&
+            (["studio", "live", "ep", "kompilacja"] as const)
+              .filter((r) => globalPoints.some((p) => p.album.rodzaj === r))
+              .map((r) => (
+                <span key={r} className="flex items-center gap-1.5">
+                  <span
+                    className="inline-block h-3"
+                    style={{ width: STYL_WYDANIA[r].szer + 1, background: STYL_WYDANIA[r].kolor, opacity: STYL_WYDANIA[r].krycie + 0.25 }}
+                  />
+                  {r === "studio" ? t.markStudio : r === "live" ? t.markLive : r === "ep" ? t.markEp : t.markCompilation}
+                </span>
+              ))}
+          {globalPoints.some((p) => p.album.biezaca) && (
             <span className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-0.5 bg-text" />
-              {markLabel}
+              <span className="inline-block h-3 w-[3px] bg-accent2" />
+              {t.markThisOne}
             </span>
           )}
           {rowPoints.some((p) => p.length > 0) && (
@@ -322,7 +388,20 @@ function Chart({
 }
 
 /** Widok zespołu: po lewej ludzie, pionowe kreski to dyskografia zespołu. */
-export function LineupTimeline({ members, albums, locale, t }: { members: Membership[]; albums: AlbumSummary[]; locale: Locale; t: TimelineLabels }) {
+export function LineupTimeline({
+  members,
+  albums,
+  locale,
+  t,
+  biezacaPlyta,
+}: {
+  members: Membership[];
+  albums: AlbumSummary[];
+  locale: Locale;
+  t: TimelineLabels;
+  /** MBID płyty, na której stronie jesteśmy — zostanie wyróżniona na osi */
+  biezacaPlyta?: string | null;
+}) {
   // Bez odsiewania po datach: człowiek bez dat członkostwa to nadal część składu.
   const rows = fillMissingSpans(mergeSpans<Membership, Mark>(members));
   // Pusto ≠ cicho. Wykres znikał bez słowa, gdy MusicBrainz nie miał składu —
@@ -334,7 +413,7 @@ export function LineupTimeline({ members, albums, locale, t }: { members: Member
     // i kiedy. Kto nie chce, zwinie.
     <details className="mt-6" open>
       <summary className="cursor-pointer text-muted hover:text-accent2">{plural(locale, rows.length, t.lineupSummary)}</summary>
-      <Chart rows={rows} albums={albums.map(markOf)} labelWidth={150} markLabel={t.markAlbumLabel} t={t} />
+      <Chart rows={rows} albums={albums.map((a) => markOf(a, biezacaPlyta))} labelWidth={150} markLabel={t.markAlbumLabel} t={t} />
     </details>
   );
 }
@@ -368,7 +447,7 @@ export function CareerTimeline({
   // MusicBrainz ma gołą relację bez dat i cała oś znikała. Czego nie da się
   // umiejscowić nawet po płytach, odpada w fillMissingSpans.
   const rows = fillMissingSpans(
-    mergeSpans<Membership, Mark>(bands, (m) => (albumsByBand.get(m.mbid) ?? []).map(markOf)),
+    mergeSpans<Membership, Mark>(bands, (m) => (albumsByBand.get(m.mbid) ?? []).map((a) => markOf(a))),
   );
 
   /**
@@ -380,7 +459,7 @@ export function CareerTimeline({
    * wcale, choć jego płyty leciały tam pionowymi kreskami bez przypisania.
    * Robimy mu wiersz z jego dyskografii — daty z płyt, stąd przerywany styl.
    */
-  const wlasneZnaczniki = own.map(markOf);
+  const wlasneZnaczniki = own.map((a) => markOf(a));
   const lata = wlasneZnaczniki.map((m) => m.date).filter((d): d is string => !!d).sort();
   const wlasnyWiersz: Row | null = lata.length
     ? {

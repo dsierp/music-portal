@@ -298,20 +298,19 @@ export default async function AlbumPage({
           </section>
         )}
 
-        {/* Oś czasu składu zespołu — tu, przy płycie, bo pytanie „kto to
-            nagrywał" pada właśnie na tej stronie. Dane już mamy (skład zespołu
-            i dyskografia lecą w tym samym Promise.all), więc nic nie kosztuje;
-            pionowe kreski to płyty, więc widać, gdzie w historii zespołu
-            siedzi ta, na którą patrzysz. */}
-        {band && band.members.filter((m) => !m.supporting).length > 0 && (
+        {/* KOLEJNOŚĆ TEJ STRONY jest odpowiedzią na pytania w tej kolejności,
+            w jakiej się je zadaje: najpierw „co tu jest" (utwory), potem „kto
+            to zagrał" (skład tej płyty), a na końcu „jak to się ma do reszty
+            historii zespołu" (oś czasu). Wcześniej oś szła pierwsza — czyli
+            portal odpowiadał na pytanie trzecie, zanim padło pierwsze. */}
+        {album.tracks.length > 0 && (
           <section className="mt-8">
-            <h2 className="mb-2 text-2xl">{t.album.lineupChartHeading}</h2>
-            <LineupTimeline
-              members={band.members.filter((m) => !m.supporting)}
-              albums={more}
-              locale={locale}
-              t={t.artist.timeline}
-            />
+            <h2 className="mb-2 text-2xl">{t.album.tracksHeading}</h2>
+            {/* Tempo dochodzi osobnym strumieniem: to pytanie do Deezera, a lista
+                utworów ma się pokazać natychmiast, nawet gdy on milczy. */}
+            <Suspense fallback={<ListaUtworow album={album} discs={discs} t={t} tempo={null} />}>
+              <ListaUtworowZTempem album={album} discs={discs} t={t} />
+            </Suspense>
           </section>
         )}
 
@@ -388,14 +387,22 @@ export default async function AlbumPage({
           )}
         </section>
 
-        {album.tracks.length > 0 && (
+
+        {/* Oś czasu składu zespołu — tu, przy płycie, bo pytanie „kto to
+            nagrywał" pada właśnie na tej stronie. Dane już mamy (skład zespołu
+            i dyskografia lecą w tym samym Promise.all), więc nic nie kosztuje;
+            pionowe kreski to płyty, więc widać, gdzie w historii zespołu
+            siedzi ta, na którą patrzysz. */}
+        {band && band.members.filter((m) => !m.supporting).length > 0 && (
           <section className="mt-8">
-            <h2 className="mb-2 text-2xl">{t.album.tracksHeading}</h2>
-            {/* Tempo dochodzi osobnym strumieniem: to pytanie do Deezera, a lista
-                utworów ma się pokazać natychmiast, nawet gdy on milczy. */}
-            <Suspense fallback={<ListaUtworow album={album} discs={discs} t={t} tempo={null} />}>
-              <ListaUtworowZTempem album={album} discs={discs} t={t} />
-            </Suspense>
+            <h2 className="mb-2 text-2xl">{t.album.lineupChartHeading}</h2>
+            <LineupTimeline
+              members={band.members.filter((m) => !m.supporting)}
+              albums={more}
+              locale={locale}
+              t={t.artist.timeline}
+              biezacaPlyta={mbid}
+            />
           </section>
         )}
 
