@@ -30,6 +30,11 @@ export async function GET() {
   void synchronizujHistorie(user.id).catch(() => {});
   if (teraz) {
     await zapiszOdsluch(user.id, { artist: teraz.artist, title: teraz.title, album: teraz.album, cover: teraz.cover, source: "spotify" });
+    // NAUKA: w odpowiedzi Spotify jest gotowy adres płyty. Jeśli portal tej
+    // płyty wcześniej nie znalazł (bo klikaliśmy w nią przed premierą), to od
+    // teraz zna — bez jednego dodatkowego zapytania.
+    const { zapamietajAdresPlyty } = await import("@/lib/spotify");
+    void zapamietajAdresPlyty(teraz.artist, teraz.album, teraz.albumUrl).catch(() => {});
   }
   return NextResponse.json({ teraz }, { headers: { "cache-control": "no-store" } });
 }

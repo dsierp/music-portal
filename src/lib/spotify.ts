@@ -224,6 +224,8 @@ export interface NowPlaying {
   artist: string;
   album: string;
   url: string;
+  /** adres PŁYTY w Spotify (nie utworu) — do nauki, patrz `zapamietajAdresPlyty` */
+  albumUrl: string | null;
   cover: string | null;
   playing: boolean;
 }
@@ -233,7 +235,48 @@ interface SpTrack {
   uri: string;
   external_urls?: { spotify?: string };
   artists?: { name: string }[];
-  album?: { name: string; images?: { url: string }[] };
+  // `id` i `external_urls` albumu: stąd bierze się ADRES PŁYTY, którego portal
+  // wcześniej nie umiał znaleźć — patrz `zapamietajAdresPlyty`.
+  album?: { id?: string; name: string; images?: { url: string }[]; external_urls?: { spotify?: string } };
+}
+
+/** Adres płyty (nie utworu) z odpowiedzi Spotify. */
+function adresAlbumu(t: SpTrack): string | null {
+  return t.album?.external_urls?.spotify ?? (t.album?.id ? `https://open.spotify.com/album/${t.album.id}` : null);
+}
+
+/**
+ * NAUKA Z ODSŁUCHÓW: zapamiętanie adresu płyty, której portal sam nie znalazł.
+ *
+ * Skąd pomysł i dlaczego jest dobry: przy premierze klikamy w płytę, zanim
+ * jeszcze wyjdzie — Spotify jej wtedy nie ma, więc przycisk prowadzi do
+ * wyszukiwarki. Kilka dni później człowiek słucha jej normalnie w Spotify,
+ * a portal i tak o to pyta (kafelek „słuchasz teraz" i jednorazowa historia).
+ * W tej odpowiedzi jest gotowy adres ALBUMU. Byłoby marnotrawstwem go wyrzucić
+ * i dalej wysyłać ludzi do wyszukiwarki — więc wkładamy go do tego samego
+ * bufora, z którego korzysta `spotifyFindAlbum`.
+ *
+ * Zapisujemy tylko wtedy, gdy nic tam jeszcze nie ma: wynik z wyszukiwania
+ * katalogu jest równie dobry, a nadpisywanie go w kółko to zapytania do bazy
+ * przy każdym mrugnięciu kafelka. Nie kosztuje to ANI JEDNEGO zapytania do
+ * Spotify — dane już mamy.
+ */
+export async function zapamietajAdresPlyty(artist: string, album: string, url: string | null): Promise<void> {
+  // Identyfikator wyciągamy z adresu, bo bufor trzyma JEDEN I TEN SAM kształt
+  // dla obu dróg — tej z wyszukiwania katalogu i tej z odsłuchu. Bez `id`
+  // wysyłka podróży do Spotify dostałaby pusty napis zamiast płyty.
+  const id = url?.match(/album\/([A-Za-z0-9]+)/)?.[1] ?? "";
+  if (!artist || !album || !url || !id) return;
+  try {
+    const klucz = `spotify:album:v1:${artist.toLowerCase()}|${album.toLowerCase()}`;
+    const NA_ZAWSZE = 60 * 60 * 24 * 3650;
+    // `cached` zapisuje tylko wtedy, gdy w buforze nic nie ma — czyli nie
+    // nadpisujemy wyniku wyszukiwania i nie piszemy do bazy przy każdym
+    // mrugnięciu kafelka „słuchasz teraz".
+    await cached(klucz, NA_ZAWSZE, async () => ({ id, url, title: album, artists: artist }));
+  } catch {
+    // Nauka jest dodatkiem. Gdy się nie uda, zostaje zwykłe szukanie.
+  }
 }
 
 /**
@@ -249,6 +292,7 @@ export async function nowPlaying(userId: string): Promise<NowPlaying | null> {
     artist: (item.artists ?? []).map((a) => a.name).join(", "),
     album: item.album?.name ?? "",
     url: item.external_urls?.spotify ?? "",
+    albumUrl: adresAlbumu(item),
     cover: item.album?.images?.[item.album.images.length - 1]?.url ?? null,
     playing: dane?.is_playing !== false,
   };
@@ -260,7 +304,7 @@ export async function nowPlaying(userId: string): Promise<NowPlaying | null> {
  * Pytamy rzadko (patrz `synchronizujHistorie`), bo to jest uzupełnianie
  * przeszłości, a nie śledzenie: przeszłość się nie zmienia.
  */
-export async function recentlyPlayed(userId: string): Promise<{ artist: string; title: string; album: string; cover: string | null; at: Date }[]> {
+export async function recentlyPlayed(userId: string): Promise<{ artist: string; title: string; album: string; albumUrl: string | null; cover: string | null; at: Date }[]> {
   const dane = await api<{ items?: { track?: SpTrack; played_at?: string }[] }>(
     userId,
     "/me/player/recently-played?limit=50",
@@ -273,6 +317,7 @@ export async function recentlyPlayed(userId: string): Promise<{ artist: string; 
       artist: (i.track!.artists ?? []).map((a) => a.name).join(", "),
       title: i.track!.name,
       album: i.track!.album?.name ?? "",
+      albumUrl: adresAlbumu(i.track!),
       cover: i.track!.album?.images?.[i.track!.album.images.length - 1]?.url ?? null,
       at: i.played_at ? new Date(i.played_at) : new Date(),
     }));

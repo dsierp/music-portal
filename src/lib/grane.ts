@@ -175,8 +175,11 @@ export async function synchronizujHistorie(userId: string): Promise<void> {
   if (await cacheHasNote(klucz).catch(() => true)) return;
   await cacheNote(klucz, 15 * 60).catch(() => {});
   try {
-    const { recentlyPlayed } = await import("./spotify");
+    const { recentlyPlayed, zapamietajAdresPlyty } = await import("./spotify");
     const lista = await recentlyPlayed(userId);
+    // Przy okazji uczymy się adresów płyt, których portal sam nie znalazł —
+    // patrz `zapamietajAdresPlyty`. Historia i tak przyszła, więc to darmowe.
+    for (const o of lista) void zapamietajAdresPlyty(o.artist, o.album, o.albumUrl).catch(() => {});
     for (const o of lista) {
       // `playedAt` bierzemy od Spotify, nie z zegara — inaczej cała historia
       // wylądowałaby w dzienniku pod dzisiejszą datą.
