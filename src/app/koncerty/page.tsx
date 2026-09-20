@@ -6,7 +6,7 @@ import { AddToList } from "@/components/add-to-list";
 import { heroArt, leadStyle } from "@/lib/lead-style";
 import { currentUser } from "@/lib/auth";
 import { getAreas, getFavoriteArtists, getGenres, getUserLocale, getMyLists } from "@/lib/user-data";
-import { acceptedLabels, concertWindow, concertsByArea, concertsByAreaMb, concertsForFavorites, dedupe, hasTicketmasterKey, matchesGenres, offGenre, zgadnijZespol, type Concert } from "@/lib/concerts";
+import { acceptedLabels, concertWindow, concertsByArea, concertsByAreaMb, concertsForFavorites, dedupe, hasTicketmasterKey, matchesGenres, offGenre, zgadnijZespol, type Concert, type StatusObszaru } from "@/lib/concerts";
 import { dbSafe } from "@/lib/db-safe";
 import { i18n } from "@/lib/t";
 import { ScreenHelp } from "@/components/screen-help";
@@ -202,11 +202,24 @@ async function ByArea({
 }) {
   // MusicBrainz zawsze (za darmo), Ticketmaster gdy jest klucz — i scalamy,
   // bo dla czytelnika to jedna lista koncertów w jego mieście.
+  const pusto = { items: [] as Concert[], statusy: [] as StatusObszaru[] };
   const [mb, tm] = await Promise.all([
-    concertsByAreaMb(areas).catch(() => []),
-    concertsByArea(areas, categories).catch(() => []),
+    concertsByAreaMb(areas).catch(() => pusto),
+    concertsByArea(areas, categories).catch(() => pusto),
   ]);
-  const zebrane = dedupe([...tm, ...mb]);
+  const zebrane = dedupe([...tm.items, ...mb.items]);
+  /**
+   * ILE Z KTÓREGO MIASTA — bo obszar bez wyników po prostu znikał.
+   * Przy dwóch miastach w profilu wyglądało to na zgubione miasto, a nie na
+   * pusty tydzień; a gdy zapytanie padło, wyglądało dokładnie tak samo.
+   * Sumujemy oba źródła (przed odsianiem duplikatów, więc to rząd wielkości,
+   * nie rachunek) i mówimy wprost, czego nie udało się sprawdzić.
+   */
+  const obszary = new Map<string, { ile: number; blad: boolean }>();
+  for (const st of [...mb.statusy, ...tm.statusy]) {
+    const b = obszary.get(st.etykieta) ?? { ile: 0, blad: false };
+    obszary.set(st.etykieta, { ile: b.ile + st.ile, blad: b.blad || st.blad });
+  }
   // Ticketmaster traktuje gatunek jak podpowiedź, nie filtr — stąd Melanie
   // Martinez w wynikach zapytania o metal. Odsiewamy to, co ma etykiety i żadna
   // nie pasuje; koncerty bez etykiet zostają, bo o nich po prostu nic nie wiemy.
@@ -233,6 +246,13 @@ async function ByArea({
   return (
     <>
       <GenreChips items={zebrane} wybrany={wybrany} moje={moje} wszystko={wszystko} locale={locale} t={t} />
+      {obszary.size > 1 && (
+        <p className="mb-3 font-mono text-[10px] text-faint">
+          {[...obszary.entries()]
+            .map(([etykieta, { ile, blad }]) => `${etykieta}: ${blad ? t.concerts.areaFailed : ile}`)
+            .join(" · ")}
+        </p>
+      )}
       {items.length ? (
         <ConcertList items={items} locale={locale} t={t} lists={lists} />
       ) : (

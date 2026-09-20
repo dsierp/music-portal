@@ -98,11 +98,12 @@ async function KoncertyZajawka({ userId, t, locale }: { userId: string; t: Dict;
   if (!areas.length) return null;
   const { concertsByArea, concertsByAreaMb, dedupe, zgadnijZespol } = await import("@/lib/concerts");
   const kategorie = genres.map((g) => g.genre);
+  const pusto = { items: [] as Awaited<ReturnType<typeof concertsByAreaMb>>["items"], statusy: [] };
   const [mb, tm] = await Promise.all([
-    concertsByAreaMb(areas).catch(() => []),
-    concertsByArea(areas, kategorie).catch(() => []),
+    concertsByAreaMb(areas).catch(() => pusto),
+    concertsByArea(areas, kategorie).catch(() => pusto),
   ]);
-  const items = dedupe([...tm, ...mb]).slice(0, 3);
+  const items = dedupe([...tm.items, ...mb.items]).slice(0, 3);
   if (!items.length) return null;
   return (
     <section>

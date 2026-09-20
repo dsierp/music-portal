@@ -297,9 +297,29 @@ export function pisownie(miasto: string): string[] {
   return [...new Set([miasto.trim(), ...(NAZWY_ZAMIENNE[bez] ?? [])])];
 }
 
-export async function concertsByAreaMb(areas: Area[]): Promise<Concert[]> {
+/**
+ * Co się stało z JEDNYM obszarem — bo „pusto" i „nie udało się sprawdzić" to
+ * dwie różne odpowiedzi, a wyglądały identycznie: obszar bez wyników po prostu
+ * znikał z ekranu. Przy dwóch miastach w profilu wygląda to jak zgubione
+ * miasto („mam Warszawę, ale zniknął Kraków... a był").
+ */
+export interface StatusObszaru {
+  /** „Kraków (Poland)" albo samo „Poland" — gotowe do pokazania */
+  etykieta: string;
+  /** ile wydarzeń stamtąd przyszło (przed filtrem gatunków) */
+  ile: number;
+  /** true = zapytanie padło; wtedy `ile: 0` nie znaczy „nic nie grają" */
+  blad: boolean;
+}
+
+export function etykietaObszaru(a: Area): string {
+  return a.city ? `${a.city} (${a.country})` : a.country;
+}
+
+export async function concertsByAreaMb(areas: Area[]): Promise<{ items: Concert[]; statusy: StatusObszaru[] }> {
   const { from, to } = concertWindow();
   const out: Concert[] = [];
+  const statusy: StatusObszaru[] = [];
   for (const area of areas.slice(0, 5)) {
     // Wszystkie pisownie naraz — jedno zapytanie, nie trzy.
     const where = area.city
@@ -310,22 +330,31 @@ export async function concertsByAreaMb(areas: Area[]): Promise<Concert[]> {
     url.searchParams.set("limit", "50");
     url.searchParams.set("fmt", "json");
     const key = `mb:events-area:v1:${area.country}:${area.city ?? "*"}:${from}`;
+    let blad = false;
     const data = await cached<{ events?: MbEvent[] }>(key, TTL.search, async () => {
       const res = await mbRawFetch(url);
       if (!res.ok) throw new MbError(`MusicBrainz events ${res.status}`, res.status);
       return (await res.json()) as { events?: MbEvent[] };
-    }).catch(() => ({ events: [] as MbEvent[] }));
-    out.push(...(data.events ?? []).filter((e) => !e.cancelled).map((e) => mbToConcert(e)).filter((c) => c.date >= from && c.date <= to));
+    }).catch(() => {
+      // Zadyszka MusicBrainz — zapamiętujemy ją, zamiast udawać pustkę.
+      blad = true;
+      return { events: [] as MbEvent[] };
+    });
+    const zObszaru = (data.events ?? []).filter((e) => !e.cancelled).map((e) => mbToConcert(e)).filter((c) => c.date >= from && c.date <= to);
+    out.push(...zObszaru);
+    statusy.push({ etykieta: etykietaObszaru(area), ile: zObszaru.length, blad });
   }
-  return dedupe(out);
+  return { items: dedupe(out), statusy };
 }
 
 /** Koncerty w moich obszarach i moich gatunkach (Ticketmaster — wymaga klucza). */
-export async function concertsByArea(areas: Area[], categories: string[]): Promise<Concert[]> {
-  if (!areas.length || !hasTicketmasterKey()) return [];
+export async function concertsByArea(areas: Area[], categories: string[]): Promise<{ items: Concert[]; statusy: StatusObszaru[] }> {
+  if (!areas.length || !hasTicketmasterKey()) return { items: [], statusy: [] };
   const genres = tmGenres(categories);
   const out: Concert[] = [];
+  const statusy: StatusObszaru[] = [];
   for (const area of areas.slice(0, 5)) {
+    const przed = out.length;
     // Bez wybranych gatunków pytamy o wszystko, co gra w okolicy.
     for (const g of (genres.length ? genres : [null]).slice(0, 4)) {
       // Ticketmaster zna miasto pod JEDNĄ nazwą i przy innej oddaje pustkę
@@ -339,8 +368,9 @@ export async function concertsByArea(areas: Area[], categories: string[]): Promi
         }
       }
     }
+    statusy.push({ etykieta: etykietaObszaru(area), ile: out.length - przed, blad: false });
   }
-  return dedupe(out);
+  return { items: dedupe(out), statusy };
 }
 
 interface MbEvent {
