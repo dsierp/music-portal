@@ -2,6 +2,7 @@ import type { Links } from "@/lib/musicbrainz";
 import type { ExternalRating } from "@/lib/externalRatings";
 import { i18n } from "@/lib/t";
 import { fmt } from "@/lib/i18n";
+import { SerwisyPills } from "./serwisy";
 
 /**
  * Pasek linków zewnętrznych — Spotify i Tidal zawsze, reszta gdy jest.
@@ -34,19 +35,6 @@ export async function LinksRow({
   const cls = compact ? "text-xs" : "text-sm";
   const wikipedia = links.wikipedia ?? wikiUrl ?? null;
   const dokladne = new Set(links.exact ?? []);
-  /**
-   * Spotify i Tidal prowadzą przez naszą trasę, która szuka adresu DOPIERO
-   * przy kliknięciu. Inaczej prawie zawsze wychodziła wyszukiwarka: MusicBrainz
-   * wiesza adresy streamingu przy konkretnym wydaniu, a nie przy grupie
-   * wydawniczej, więc pytanie o samą grupę wracało puste — choć płyta
-   * w serwisie jest.
-   */
-  const przezTrase = (serwis: "spotify" | "tidal") =>
-    mbid
-      ? `/go/serwis?serwis=${serwis}&typ=${typ ?? "release-group"}&mbid=${encodeURIComponent(mbid)}&etykieta=${encodeURIComponent(etykieta ?? "")}`
-      : serwis === "spotify"
-        ? links.spotify
-        : links.tidal;
   const wynikiLinkow = mbid
     ? await kvGetMany<{ url: string | null }>([`link:spotify:${mbid}`, `link:tidal:${mbid}`]).catch(() => new Map())
     : new Map();
@@ -65,6 +53,18 @@ export async function LinksRow({
    * klikał w „Bandcamp" spodziewając się płyty, a lądował w wyszukiwarce.
    * Teraz strzałka znaczy „wchodzisz prosto tam", lupka „to jest szukanie".
    */
+  /**
+   * Pigułki, a nie goły tekst — ten sam kształt co przy premierach.
+   *
+   * Wcześniej ten sam gest („posłuchaj tego") wyglądał na dwa sposoby
+   * zależnie od ekranu: na premierach obwiedziony guzik, na stronie płyty
+   * linijka tekstu. To samo znaczy to samo, więc ma wyglądać tak samo —
+   * a przy okazji w guzik łatwiej trafić palcem na telefonie.
+   *
+   * Znak przed nazwą zostaje, bo niesie treść: strzałka to „wchodzisz prosto
+   * tam", lupka to „to jest szukanie".
+   */
+  const pill = "rounded-full border px-3 py-1 font-mono transition-colors";
   const Odnosnik = ({ url, stan, nazwa, klasa }: { url: string; stan: boolean | undefined; nazwa: string; klasa: string }) => (
     <a
       href={url}
@@ -77,22 +77,39 @@ export async function LinksRow({
             ? fmt(t.lists.onlySearch, { name: nazwa })
             : fmt(t.lists.notChecked, { name: nazwa })
       }
-      className={`${klasa} hover:underline`}
+      className={`${pill} ${klasa}`}
     >
       {stan === true ? "▸" : stan === false ? "⌕" : "·"} {nazwa}
     </a>
   );
 
   return (
-    <div className={`flex flex-wrap gap-x-4 gap-y-1 font-mono ${cls}`}>
-      <Odnosnik url={przezTrase("spotify")} stan={stanSerwisu("spotify")} nazwa="Spotify" klasa="text-spotify hover:text-spotify" />
-      <Odnosnik url={przezTrase("tidal")} stan={stanSerwisu("tidal")} nazwa="Tidal" klasa="text-tidal hover:text-tidal" />
-      {links.bandcamp && <Odnosnik url={links.bandcamp} stan={dokladne.has("bandcamp")} nazwa="Bandcamp" klasa="text-text2" />}
-      {links.metalArchives && <Odnosnik url={links.metalArchives} stan={dokladne.has("metalArchives")} nazwa="Metal-Archives" klasa="text-text2" />}
-      {links.allmusic && <Odnosnik url={links.allmusic} stan={dokladne.has("allmusic")} nazwa="AllMusic" klasa="text-text2" />}
-      {links.discogs && <Odnosnik url={links.discogs} stan={dokladne.has("discogs")} nazwa="Discogs" klasa="text-text2" />}
-      {wikipedia && <Odnosnik url={wikipedia} stan={true} nazwa="Wikipedia" klasa="text-text2" />}
-      {links.official && <Odnosnik url={links.official} stan={true} nazwa="www" klasa="text-text2" />}
+    <div className={`flex flex-wrap items-center gap-2 font-mono ${cls}`}>
+      {/* Spotify i Tidal idą przez WSPÓLNY komponent — ten sam, co na
+          premierach, półkach i w best of. Jeden guzik, jedna trasa, jeden
+          zapis w dzienniku; patrz `components/serwisy.tsx`. */}
+      <SerwisyPills
+        etykieta={etykieta ?? ""}
+        mbid={mbid}
+        typ={typ ?? "release-group"}
+        stanSpotify={stanSerwisu("spotify")}
+        stanTidal={stanSerwisu("tidal")}
+        tytul={(serwis, stan) => {
+          const nazwa = serwis === "spotify" ? "Spotify" : "Tidal";
+          return stan === true
+            ? fmt(t.lists.openIn, { name: nazwa })
+            : stan === false
+              ? fmt(t.lists.onlySearch, { name: nazwa })
+              : fmt(t.lists.notChecked, { name: nazwa });
+        }}
+        small={compact}
+      />
+      {links.bandcamp && <Odnosnik url={links.bandcamp} stan={dokladne.has("bandcamp")} nazwa="Bandcamp" klasa="border-rule text-muted hover:border-accent2 hover:text-accent2" />}
+      {links.metalArchives && <Odnosnik url={links.metalArchives} stan={dokladne.has("metalArchives")} nazwa="Metal-Archives" klasa="border-rule text-muted hover:border-accent2 hover:text-accent2" />}
+      {links.allmusic && <Odnosnik url={links.allmusic} stan={dokladne.has("allmusic")} nazwa="AllMusic" klasa="border-rule text-muted hover:border-accent2 hover:text-accent2" />}
+      {links.discogs && <Odnosnik url={links.discogs} stan={dokladne.has("discogs")} nazwa="Discogs" klasa="border-rule text-muted hover:border-accent2 hover:text-accent2" />}
+      {wikipedia && <Odnosnik url={wikipedia} stan={true} nazwa="Wikipedia" klasa="border-rule text-muted hover:border-accent2 hover:text-accent2" />}
+      {links.official && <Odnosnik url={links.official} stan={true} nazwa="www" klasa="border-rule text-muted hover:border-accent2 hover:text-accent2" />}
     </div>
   );
 }
@@ -120,11 +137,11 @@ export async function ReviewLinks({ links, ratings }: { links: Links; ratings?: 
   return (
     <div>
       <h3 className="label mb-1">{t.common.reviewsTitle}</h3>
-      <div className="flex flex-col gap-1 font-mono text-sm">
+      <div className="flex flex-wrap items-center gap-2 font-mono text-sm">
         {items.map((i) => {
           const r = byLabel.get(i.label);
           return (
-            <div key={i.label} className="flex flex-wrap items-baseline gap-x-2">
+            <div key={i.label} className="flex items-center gap-1.5">
               {/* Ten sam znak co wszędzie: strzałka prowadzi prosto,
                   lupka do wyszukiwania. */}
               <a
@@ -132,7 +149,7 @@ export async function ReviewLinks({ links, ratings }: { links: Links; ratings?: 
                 target="_blank"
                 rel="noopener"
                 title={dokladne.has(i.klucz as never) ? fmt(t.lists.openIn, { name: i.label }) : fmt(t.lists.onlySearch, { name: i.label })}
-                className="text-text2 hover:text-accent2 hover:underline"
+                className="rounded-full border border-rule px-3 py-1 text-muted transition-colors hover:border-accent2 hover:text-accent2"
               >
                 {dokladne.has(i.klucz as never) ? "▸" : "⌕"} {i.label}
               </a>
@@ -154,16 +171,11 @@ export async function ReviewLinks({ links, ratings }: { links: Links; ratings?: 
 }
 
 /**
- * Linki dla pozycji bez MBID (premiery, best of).
+ * USUNIĘTE: `searchLinks`.
  *
- * Spotify prowadzi przez naszą trasę, która dopiero przy kliknięciu szuka
- * konkretnej płyty — na stronie z premierami jest ich kilkadziesiąt, a kwota
- * aplikacji nie zniosłaby pytania o wszystkie z góry.
+ * Budowało adresy do serwisów na boku — Spotify przez własną trasę, Tidala
+ * prosto w wyszukiwarkę. Efekt: przyciski przy premierach i w best of
+ * wyglądały jak pozostałe, ale nie zapisywały wyjścia w dzienniku, a Tidal
+ * z zasady lądował w wyszukiwarce. Wszystkie te miejsca używają teraz
+ * wspólnego `SerwisyPills` (components/serwisy.tsx).
  */
-export function searchLinks(artist: string, album: string): Links {
-  const q = encodeURIComponent(`${artist} ${album}`);
-  return {
-    spotify: `/go/spotify?artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(album)}`,
-    tidal: `https://listen.tidal.com/search?q=${q}`,
-  };
-}

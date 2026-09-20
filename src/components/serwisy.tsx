@@ -1,23 +1,71 @@
 import Link from "next/link";
 
 /**
- * Dwa przyciski: posłuchaj w Spotify, posłuchaj w Tidalu. Jedno miejsce.
+ * JEDEN przycisk „posłuchaj" na cały portal — Spotify i Tidal.
  *
- * Wcześniej każdy ekran rysował je po swojemu i — co gorsza — prowadził
- * WPROST do wyszukiwarki serwisu. Przy tytule w rodzaju „III" taka wyszukiwarka
- * pokazuje wszystko oprócz szukanej płyty, więc przycisk wyglądał jak zepsuty.
+ * Powód, dla którego to jest osobny plik, a nie trzy kopie w trzech miejscach:
+ * ten sam gest wyglądał i DZIAŁAŁ inaczej zależnie od ekranu. Na premierach
+ * obwiedziony guzik prowadzący przez naszą trasę, na stronie płyty linijka
+ * tekstu, w podróży coś trzeciego, a gdzieniegdzie goły adres wyszukiwarki
+ * serwisu — ten ostatni nie zapisywał nawet, że człowiek stąd wyszedł, więc
+ * dziennik odsłuchów miał dziury. To samo ma znaczyć to samo i robić to samo.
  *
- * Teraz oba idą przez naszą trasę `/go/serwis`, która adres ustala DOPIERO przy
- * kliknięciu: pyta MusicBrainz, a gdy ten nie wie — katalog serwisu po nazwie.
- * Dzięki temu trafia w konkretną płytę, a wyszukiwarka zostaje ostatnią deską
- * ratunku zamiast być regułą. Przy okazji wyjście zapisuje się w dzienniku
- * („puszczone z portalu"), co przy Tidalu jest JEDYNYM śladem odsłuchania,
- * jaki w ogóle mamy — ich API nie oddaje ani historii, ani „co teraz gra".
+ * CO ROBI TRASA (`/go/serwis`, a w podróży `/go/stop`): adres płyty ustala
+ * DOPIERO przy kliknięciu — najpierw MusicBrainz, potem katalog serwisu po
+ * nazwie, a wyszukiwarka jest ostatnią deską ratunku. Przy okazji zapisuje
+ * wyjście w dzienniku („puszczone z portalu"), a w podróży stawia ptaszek.
+ * Dlatego NIGDY nie budujemy tu adresu serwisu wprost.
+ *
+ * ZNAK PRZED NAZWĄ niesie treść i dlatego został: strzałka „wchodzisz prosto
+ * w płytę", lupka „to będzie szukanie", kropka „jeszcze nie sprawdzaliśmy".
  */
+export type StanLinku = boolean | undefined;
+
+const PILL = "rounded-full border px-3 py-1 font-mono transition-colors";
+const BARWA: Record<"spotify" | "tidal", string> = {
+  spotify: "border-spotify/40 text-spotify hover:bg-spotify/10",
+  tidal: "border-tidal/40 text-tidal hover:bg-tidal/10",
+};
+const NAZWA: Record<"spotify" | "tidal", string> = { spotify: "Spotify", tidal: "Tidal" };
+
+function znak(stan: StanLinku): string {
+  return stan === true ? "▸" : stan === false ? "⌕" : "·";
+}
+
+/** Pojedynczy guzik — do użycia tam, gdzie adres buduje wywołujący (podróż). */
+export function SerwisPill({
+  serwis,
+  href,
+  stan,
+  title,
+  small = false,
+}: {
+  serwis: "spotify" | "tidal";
+  href: string;
+  stan?: StanLinku;
+  title?: string;
+  small?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      prefetch={false}
+      title={title}
+      className={`${PILL} ${BARWA[serwis]} ${small ? "text-[11px]" : "text-xs"}`}
+    >
+      {znak(stan)} {NAZWA[serwis]}
+    </Link>
+  );
+}
+
+/** Para guzików dla płyty (albo artysty) — domyślna droga przez `/go/serwis`. */
 export function SerwisyPills({
   etykieta,
   mbid,
   typ = "release-group",
+  stanSpotify,
+  stanTidal,
+  tytul,
   small = false,
   className = "",
 }: {
@@ -26,20 +74,24 @@ export function SerwisyPills({
   /** MBID, gdy znany — wtedy trasa pyta najpierw MusicBrainz */
   mbid?: string | null;
   typ?: "release-group" | "artist";
+  /** co już wiemy o tym, czy link prowadzi prosto w płytę (z poprzednich kliknięć) */
+  stanSpotify?: StanLinku;
+  stanTidal?: StanLinku;
+  /** podpowiedzi pod kursorem, osobne dla każdego stanu (z tłumaczeń) */
+  tytul?: (serwis: "spotify" | "tidal", stan: StanLinku) => string;
   small?: boolean;
   className?: string;
 }) {
-  const pill = "rounded-full border px-3 py-1 font-mono transition-colors";
   const adres = (serwis: "spotify" | "tidal") =>
     `/go/serwis?serwis=${serwis}&typ=${typ}&mbid=${encodeURIComponent(mbid ?? "")}&etykieta=${encodeURIComponent(etykieta)}`;
   return (
-    <div className={`flex flex-wrap items-center gap-2 ${small ? "text-[11px]" : "text-xs"} ${className}`}>
-      <Link href={adres("spotify")} prefetch={false} className={`${pill} border-spotify/40 text-spotify hover:bg-spotify/10`}>
-        ▸ Spotify
-      </Link>
-      <Link href={adres("tidal")} prefetch={false} className={`${pill} border-tidal/40 text-tidal hover:bg-tidal/10`}>
-        ▸ Tidal
-      </Link>
+    <div className={`flex flex-wrap items-center gap-2 ${className}`}>
+      {(["spotify", "tidal"] as const).map((s) => {
+        const stan = s === "spotify" ? stanSpotify : stanTidal;
+        return (
+          <SerwisPill key={s} serwis={s} href={adres(s)} stan={stan} title={tytul?.(s, stan)} small={small} />
+        );
+      })}
     </div>
   );
 }

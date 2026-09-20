@@ -8,6 +8,7 @@ import { spotifyConfigured, spotifyConnected } from "@/lib/spotify";
 import { connectSpotify, deleteListAction, kawalkiZListy, removeFromListAction, sendJourneyToSpotify, shareListAction, toggleVisitAction } from "@/app/actions";
 import { Cover } from "@/components/cover";
 import { i18n } from "@/lib/t";
+import { SerwisPill } from "@/components/serwisy";
 import { fmt, formatDate, plural } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
@@ -171,7 +172,7 @@ export default async function ListPage({
                     drodze stawia ptaszek — „znam to" bierze się z tego, co
                     człowiek i tak robi, a nie z pamiętania o odhaczeniu. */}
                 {it.targetType !== "CONCERT" && (
-                  <div className="mt-0.5 flex gap-3">
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
                     {[
                       // Oba serwisy dobiera teraz trasa /go/stop przy kliknięciu:
                       // najpierw adres z MusicBrainz (działa też dla utworu i —
@@ -188,11 +189,15 @@ export default async function ListPage({
                       // w płytę i nie zdziwił się wyszukiwarką.
                       stan: stanLinku.get(`${s.serwis}:${it.targetMbid}`),
                     })).map((s) => (
-                      <a
+                      // TEN SAM guzik co wszędzie indziej (components/serwisy.tsx);
+                      // inny jest tylko adres, bo przystanek idzie przez /go/stop,
+                      // które dodatkowo stawia ptaszek „znam to".
+                      <SerwisPill
                         key={s.nazwa}
+                        serwis={s.serwis as "spotify" | "tidal"}
                         href={`/go/stop?listId=${encodeURIComponent(id)}&type=${it.targetType}&mbid=${encodeURIComponent(it.targetMbid)}${s.param}`}
-                        target="_blank"
-                        rel="noopener"
+                        stan={s.stan}
+                        small
                         title={
                           s.stan === true
                             ? fmt(t.lists.openIn, { name: s.nazwa })
@@ -200,12 +205,7 @@ export default async function ListPage({
                               ? fmt(t.lists.onlySearch, { name: s.nazwa })
                               : fmt(t.lists.notChecked, { name: s.nazwa })
                         }
-                        className={`font-mono text-[10px] hover:text-accent2 ${s.stan === true ? "text-accent2" : "text-faint"}`}
-                      >
-                        {/* Trzy stany, bo dwa kłamały: dopóki nie sprawdzimy,
-                            „strzałka" obiecywała wejście prosto w płytę. */}
-                        {s.stan === true ? "▸" : s.stan === false ? "⌕" : "·"} {s.nazwa}
-                      </a>
+                      />
                     ))}
                   </div>
                 )}

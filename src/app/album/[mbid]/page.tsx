@@ -68,20 +68,15 @@ export default async function AlbumPage({
   const user = await currentUser();
   const mainArtist = album.credit[0];
   /**
-   * Adres płyty w Spotify.
+   * Adresy Spotify i Tidala NIE są już tu podmieniane.
    *
-   * MusicBrainz rzadko ma bezpośredni link, a wtedy `buildLinks` daje adres do
-   * WYSZUKIWARKI — i tam trzeba było celować drugi raz. Gdy więc nie ma linku
-   * wprost, prowadzimy przez naszą trasę: ta znajdzie płytę w chwili kliknięcia
-   * (a nie przy każdym wejściu na stronę — kwota aplikacji Spotify jest mała
-   * i wspólna dla całego portalu).
+   * Kiedyś stała tu łatka: gdy MusicBrainz nie miał adresu płyty, podstawialiśmy
+   * własną trasę `/go/spotify` — ale tylko dla Spotify i tylko na tym ekranie.
+   * Dziś oba serwisy prowadzą przez jeden wspólny guzik (`components/serwisy.tsx`
+   * → `/go/serwis`), który sam wybiera drogę i zapisuje wyjście w dzienniku.
+   * Łatka była więc trzecim mechanizmem robiącym to samo gorzej.
    */
-  const linki = album.links.spotify.includes("/search/")
-    ? {
-        ...album.links,
-        spotify: `/go/spotify?artist=${encodeURIComponent(album.artistText)}&album=${encodeURIComponent(album.title)}`,
-      }
-    : album.links;
+  const linki = album.links;
   // Dane z bazy przez dbSafe: gdy lokalna baza padnie, strona ma dalej pokazać
   // to, co pochodzi z MusicBrainz/Wikipedii, a nie zamienić się w ekran błędu.
   const [summaryS, treeS, likedS, likesS, wiki, more, externalRatings, pressRatings, band] = await Promise.all([
