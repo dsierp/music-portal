@@ -393,11 +393,17 @@ export default async function AlbumPage({
             i dyskografia lecą w tym samym Promise.all), więc nic nie kosztuje;
             pionowe kreski to płyty, więc widać, gdzie w historii zespołu
             siedzi ta, na którą patrzysz. */}
-        {band && band.members.filter((m) => !m.supporting).length > 0 && (
+        {band && band.members.length > 0 && (
           <section className="mt-8">
             <h2 className="mb-2 text-2xl">{t.album.lineupChartHeading}</h2>
             <LineupTimeline
-              members={band.members.filter((m) => !m.supporting)}
+              /* Także muzycy sesyjni: MusicBrainz trzyma ich jako „supporting
+                 musician", nie członkostwo, i odsiewaliśmy ich przed wykresem.
+                 Przy Terrorizerze znikał przez to Sam Molina, który śpiewa
+                 i gra na basie na tej właśnie płycie. Wykres umie ich pokazać
+                 cieńszym paskiem i podpisem „sesyjnie" — i to jest uczciwsze
+                 niż wymazanie ich z historii zespołu. */
+              members={band.members}
               albums={more}
               locale={locale}
               t={t.artist.timeline}

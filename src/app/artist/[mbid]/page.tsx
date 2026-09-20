@@ -896,7 +896,8 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
           )}
         </>
       ) : (
-        <LineupTimeline members={artist.members.filter((m) => !m.supporting)} albums={disco} locale={locale} t={t.artist.timeline} />
+        /* Z sesyjnymi — wykres rysuje ich cieńszym paskiem i podpisuje. */
+        <LineupTimeline members={artist.members} albums={disco} locale={locale} t={t.artist.timeline} />
       )}
 
       <Suspense fallback={<p className="mt-10 font-mono text-xs text-muted">{t.artist.concertsLoading}</p>}>
