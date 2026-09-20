@@ -176,6 +176,17 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
   // Tylko to, co już wyszło — zapowiedzi na nadchodzący piątek są w Premierach.
   const sections = await latestSections(2, { tylkoWydane: true });
   const rel = await releasesFor(sections.map((s) => s.id));
+  /**
+   * KAFELKI TYLKO Z NAJNOWSZEGO PIĄTKU.
+   *
+   * Bierzemy dwa terminy (starszy przydaje się niżej), a „po jednym z każdej
+   * kategorii" szło przez oba naraz, uszeregowane pozycją w sekcji — więc na
+   * stronie głównej wychodziła mieszanka, w której wygrywał tydzień starszy.
+   * Wybór ma dotyczyć tego piątku, o którym mówi nagłówek.
+   */
+  const najnowszaData = sections[0]?.sortDate.getTime();
+  const idNajnowszych = new Set(sections.filter((x) => x.sortDate.getTime() === najnowszaData).map((x) => x.id));
+  const relNajnowsze = rel.filter((r) => idNajnowszych.has(r.sectionId));
   const years = await bestOfYears();
   const best = years[0] ? await bestOf(years[0].year) : null;
   const recent = await recentComments(6);
@@ -241,7 +252,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
   const sprobuj = pula.length ? pula[new Date().getUTCDate() % pula.length] ?? null : null;
   const sprobujWSwoim = swoje.length > 0;
 
-  const stars = rel.filter((r) => r.star === 1 && (!prefSections || prefSections.has(r.genre)));
+  const stars = relNajnowsze.filter((r) => r.star === 1 && (!prefSections || prefSections.has(r.genre)));
 
   /**
    * Łagodne wejście dla nieznajomego.
@@ -352,7 +363,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
             <h2 className="text-3xl">{prefSections ? t.home.releasesForYou : t.home.releasesThisWeek}</h2>
             <Link href="/premiery" className="text-sm text-muted hover:text-accent2">{t.home.allReleases}</Link>
           </div>
-          <p className="mt-1 text-xs text-muted">{t.home.oneEach}</p>
+          <p className="mt-1 text-xs text-muted">
+            {sections[0] ? `${sections[0].date} — ` : ""}{t.home.oneEach}
+          </p>
           {/* Gość dostaje łagodniejsze wejście. Portal jest o metalu i progu,
               ale witanie kogoś z ulicy ścianą bestial black metalu to nie
               zaproszenie, tylko test na wytrzymałość — a wybór jest obok. */}
