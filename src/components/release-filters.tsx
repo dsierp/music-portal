@@ -152,8 +152,13 @@ export function ReleaseFilters({
           const moje = widoczne.filter((i) => i.sectionId === s.id);
           // Top tygodnia idzie na górę i NIE powtarza się niżej w gatunkach —
           // ta sama płyta dwa razy na jednym ekranie to nie jest wyróżnienie.
+          const pickWidoczny = s.pickId ? moje.some((i) => i.id === s.pickId) : false;
           const top = moje.filter((i) => i.star === 1 && i.id !== s.pickId).slice(0, TOP_ILE);
-          const wTopie = new Set(top.map((i) => i.id));
+          // Wyżej już pokazane: top tygodnia ORAZ płyta tygodnia (duża karta
+          // nad wszystkim). Pick wypadał z „topu", ale zostawał w grupach
+          // gatunkowych — i przez to jedyna płyta, którą wyróżniliśmy
+          // najmocniej, była jedyną pokazaną dwa razy.
+          const wTopie = new Set([...top.map((i) => i.id), ...(pickWidoczny && s.pickId ? [s.pickId] : [])]);
           const reszta = moje.filter((i) => !wTopie.has(i.id));
           const grupy = cats
             .filter((g) => reszta.some((i) => i.g === g))
@@ -161,7 +166,6 @@ export function ReleaseFilters({
           // Tło nagłówka bierzemy z gatunku, który po odfiltrowaniu został
           // w sekcji na pierwszym miejscu — tak jak przed przejściem na klienta.
           const lead = grupy[0]?.g ?? "db";
-          const pickWidoczny = s.pickId ? moje.some((i) => i.id === s.pickId) : false;
           return (
             <div key={s.id}>
               <section className="mb-12">
