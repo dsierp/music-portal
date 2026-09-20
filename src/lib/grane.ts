@@ -112,15 +112,19 @@ export async function ostatniePlyty(userId: string, dni = 30, ile = 20) {
   const od = new Date(Date.now() - dni * 24 * 3600 * 1000);
   const rows = await db
     .select({
-      artist: schema.plays.artist,
-      album: schema.plays.album,
+      // Napis wybieramy tak samo jak w kafelkach: pisownia z MusicBrainz ma
+      // pierwszeństwo, a grupujemy po wersji bez wielkich liter — więc gołej
+      // kolumny wziąć tu nie wolno (nie ma jej w GROUP BY).
+      artist: sql<string>`coalesce(max(${schema.plays.artist}) filter (where ${schema.plays.mbid} is not null), max(${schema.plays.artist}))`,
+      album: sql<string | null>`coalesce(max(${schema.plays.album}) filter (where ${schema.plays.mbid} is not null), max(${schema.plays.album}))`,
       mbid: sql<string | null>`max(${schema.plays.mbid})`,
       kiedy: sql<Date>`max(${schema.plays.playedAt})`,
       n: sql<number>`count(*)`,
     })
     .from(schema.plays)
     .where(and(eq(schema.plays.userId, userId), gte(schema.plays.playedAt, od)))
-    .groupBy(schema.plays.artist, schema.plays.album)
+    // Tak samo jak niżej: „The" i „the" to ta sama płyta, nie dwie.
+    .groupBy(sql`lower(trim(${schema.plays.artist}))`, sql`lower(trim(${schema.plays.album}))`)
     .orderBy(desc(sql`max(${schema.plays.playedAt})`))
     .limit(ile);
   return rows.filter((r) => r.album).map((r) => ({ ...r, album: r.album!, ile: Number(r.n) }));
@@ -140,10 +144,24 @@ export async function ostatniePlyty(userId: string, dni = 30, ile = 20) {
  * mówi podpis przy kafelku.
  */
 export async function ostatnieKafelki(userId: string, ile = 6, zrodlo?: Zrodlo) {
+  /**
+   * GRUPUJEMY BEZ WZGLĘDU NA WIELKIE LITERY.
+   *
+   * Ta sama płyta przychodzi do dziennika dwiema drogami i każda pisze ją
+   * po swojemu: Spotify „Once Upon The Cross", MusicBrainz (czyli klik
+   * z portalu) „Once Upon the Cross". Grupowanie po surowym napisie robiło
+   * z tego dwa kafelki obok siebie — jeden „z portalu", drugi nie.
+   *
+   * Do podpisu bierzemy pisownię z MusicBrainz, gdy jakikolwiek zapis tej
+   * płyty ma MBID: to jest nasza wersja kanoniczna i ta sama, którą widać
+   * na stronie płyty.
+   */
+  const kluczArtysty = sql`lower(trim(${schema.plays.artist}))`;
+  const kluczAlbumu = sql`lower(trim(${schema.plays.album}))`;
   const rows = await db
     .select({
-      artist: schema.plays.artist,
-      album: schema.plays.album,
+      artist: sql<string>`coalesce(max(${schema.plays.artist}) filter (where ${schema.plays.mbid} is not null), max(${schema.plays.artist}))`,
+      album: sql<string | null>`coalesce(max(${schema.plays.album}) filter (where ${schema.plays.mbid} is not null), max(${schema.plays.album}))`,
       mbid: sql<string | null>`max(${schema.plays.mbid})`,
       cover: sql<string | null>`max(${schema.plays.cover})`,
       kiedy: sql<Date>`max(${schema.plays.playedAt})`,
@@ -151,7 +169,7 @@ export async function ostatnieKafelki(userId: string, ile = 6, zrodlo?: Zrodlo) 
     })
     .from(schema.plays)
     .where(zZrodla(userId, zrodlo))
-    .groupBy(schema.plays.artist, schema.plays.album)
+    .groupBy(kluczArtysty, kluczAlbumu)
     .orderBy(desc(sql`max(${schema.plays.playedAt})`))
     .limit(ile);
   return rows.filter((r) => r.album).map((r) => ({ ...r, album: r.album! }));
