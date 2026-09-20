@@ -126,15 +126,34 @@ export default async function AlbumPage({
   // osobną, wyraźnie podpisaną listę — to nie są credits z okładki i nie udajemy,
   // że są.
   const albumDate = album.firstReleaseDate ?? null;
+  /**
+   * SKŁAD Z CZASU PŁYTY TO TYLKO CI Z DATAMI.
+   *
+   * Wcześniej wpadali tu również ludzie bez żadnej daty — wystarczyło, że
+   * MusicBrainz ma ich za obecnych. Wychodziła z tego nieścisłość na jednej
+   * stronie: nagłówek „Zespół w tym czasie" wymieniał czterech muzyków z „?–",
+   * a wykres niżej rysował ich przerywaną ramką jako „nie wiadomo kiedy"
+   * i pokazywał w tym roku zupełnie inny skład. Kto nie ma ani jednej daty,
+   * nie da się umieścić w czasie — więc nie twierdzimy, że wtedy grał;
+   * wymieniamy go osobno, pod listą.
+   */
+  const zDatami = (band?.members ?? []).filter((m) => m.begin || m.end);
+  const bezDatWszyscy = (band?.members ?? []).filter((m) => !m.begin && !m.end);
   const lineupThen = (() => {
-    if (!band?.members?.length || !albumDate) return [];
-    const inRange = band.members.filter((m) => {
+    if (!zDatami.length || !albumDate) return [];
+    const inRange = zDatami.filter((m) => {
       if (m.begin && m.begin > albumDate) return false;
       if (m.end && m.end < albumDate) return false;
-      return Boolean(m.begin || m.end || m.current);
+      return true;
     });
     const already = new Set(musicians.map((c) => c.mbid));
     return inRange.filter((m) => !already.has(m.mbid));
+  })();
+  // Bez dat: wymieniamy z nazwiska, ale bez udawania, że to skład z tego roku.
+  const bezDat = (() => {
+    if (!albumDate) return [];
+    const already = new Set(musicians.map((c) => c.mbid));
+    return bezDatWszyscy.filter((m) => !already.has(m.mbid)).slice(0, 12);
   })();
   // …i dopasowujemy nazwiska do MBID-ów (członkowie zespołu + credits z MB), żeby
   // dało się w nie kliknąć — bez tego "podróż" po składach urywa się na tej stronie.
@@ -332,6 +351,21 @@ export default async function AlbumPage({
               </ul>
               <p className="mt-1 text-xs text-faint">{t.album.currentLineupNote}</p>
             </div>
+          )}
+          {bezDat.length > 0 && (
+            <p className="mb-5 text-xs text-faint">
+              {t.album.lineupNoDates}{" "}
+              {bezDat.map((m, i) => (
+                <span key={m.mbid || m.name}>
+                  {i > 0 && ", "}
+                  {m.mbid ? (
+                    <Link href={`/artist/${m.mbid}`} className="hover:text-accent2 hover:underline">{m.name}</Link>
+                  ) : (
+                    m.name
+                  )}
+                </span>
+              ))}
+            </p>
           )}
           {musicians.length ? (
             <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2">

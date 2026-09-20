@@ -28,6 +28,7 @@ const pl = {
 
   currentLineupHeading: "Zespół w tym czasie",
   currentLineupNote: "Z dat członkostwa w MusicBrainz — kto był w składzie, gdy płyta wychodziła. To nie są credits z okładki: MusicBrainz opisuje nagrania wybiórczo, więc lista wyżej bywa krótsza niż rzeczywisty skład.",
+  lineupNoDates: "W zespole bywali też, ale bez dat w MusicBrainz — nie wiadomo, czy przy tej płycie:",
 
   staffSummary: "Pozostałe osoby ({n})",
 
@@ -78,6 +79,7 @@ const en: T = {
 
   currentLineupHeading: "Band at the time",
   currentLineupNote: "From membership dates on MusicBrainz — who was in the lineup when this album came out. These aren't sleeve credits: MusicBrainz's recording data is selective, so this list can be shorter than the actual lineup.",
+  lineupNoDates: "Also in the band but without dates in MusicBrainz — no telling whether at the time of this album:",
 
   staffSummary: "Everyone else ({n})",
 
@@ -126,6 +128,7 @@ const es: T = {
 
   currentLineupHeading: "La banda en ese momento",
   currentLineupNote: "Según las fechas de pertenencia en MusicBrainz — quién estaba en la formación cuando salió este disco. No son créditos de la portada: MusicBrainz describe las grabaciones de forma selectiva, así que esta lista puede ser más corta que la formación real.",
+  lineupNoDates: "También estuvieron en la banda, pero sin fechas en MusicBrainz — no se sabe si en la época de este disco:",
 
   staffSummary: "Las demás personas ({n})",
 
@@ -174,6 +177,7 @@ const de: T = {
 
   currentLineupHeading: "Die Band zu dieser Zeit",
   currentLineupNote: "Nach Mitgliedschaftsdaten von MusicBrainz — wer zur Besetzung gehörte, als dieses Album erschien. Das sind keine Album-Credits: MusicBrainz erfasst Aufnahmen selektiv, daher kann diese Liste kürzer sein als die tatsächliche Besetzung.",
+  lineupNoDates: "Ebenfalls in der Band, aber ohne Daten in MusicBrainz — unklar, ob zur Zeit dieses Albums:",
 
   staffSummary: "Alle Übrigen ({n})",
 
