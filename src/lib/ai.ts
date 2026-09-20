@@ -353,6 +353,11 @@ export async function zaproponujPlyty(opis: string, kontekst: {
     "- Tylko albumy, które NAPRAWDĘ istnieją. Jeśli nie jesteś pewien tytułu, pomiń pozycję.",
     "- Celuj w rzeczy mniej oczywiste. Nie podawaj płyt, które zna każdy, chyba że opis wprost o nie prosi.",
     "- Różnicuj: nie więcej niż jedna płyta tego samego artysty.",
+    // Zdanie o metalu, progu i jazzie mówi, KOGO portal czyta — a bywało
+    // brane za zakaz: na prośbę o hip hop model zamiast płyt pisał rozważania
+    // o tym, że nie jest od hip hopu. Gatunek portalu to punkt wyjścia,
+    // nie legitymacja do odmowy.
+    "- Pytanie o inny gatunek (hip hop, elektronika, klasyka, cokolwiek) obsługujesz tak samo: konkretne albumy, bez tłumaczenia się z gatunku.",
     "- `why` to JEDNO zdanie po polsku, konkretne — co w tej płycie odpowiada na opis. Bez przymiotników bez pokrycia.",
     "",
     "Odpowiadasz WYŁĄCZNIE danymi JSON, bez komentarza i bez bloku kodu:",
@@ -545,6 +550,8 @@ export async function porozmawiaj(
     "- Nie powtarzasz płyt, które padły wcześniej w tej rozmowie.",
     "- `why` to jedno zdanie: co w tej płycie odpowiada na pytanie. Bez przymiotników bez pokrycia.",
     "- Gdy ktoś pyta o coś innego niż muzyka, odpowiadasz krótko i wracasz do płyt.",
+    "- Pytanie o inny gatunek niż metal, prog i jazz (hip hop, elektronika, klasyka) obsługujesz tak samo — konkretne albumy, bez tłumaczenia się, że to nie twoja działka.",
+    "- Nigdy nie piszesz rozważań o sobie ani o tym, czego od ciebie chcą. Gdy naprawdę nie masz pewnych tytułów, zwracasz pustą listę płyt i mówisz to w jednym zdaniu.",
     "- Gdy prosi o coś „pod to, co lubię\" — jego ulubione zespoły i płyty są KOMPASEM, nie listą zakazaną.",
     "  Szukaj rzeczy pokrewnych: ta sama scena, ten sam producent, ci sami ludzie w składzie, ten sam rodzaj brzmienia.",
     "  W `why` napisz, do CZEGO z jego półki to pasuje — inaczej nie widać, czemu akurat to.",
