@@ -322,14 +322,25 @@ export async function concertsByAreaMb(areas: Area[]): Promise<{ items: Concert[
   const statusy: StatusObszaru[] = [];
   for (const area of areas.slice(0, 5)) {
     // Wszystkie pisownie naraz — jedno zapytanie, nie trzy.
+    /**
+     * NAWIASY WOKÓŁ „OR" — bez nich Lucene wiąże AND ciaśniej niż OR.
+     *
+     * Zapytanie `area:"Kraków" OR area:"Krakow" OR area:"Cracow" AND begin:[…]`
+     * czyta się jako `Kraków OR Krakow OR (Cracow AND w zakresie dat)` — czyli
+     * dwie pierwsze pisownie ciągnęły wydarzenia z DOWOLNEGO roku. Limit
+     * pięćdziesięciu wyników zapychały wtedy koncerty sprzed dekady, a nasz
+     * filtr dat wycinał je na miejscu i miasto wychodziło puste. Które miasto
+     * padnie, zależało od tego, ile ma pisowni i co akurat ma w bazie —
+     * stąd raz znikał Kraków, raz Warszawa.
+     */
     const where = area.city
-      ? pisownie(area.city).map((n) => `area:"${n}"`).join(" OR ")
+      ? `(${pisownie(area.city).map((n) => `area:"${n}"`).join(" OR ")})`
       : `area:"${area.country}"`;
     const url = new URL(`${MB_BASE}/event`);
     url.searchParams.set("query", `${where} AND begin:[${from} TO ${to}]`);
     url.searchParams.set("limit", "50");
     url.searchParams.set("fmt", "json");
-    const key = `mb:events-area:v1:${area.country}:${area.city ?? "*"}:${from}`;
+    const key = `mb:events-area:v2:${area.country}:${area.city ?? "*"}:${from}`;
     let blad = false;
     const data = await cached<{ events?: MbEvent[] }>(key, TTL.search, async () => {
       const res = await mbRawFetch(url);
