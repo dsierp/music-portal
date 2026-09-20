@@ -50,6 +50,10 @@ export interface TekstyFiltru {
   showFlagged: string;
   footnote: string;
   noMatch: string;
+  /** sekcja pusta u źródła, a nie przez filtry */
+  emptyFriday: string;
+  /** wyjście z sytuacji „mam premiery, ale nie w Twoich stylach" */
+  showAllGenres: string;
   journey: string;
   journeyNote: string;
   all: string;
@@ -212,7 +216,34 @@ export function ReleaseFilters({
                     )}
                   </div>
                 ))}
-                {!grupy.length && !pickWidoczny && <p className="mt-3 text-sm text-muted">{teksty.noMatch}</p>}
+                {/* Dwa różne „pusto" i dwa różne zdania.
+                    Gdy filtry wycięły wszystko — trzeba powiedzieć o filtrach.
+                    Gdy na ten piątek NIC nie ma w bazie (typowe dla tygodnia,
+                    który dopiero nadejdzie: MusicBrainz dowiaduje się o płytach
+                    w dniu premiery, a tagi gatunków przychodzą jeszcze później)
+                    — zdanie o filtrach jest po prostu nieprawdą i każe szukać
+                    winy u siebie. */}
+                {!grupy.length && !pickWidoczny && (
+                  items.some((i) => i.sectionId === s.id) ? (
+                    <div className="mt-3 text-sm text-muted">
+                      <p>{teksty.noMatch}</p>
+                      {/* Najczęstszy powód, dla którego piątek wygląda na pusty:
+                          premiery SĄ, ale w innych stylach niż wybrane w profilu.
+                          Samo zdanie o filtrach każe wtedy szukać winy u siebie
+                          i klikać po kolei po kategoriach. Jeden guzik pokazuje
+                          wszystko, co tego dnia wyszło. */}
+                      <button
+                        type="button"
+                        onClick={() => setWybrane(new Set(cats))}
+                        className="mt-2 text-xs text-muted underline hover:text-accent2"
+                      >
+                        {teksty.showAllGenres}
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-sm text-muted">{teksty.emptyFriday}</p>
+                  )
+                )}
               </section>
               {s.podroz && (
                 /* Podróż z tego, co i tak jest na ekranie — jeden klik zamiast
