@@ -107,5 +107,44 @@ export async function GET(req: Request) {
     }));
   }
 
+  /**
+   * DZIENNIK ODSŁUCHÓW — bo „nie ma tej płyty w Ostatnio" ma trzy różne
+   * przyczyny i z zewnątrz wyglądają identycznie: (1) Spotify nie oddaje
+   * historii, bo konto podłączono przed dołożeniem zakresu
+   * `user-read-recently-played`; (2) historia przychodzi, ale portal jej nie
+   * pytał, bo nikt nie otwierał strony, która o nią prosi; (3) wszystko działa,
+   * a płyta wypadła z pięćdziesięciu ostatnich utworów.
+   *
+   * Te trzy liczby rozstrzygają to w jednym wejściu.
+   */
+  {
+    const { db, schema } = await import("@/db");
+    const { sql, eq, desc } = await import("drizzle-orm");
+    const ile = await db
+      .select({ source: schema.plays.source, n: sql<number>`count(*)`, ostatni: sql<Date>`max(${schema.plays.playedAt})` })
+      .from(schema.plays)
+      .where(eq(schema.plays.userId, user.id))
+      .groupBy(schema.plays.source)
+      .catch(() => []);
+    const ostatnie = await db
+      .select({ artist: schema.plays.artist, title: schema.plays.title, album: schema.plays.album, source: schema.plays.source, kiedy: schema.plays.playedAt })
+      .from(schema.plays)
+      .where(eq(schema.plays.userId, user.id))
+      .orderBy(desc(schema.plays.playedAt))
+      .limit(8)
+      .catch(() => []);
+    wynik.dziennik = { wgZrodla: ile, ostatnie };
+  }
+
+  // Czy Spotify W OGÓLE oddaje historię temu kontu (&historia=1).
+  // To jedno prawdziwe zapytanie, więc tylko na życzenie.
+  if (sp.get("historia") === "1") {
+    const { recentlyPlayed } = await import("@/lib/spotify");
+    const lista = await recentlyPlayed(user.id).catch((e) => (e instanceof Error ? e.message : String(e)));
+    wynik.historiaZeSpotify = Array.isArray(lista)
+      ? { ile: lista.length, pierwsze: lista.slice(0, 5).map((o) => `${o.artist} – ${o.album} (${o.title})`) }
+      : { blad: lista, podpowiedz: "pusto zwykle znaczy stary zakres uprawnień — odłącz i połącz Spotify od nowa" };
+  }
+
   return NextResponse.json(wynik);
 }

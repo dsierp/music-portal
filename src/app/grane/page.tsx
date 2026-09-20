@@ -32,6 +32,14 @@ export default async function GranePage() {
   // Dwie listy, nie jedna: to, co człowiek puścił STĄD (ślad po portalu), i to,
   // co portal podejrzał w Spotify (cudze, choć jego). Mieszane wyglądały jak
   // jeden dziennik, w którym nie wiadomo, co się z czego wzięło.
+  // Dociągnięcie historii ze Spotify NIE MOŻE zależeć od tego, czy ktoś akurat
+  // zajrzał na stronę główną. Dotąd pytał o nią wyłącznie kafelek „słuchasz
+  // teraz", więc kto słuchał przy zamkniętym portalu i wszedł prosto tutaj,
+  // widział dziennik bez połowy swoich odsłuchów. Sama funkcja pilnuje, żeby
+  // nie pytać częściej niż raz na kwadrans.
+  const { synchronizujHistorie } = await import("@/lib/grane");
+  await synchronizujHistorie(user.id).catch(() => {});
+
   const [odsluchy, zeSpotify, plyty, topki, lubiane] = await Promise.all([
     ostatnieOdsluchy(user.id, 60, "klik").catch(() => []),
     ostatnieOdsluchy(user.id, 30, "spotify").catch(() => []),
