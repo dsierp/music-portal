@@ -446,11 +446,13 @@ export async function albumyZPlaylisty(userId: string, playlistId: string, maks 
 
 // ---------- podróż → playlista ----------
 
-/** „Artysta – Tytuł" z etykiety przystanku; bez myślnika bierzemy całość jako tytuł. */
-export function rozbijEtykiete(label: string): { artist: string; title: string } {
-  const [a, ...reszta] = label.split(/\s+[–—-]\s+/);
-  return reszta.length ? { artist: a.trim(), title: reszta.join(" – ").trim() } : { artist: "", title: label.trim() };
-}
+/**
+ * „Artysta – Tytuł" — mieszka teraz w `lib/names.ts`, razem z odwrotnością
+ * (`zlozEtykiete`). Tu zostaje re-eksport, żeby nie przepisywać kilkunastu
+ * importów; nowy kod bierze to prosto z `names`.
+ */
+export { rozbijEtykiete } from "./names";
+import { rozbijEtykiete } from "./names";
 
 /**
  * Zapytanie do wyszukiwarki Spotify.

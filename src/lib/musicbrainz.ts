@@ -80,13 +80,35 @@ export function mbUserAgent(): string {
   return UA;
 }
 export async function mbRawFetch(url: URL | string): Promise<Response> {
-  return throttle(() =>
-    fetch(url, {
-      headers: { "User-Agent": UA, Accept: "application/json" },
-      cache: "no-store",
-      signal: AbortSignal.timeout(MB_TIMEOUT_MS),
-    }),
-  );
+  return throttle(async () => {
+    /**
+     * Ta sama wytrwałość co w `mbFetch`, i z tego samego powodu.
+     *
+     * Dotąd to wyjście strzelało raz: przy 503 (MusicBrainz pod obciążeniem
+     * odpowiada nim regularnie) koncerty i teledyski po prostu znikały ze
+     * strony, podczas gdy wszystkie pozostałe ekrany spokojnie przeczekiwały
+     * zadyszkę. Ten sam serwis nie może być raz odporny, a raz nie.
+     *
+     * Zwracamy `Response`, nie wyjątek — wołający sami sprawdzają `ok`
+     * i traktują niepowodzenie jako „brak danych", nie jako awarię.
+     */
+    let ostatnia: Response | null = null;
+    for (let proba = 0; proba < 3; proba++) {
+      try {
+        const res = await fetch(url, {
+          headers: { "User-Agent": UA, Accept: "application/json" },
+          cache: "no-store",
+          signal: AbortSignal.timeout(MB_TIMEOUT_MS),
+        });
+        if (res.status !== 503 && res.status !== 429) return res;
+        ostatnia = res;
+      } catch {
+        ostatnia = null; // zerwane połączenie — próbujemy jeszcze raz
+      }
+      if (proba < 2) await new Promise((r) => setTimeout(r, 1000 * 2 ** proba + Math.random() * 400));
+    }
+    return ostatnia ?? new Response(null, { status: 503 });
+  });
 }
 
 export class MbError extends Error {

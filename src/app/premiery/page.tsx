@@ -10,6 +10,7 @@ import { orderByPopularity } from "@/lib/popularity";
 import { currentUser } from "@/lib/auth";
 import { getGenres } from "@/lib/user-data";
 import { i18n } from "@/lib/t";
+import { formatDate } from "@/lib/i18n";
 import { ScreenHelp } from "@/components/screen-help";
 import { journeyFromReleases } from "@/app/actions";
 
@@ -22,7 +23,7 @@ export const dynamic = "force-dynamic";
 
 export default async function PremieryPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const sp = await searchParams;
-  const { t } = await i18n();
+  const { locale, t } = await i18n();
   const user = await currentUser();
   const prefs = user ? await getGenres(user.id) : [];
   /**
@@ -104,7 +105,9 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
   const dataSekcji = new Map(zTegoDnia.map((s) => [s.id, s.date]));
   const kiedy = (r: (typeof rel)[number]) => {
     const d = dataPozycji(r.dayLabel, dataSekcji.get(r.sectionId) ?? "");
-    return jeszczeNieWyszla(d) ? (r.dayLabel?.replace(/^\D+/, "") ?? d!.toLocaleDateString("pl-PL")) : null;
+    // Data po języku czytelnika, nie na sztywno po polsku — `formatDate` robi
+    // to w całym portalu, a tu jako jedyne miejsce siedziało „pl-PL".
+    return jeszczeNieWyszla(d) ? (r.dayLabel?.replace(/^\D+/, "") ?? formatDate(d!.toISOString().slice(0, 10), locale)) : null;
   };
 
   const items: PozycjaFiltru[] = rel.map((r) => ({

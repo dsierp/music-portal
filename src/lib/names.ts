@@ -30,3 +30,24 @@ export function nameKeys(s: string): string[] {
   if (parts.length > 2) keys.add(`${parts[0]} ${parts[parts.length - 1]}`);
   return [...keys];
 }
+
+/**
+ * „Artysta – Tytuł" — jedno miejsce na rozbijanie i składanie tej etykiety.
+ *
+ * Powód: portal trzyma pozycje list jako JEDEN napis i rozbijał go w kilku
+ * miejscach na własną rękę. Jedna z tych kopii ciła po dosłownym „ – ", więc
+ * przystanek podpisany myślnikiem albo półpauzą trafiał do kafelka dwa razy
+ * w całości (raz jako tytuł, raz jako wykonawca). Separator bywa trojaki
+ * (-, –, —), bo dane pochodzą z kilku źródeł.
+ */
+const SEPARATOR = /\s+[–—-]\s+/;
+
+export function rozbijEtykiete(label: string): { artist: string; title: string } {
+  const [a, ...reszta] = label.split(SEPARATOR);
+  return reszta.length ? { artist: a.trim(), title: reszta.join(" – ").trim() } : { artist: "", title: label.trim() };
+}
+
+/** Odwrotność: z wykonawcy i tytułu robi etykietę w jednym, stałym kształcie. */
+export function zlozEtykiete(artist: string | null | undefined, title: string | null | undefined): string {
+  return [artist?.trim(), title?.trim()].filter(Boolean).join(" – ");
+}

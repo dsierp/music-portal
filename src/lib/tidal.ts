@@ -12,6 +12,7 @@
  */
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { kluczTytulu } from "./spotify";
 
 const API = "https://openapi.tidal.com/v2";
 const TOKEN_URL = "https://auth.tidal.com/v1/oauth2/token";
@@ -276,15 +277,12 @@ async function tokenAplikacji(): Promise<string | null> {
   return dane?.t ?? null;
 }
 
-/** Uproszczony tytuł do porównań — reedycje i „(Remastered)" nie mogą mylić. */
-function uproszcz(t: string): string {
-  return t
-    .toLowerCase()
-    .replace(/\((?:deluxe|remaster(?:ed)?|reissue|edition|expanded)[^)]*\)/g, "")
-    .replace(/\s*[-–—]\s*(?:deluxe|remaster(?:ed)?|reissue|.*edition).*$/g, "")
-    .replace(/[^a-z0-9]+/g, "")
-    .trim();
-}
+/**
+ * Uproszczony tytuł do porównań — ta sama funkcja, której używa Spotify.
+ * Była tu jej kopia co do znaku: dwie kopie znaczą, że poprawka („(Anniversary
+ * Edition)"!) trafia do jednej, a druga po cichu zaczyna dopasowywać inaczej.
+ */
+const uproszcz = kluczTytulu;
 
 /**
  * Adres KONKRETNEJ płyty w Tidalu — albo nic.

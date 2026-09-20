@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import { latestSections, releasesFor, bestOfYears, bestOf, BEST_CATS } from "@/lib/lists";
 import { Kafelki } from "@/components/kafelki";
+import { rozbijEtykiete, zlozEtykiete } from "@/lib/names";
 import { SearchBox } from "@/components/search-box";
 import { Banner } from "@/components/banner";
 import { Suspense } from "react";
@@ -310,8 +311,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
                       ? i.url ?? "/koncerty"
                       : `/album/${i.targetMbid}`,
                 mbid: i.targetType === "ALBUM" ? i.targetMbid : null,
-                title: i.label.split(" – ").slice(1).join(" – ") || i.label,
-                subtitle: i.label.split(" – ")[0],
+                // Rozbicie etykiety idzie przez wspólną funkcję: dosłowne
+                // „ – " gubiło pozycje zapisane zwykłym myślnikiem i wpisywało
+                // cały napis i w tytuł, i w wykonawcę.
+                title: rozbijEtykiete(i.label).title || i.label,
+                subtitle: rozbijEtykiete(i.label).artist || null,
               }))}
             />
           </section>

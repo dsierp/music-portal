@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { currentUser } from "@/lib/auth";
-import { isAdmin } from "@/lib/admin";
+import { odmowaDlaNieadmina } from "@/lib/admin-guard";
 
 /**
  * Diagnostyka modelu — dla administratora, bez ujawniania klucza.
@@ -18,10 +17,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function GET() {
-  const user = await currentUser().catch(() => null);
-  if (!user || !isAdmin(user.email)) {
-    return NextResponse.json({ error: "tylko administrator" }, { status: 403 });
-  }
+  const odmowa = await odmowaDlaNieadmina();
+  if (odmowa) return odmowa;
   const opis = (v: string) => ({
     ustawiona: Boolean(v),
     dlugosc: v.length,

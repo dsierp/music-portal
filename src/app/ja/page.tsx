@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { currentUser } from "@/lib/auth";
 import { getAreas, getFavoriteArtists, getGenres, getLikedAlbums, getUserLocale, myRatings, usersCount, getSharingProfile } from "@/lib/user-data";
 import { isAdmin } from "@/lib/admin";
-import { addAreaAction, connectSpotify, disconnectSpotify, removeAreaAction, setGenreAction, setSharingAction, skipOnboarding, toggleFavorite, toggleLike } from "@/app/actions";
+import { addAreaAction, connectSpotify, connectTidal, disconnectSpotify, disconnectTidal, removeAreaAction, setGenreAction, setSharingAction, skipOnboarding, toggleFavorite, toggleLike } from "@/app/actions";
 import { spotifyConfigured, spotifyConnected, spotifyKto } from "@/lib/spotify";
 import { MAIN_CATEGORIES } from "@/lib/genres";
 import { orderByPopularity } from "@/lib/popularity";
@@ -61,6 +61,9 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const spotifyJest = spotifyGotowy ? await spotifyConnected(user.id).catch(() => false) : false;
   // Które konto — inaczej „połączone" nic nie mówi komuś, kto ma ich dwa.
   const spotifyKtoTo = spotifyJest ? await spotifyKto(user.id).catch(() => null) : null;
+  const { tidalConfigured, tidalConnected } = await import("@/lib/tidal");
+  const tidalGotowy = tidalConfigured();
+  const tidalJest = tidalGotowy ? await tidalConnected(user.id).catch(() => false) : false;
 
   return (
     <div className="space-y-10">
@@ -105,6 +108,33 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           ) : (
             <form action={connectSpotify.bind(null, "/ja")} className="mt-2">
               <button className="btn btn-accent">{t.lists.spotifyConnect}</button>
+            </form>
+          )}
+        </section>
+      )}
+
+      {/* Tidal — dokładnie tak samo jak Spotify. Dotąd dało się go podłączyć
+          (na ekranie ściągania list), ale NIE dało się odłączyć: funkcja
+          w kodzie była, tylko nikt jej nie wołał. */}
+      {tidalGotowy && (
+        <section className="card">
+          <h2 className="text-xl">TIDAL</h2>
+          <p className="mt-1 text-xs text-muted">{t.lists.tidalNote}</p>
+          {tidalJest ? (
+            <>
+              <p className="mt-2 text-sm text-ok">{t.lists.tidalConnected}</p>
+              <p className="mt-2 text-sm">
+                <Link href="/podroze/z-tidala" className="text-muted hover:text-accent2">
+                  {t.lists.tidalImport} →
+                </Link>
+              </p>
+              <form action={disconnectTidal} className="mt-2">
+                <button className="btn">{t.lists.tidalDisconnect}</button>
+              </form>
+            </>
+          ) : (
+            <form action={connectTidal.bind(null, "/ja")} className="mt-2">
+              <button className="btn btn-accent">{t.lists.tidalConnect}</button>
             </form>
           )}
         </section>

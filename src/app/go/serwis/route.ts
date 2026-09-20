@@ -59,12 +59,13 @@ export async function GET(req: NextRequest) {
     const { currentUser } = await import("@/lib/auth");
     const user = await currentUser().catch(() => null);
     if (user && etykieta) {
-      const [artysta, ...reszta] = etykieta.split(/\s+[–—-]\s+/);
+      const { rozbijEtykiete } = await import("@/lib/names");
+      const { artist, title } = rozbijEtykiete(etykieta);
       const { zapiszOdsluch } = await import("@/lib/grane");
       await zapiszOdsluch(user.id, {
-        artist: artysta ?? etykieta,
-        title: reszta.join(" – ") || etykieta,
-        album: reszta.join(" – ") || null,
+        artist: artist || etykieta,
+        title: title || etykieta,
+        album: title || null,
         mbid: typ === "release-group" ? mbid || null : null,
         source: "klik",
       });

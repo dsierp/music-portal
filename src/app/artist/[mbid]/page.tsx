@@ -14,6 +14,8 @@ import { AddToList } from "@/components/add-to-list";
 import { DoPosluchania } from "@/components/do-posluchania";
 import { toggleFavorite } from "@/app/actions";
 import { LinksRow } from "@/components/links";
+import { SerwisyPills } from "@/components/serwisy";
+import { zlozEtykiete } from "@/lib/names";
 import { RatingBadge, RatingPanel } from "@/components/rating";
 import { Comments } from "@/components/comments";
 import { AlbumCard } from "@/components/cards";
@@ -737,10 +739,14 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
               <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
                 {noweGoscinne.map((a) => (
                   <li key={a.id} className="flex flex-wrap items-baseline gap-x-2 text-sm">
-                    <a href={a.url} target="_blank" rel="noopener" className="font-medium hover:text-accent2 hover:underline">
+                    {/* Wyjście w serwis idzie przez wspólny guzik, a nie gołym
+                        adresem: inaczej to jedno miejsce w portalu nie
+                        zapisywało odsłuchania i nie dawało Tidala. */}
+                    <span className="font-medium">
                       {a.artists && a.artists.toLowerCase() !== artist.name.toLowerCase() ? `${a.artists} – ` : ""}
                       <i>{a.title}</i>
-                    </a>
+                    </span>
+                    <SerwisyPills etykieta={zlozEtykiete(a.artists || artist.name, a.title)} small />
                     {a.year && <span className="font-mono text-[10px] text-faint">{a.year}</span>}
                     <span className="font-mono text-[10px] uppercase text-faint" title={t.artist.fromSpotifyNote}>spotify</span>
                   </li>

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { currentUser } from "@/lib/auth";
-import { isAdmin } from "@/lib/admin";
+import { adminAlboOdmowa } from "@/lib/admin-guard";
 import { rozbijEtykiete } from "@/lib/spotify";
 
 /**
@@ -15,10 +14,9 @@ import { rozbijEtykiete } from "@/lib/spotify";
  * albo cudzysłów, bo dokładnie to najczęściej psuje wklejanie do panelu.
  */
 export async function GET(req: Request) {
-  const user = await currentUser().catch(() => null);
-  if (!user || !isAdmin(user.email)) {
-    return NextResponse.json({ error: "tylko administrator" }, { status: 403 });
-  }
+  const wynikStrazy = await adminAlboOdmowa();
+  if ("odmowa" in wynikStrazy) return wynikStrazy.odmowa;
+  const { user } = wynikStrazy;
 
   let wyczyszczono: number | null = null;
   const id = process.env.SPOTIFY_CLIENT_ID ?? "";

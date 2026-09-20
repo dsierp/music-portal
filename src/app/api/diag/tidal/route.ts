@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { currentUser } from "@/lib/auth";
-import { isAdmin } from "@/lib/admin";
+import { adminAlboOdmowa } from "@/lib/admin-guard";
 import { TIDAL_SCOPES, tidalConfigured, tidalConnected, tidalJa, tidalPlaylisty } from "@/lib/tidal";
 
 /**
@@ -16,10 +15,9 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 export async function GET(req: NextRequest) {
-  const user = await currentUser().catch(() => null);
-  if (!user || !isAdmin(user.email)) {
-    return NextResponse.json({ error: "tylko administrator" }, { status: 403 });
-  }
+  const wynikStrazy = await adminAlboOdmowa();
+  if ("odmowa" in wynikStrazy) return wynikStrazy.odmowa;
+  const { user } = wynikStrazy;
   const opis = (v: string) => ({ ustawiona: Boolean(v), dlugosc: v.length, czysty: v === v.trim() });
 
   // ?wyczysc=1 — wymiata zapamiętane odpowiedzi Tidala (adresy płyt i token

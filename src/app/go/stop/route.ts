@@ -94,6 +94,29 @@ export async function GET(req: NextRequest) {
     // Odhaczenie jest miłym dodatkiem, nie warunkiem wyjścia: gdy się nie uda,
     // człowiek i tak ma trafić tam, gdzie kliknął.
     if (user) await markVisited(user.id, listId, type, mbid, "link").catch(() => {});
+
+    /**
+     * Wyjście z przystanku to TAKIE SAMO wyjście jak z premiery — i musi tak
+     * samo trafiać do dziennika odsłuchów.
+     *
+     * Dotąd nie trafiało: ta trasa stawiała tylko ptaszek „znam to", więc
+     * płyta puszczona z podróży nie pokazywała się w „Ostatnio", choć
+     * identycznie wyglądający guzik na premierach ją tam wpisywał. Jeden
+     * gest, jeden skutek.
+     */
+    const etykietaPrzystanku = sp.get("etykieta") ?? "";
+    if (user && etykietaPrzystanku && type !== "CONCERT") {
+      const { rozbijEtykiete } = await import("@/lib/names");
+      const { artist, title } = rozbijEtykiete(etykietaPrzystanku);
+      const { zapiszOdsluch } = await import("@/lib/grane");
+      await zapiszOdsluch(user.id, {
+        artist: artist || etykietaPrzystanku,
+        title: title || etykietaPrzystanku,
+        album: type === "ALBUM" ? title || etykietaPrzystanku : null,
+        mbid: type === "ALBUM" ? mbid : null,
+        source: "klik",
+      }).catch(() => {});
+    }
   }
   return NextResponse.redirect(cel.toString());
 }

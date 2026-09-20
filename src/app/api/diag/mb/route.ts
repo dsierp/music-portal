@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { currentUser } from "@/lib/auth";
-import { isAdmin } from "@/lib/admin";
+import { odmowaDlaNieadmina } from "@/lib/admin-guard";
 import { mbBase, mbMinGapMs, mbUserAgent } from "@/lib/musicbrainz";
 
 /**
@@ -17,10 +16,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 export async function GET() {
-  const user = await currentUser().catch(() => null);
-  if (!user || !isAdmin(user.email)) {
-    return NextResponse.json({ error: "tylko administrator" }, { status: 403 });
-  }
+  const odmowa = await odmowaDlaNieadmina();
+  if (odmowa) return odmowa;
 
   const base = mbBase();
   const wlasnaKopia = !/(^|\/\/)([^/]*\.)?musicbrainz\.org/.test(base);
