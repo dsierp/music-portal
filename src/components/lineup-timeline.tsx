@@ -234,56 +234,6 @@ function Chart({
         <svg viewBox={`0 0 ${W} ${H}`} width={W} className="min-w-[680px] max-w-full" role="img" aria-label={t.axisAriaLabel}>
           {/* Pionowe kreski = płyty. Kółko na górze jest klikalne i ma podpowiedź
               (SVG <title> = natywny dymek przeglądarki, bez javascriptu). */}
-          {/* Pasma wydawnictw: jeden rząd na rodzaj, znacznik w roku wydania.
-              Kreska w dół przez cały wykres zostaje TYLKO przy tej płycie,
-              na której stronie jesteśmy — reszta byłaby płotem. */}
-          {pasma.map((rodzaj, pi) => {
-            const st = STYL_WYDANIA[rodzaj];
-            const yP = pi * PASMO_H + 10;
-            const etykieta =
-              rodzaj === "studio" ? t.markStudio
-              : rodzaj === "live" ? t.markLive
-              : rodzaj === "ep" ? t.markEp
-              : rodzaj === "kompilacja" ? t.markCompilation
-              : t.markOther;
-            return (
-              <g key={`pas-${rodzaj}`} className={`znacznik-${rodzaj}`}>
-                <rect x={LABEL_W} y={yP - PASMO_H / 2 + 2} width={plotW} height={PASMO_H - 4} fill="var(--surface2)" opacity={0.6} />
-                <text x={LABEL_W - 8} y={yP + 3} textAnchor="end" fontSize="10" fill="var(--muted)" fontFamily="var(--font-mono)">
-                  {etykieta}
-                </text>
-                {globalPoints
-                  .filter((p) => p.album.rodzaj === rodzaj)
-                  .map((p, i) => {
-                    const kolor = p.album.biezaca ? "var(--accent2)" : st.kolor;
-                    return (
-                      <a key={`pm-${rodzaj}-${i}`} href={`/album/${p.album.mbid}`} className="album-mark">
-                        <title>
-                          {`${p.album.artistText} – ${p.album.title}${p.album.year ? ` (${p.album.year})` : ""}${
-                            p.album.biezaca ? ` — ${t.markThisOne}` : ""
-                          }`}
-                        </title>
-                        {p.album.biezaca && (
-                          <line x1={x(p.year)} x2={x(p.year)} y1={yP} y2={baseY} stroke="var(--accent2)" strokeWidth={2} opacity={0.5} />
-                        )}
-                        <rect
-                          x={x(p.year) - (p.album.biezaca ? 2.5 : st.szer / 2)}
-                          y={yP - 5}
-                          width={p.album.biezaca ? 5 : Math.max(2, st.szer)}
-                          height={10}
-                          rx={1}
-                          fill={kolor}
-                          opacity={p.album.biezaca ? 1 : st.krycie + 0.25}
-                        />
-                        {/* powiększone pole trafienia — w dwupikselową kreskę
-                            nie da się celować myszą, a palcem tym bardziej */}
-                        <rect x={x(p.year) - 7} y={yP - PASMO_H / 2} width={14} height={PASMO_H} fill="transparent" />
-                      </a>
-                    );
-                  })}
-              </g>
-            );
-          })}
           {rows.map((row, i) => {
             const s = roleStyle(rowRoles(row), t);
             const y = PASMA_H + i * ROW_H + 12;
@@ -357,6 +307,106 @@ function Chart({
                       (row.spans.every((sp) => sp.unknown) ? " ?" : "")}
                   </text>
                 </a>
+              </g>
+            );
+          })}
+          {/* Pasma wydawnictw: jeden rząd na rodzaj, znacznik w roku wydania.
+              Kreska w dół przez cały wykres zostaje TYLKO przy tej płycie,
+              na której stronie jesteśmy — reszta byłaby płotem. */}
+          {pasma.map((rodzaj, pi) => {
+            const st = STYL_WYDANIA[rodzaj];
+            const yP = pi * PASMO_H + 10;
+            const etykieta =
+              rodzaj === "studio" ? t.markStudio
+              : rodzaj === "live" ? t.markLive
+              : rodzaj === "ep" ? t.markEp
+              : rodzaj === "kompilacja" ? t.markCompilation
+              : t.markOther;
+            return (
+              <g key={`pas-${rodzaj}`} className={`znacznik-${rodzaj}`}>
+                <rect x={LABEL_W} y={yP - PASMO_H / 2 + 2} width={plotW} height={PASMO_H - 4} fill="var(--surface2)" opacity={0.6} />
+                <text x={LABEL_W - 8} y={yP + 3} textAnchor="end" fontSize="10" fill="var(--muted)" fontFamily="var(--font-mono)">
+                  {etykieta}
+                </text>
+                {globalPoints
+                  .filter((p) => p.album.rodzaj === rodzaj)
+                  .map((p, i) => {
+                    const kolor = p.album.biezaca ? "var(--accent2)" : st.kolor;
+                    // KTO GRAŁ NA TEJ PŁYCIE — pokazujemy dopiero pod kursorem.
+                    // Odkąd na oś trafiła cała dyskografia (koncertówki, EP-ki,
+                    // składanki), kresek zrobiło się tyle, że pytanie „kto był
+                    // wtedy w składzie" ginęło. Najazd na płytę rysuje pionową
+                    // linię przez cały wykres i podświetla wiersze tych, których
+                    // kadencja obejmuje rok wydania — nazwisko dostaje jeszcze
+                    // podkreślenie, bo samo tło ginie przy gęstym składzie.
+                    // Bez javascriptu: to zwykły :hover po CSS, a wykres zostaje
+                    // serwerowy. Dlatego też pasma rysujemy PO wierszach — w SVG
+                    // o tym, co jest na wierzchu, decyduje kolejność.
+                    const grali = rows
+                      .map((row, ri) => ({ row, ri }))
+                      .filter(({ row }) =>
+                        row.spans.some(
+                          (sp) =>
+                            !sp.unknown &&
+                            p.year >= toYear(sp.begin, -Infinity) &&
+                            p.year <= (sp.current ? now : toYear(sp.end, now)),
+                        ),
+                      );
+                    return (
+                      <a key={`pm-${rodzaj}-${i}`} href={`/album/${p.album.mbid}`} className="album-mark">
+                        <title>
+                          {`${p.album.artistText} – ${p.album.title}${p.album.year ? ` (${p.album.year})` : ""}${
+                            p.album.biezaca ? ` — ${t.markThisOne}` : ""
+                          }`}
+                        </title>
+                        {p.album.biezaca && (
+                          <line x1={x(p.year)} x2={x(p.year)} y1={yP} y2={baseY} stroke="var(--accent2)" strokeWidth={2} opacity={0.5} />
+                        )}
+                        <rect
+                          x={x(p.year) - (p.album.biezaca ? 2.5 : st.szer / 2)}
+                          y={yP - 5}
+                          width={p.album.biezaca ? 5 : Math.max(2, st.szer)}
+                          height={10}
+                          rx={1}
+                          fill={kolor}
+                          opacity={p.album.biezaca ? 1 : st.krycie + 0.25}
+                        />
+                        <g className="najazd">
+                          <line
+                            x1={x(p.year)}
+                            x2={x(p.year)}
+                            y1={yP}
+                            y2={baseY}
+                            stroke="var(--accent2)"
+                            strokeWidth={1.5}
+                            strokeDasharray="3 3"
+                            opacity={0.7}
+                          />
+                          {grali.map(({ row, ri }) => {
+                            const yr = PASMA_H + ri * ROW_H + 12;
+                            const nazwa = row.name.length > maxName ? maxName : row.name.length;
+                            const szer = Math.min(LABEL_W - 10, nazwa * 6.6);
+                            return (
+                              <g key={`gr-${row.mbid}`}>
+                                <rect x={2} y={yr + 2} width={W - 14} height={ROW_H - 4} fill="var(--accent2)" opacity={0.14} rx={2} />
+                                <line
+                                  x1={LABEL_W - 8 - szer}
+                                  x2={LABEL_W - 8}
+                                  y1={yr + ROW_H / 2 + 7}
+                                  y2={yr + ROW_H / 2 + 7}
+                                  stroke="var(--accent2)"
+                                  strokeWidth={1.4}
+                                />
+                              </g>
+                            );
+                          })}
+                        </g>
+                        {/* powiększone pole trafienia — w dwupikselową kreskę
+                            nie da się celować myszą, a palcem tym bardziej */}
+                        <rect x={x(p.year) - 7} y={yP - PASMO_H / 2} width={14} height={PASMO_H} fill="transparent" />
+                      </a>
+                    );
+                  })}
               </g>
             );
           })}

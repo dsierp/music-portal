@@ -542,7 +542,10 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
     const bands = [...new Map(artist.memberOf.map((m) => [m.mbid, m])).values()].slice(0, 10);
     const discos = await Promise.all(bands.map((b) => getDiscography(b.mbid).catch(() => [])));
     bands.forEach((b, i) => {
-      bandAlbums.set(b.mbid, discos[i].filter((a) => a.primaryType === "Album" && !a.secondaryTypes.length));
+      // Cała dyskografia, nie same studyjne: oś sama rozdziela rodzaje na
+      // pasma i pozwala je wyłączyć, a koncertówka czy EP-ka też mówi, że
+      // zespół w tym roku żył. Tak samo jak przy płycie.
+      bandAlbums.set(b.mbid, discos[i]);
     });
   }
   // Kolejność płyt: najpierw wskazujemy „tę jedną", potem cały dorobek
@@ -857,7 +860,7 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
             mbid={mbid}
             bands={artist.memberOf.length ? artist.memberOf : zespolyZPlyt}
             albumsByBand={artist.memberOf.length ? bandAlbums : plytyZespolowZPlyt}
-            own={albums}
+            own={disco}
             locale={locale}
             t={t.artist.timeline}
           />
@@ -866,11 +869,11 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
               MusicBrainz wie kto i kiedy, rysujemy mu zwykłą oś składu — obok
               osi „gdzie grał", bo to dwie różne historie tej samej osoby. */}
           {ownBand.length > 0 && (
-            <LineupTimeline members={ownBand} albums={albums} locale={locale} t={t.artist.timeline} />
+            <LineupTimeline members={ownBand} albums={disco} locale={locale} t={t.artist.timeline} />
           )}
         </>
       ) : (
-        <LineupTimeline members={artist.members.filter((m) => !m.supporting)} albums={albums} locale={locale} t={t.artist.timeline} />
+        <LineupTimeline members={artist.members.filter((m) => !m.supporting)} albums={disco} locale={locale} t={t.artist.timeline} />
       )}
 
       <Suspense fallback={<p className="mt-10 font-mono text-xs text-muted">{t.artist.concertsLoading}</p>}>

@@ -111,6 +111,17 @@ a:hover { color: var(--accent2); }
 .album-mark:hover circle { stroke: var(--accent2); }
 .album-mark:hover line { stroke: var(--accent2); opacity: 1; }
 
+/* Najazd na płytę = „kto ją nagrywał".
+   Kreska przez cały wykres plus podświetlone wiersze tych, których kadencja
+   obejmuje rok wydania. Rysuje to serwer (grupa .najazd przy każdym znaczniku),
+   CSS tylko ją odsłania — dzięki temu wykres nie potrzebuje javascriptu.
+   `pointer-events: none`, żeby podświetlenie nie przechwytywało kursora
+   i nie mrugało, gdy myszka wjeżdża na własne tło. */
+.album-mark .najazd { opacity: 0; pointer-events: none; transition: opacity .12s ease-out; }
+.album-mark:hover .najazd, .album-mark:focus .najazd, .album-mark:focus-visible .najazd { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .album-mark .najazd { transition: none; } }
+@media (hover: none) { .album-mark .najazd { display: none; } }
+
 /* Filtr instrumentów nad składem (LineupFilter).
    Serwer renderuje całą listę raz, z `data-i` na każdej pozycji; klik w chips
    przestawia `data-filter` na kontenerze i to CSS decyduje, co widać. Bez rundy
