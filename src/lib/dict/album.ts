@@ -32,6 +32,10 @@ const pl = {
   staffSummary: "Pozostałe osoby ({n})",
 
   tracksHeading: "Utwory",
+  bpmValue: "ok. {n} BPM",
+  bpmNote: "Tempo policzone automatem (Deezer) — przy blastach bywa liczone na pół albo podwójnie.",
+  bpmMedian: "Tempo płyty: ok. {n} BPM (mediana)",
+  bpmCoverage: "— zmierzone {znane} z {all} utworów",
   discLabel: "Dysk {n}",
 
   morePrefix: "Więcej:",
@@ -78,6 +82,10 @@ const en: T = {
   staffSummary: "Everyone else ({n})",
 
   tracksHeading: "Tracklist",
+  bpmValue: "~{n} BPM",
+  bpmNote: "Tempo measured automatically (Deezer) — blast beats often come out halved or doubled.",
+  bpmMedian: "Album tempo: ~{n} BPM (median)",
+  bpmCoverage: "— measured for {znane} of {all} tracks",
   discLabel: "Disc {n}",
 
   morePrefix: "More from:",
@@ -122,6 +130,10 @@ const es: T = {
   staffSummary: "Las demás personas ({n})",
 
   tracksHeading: "Canciones",
+  bpmValue: "~{n} BPM",
+  bpmNote: "Tempo medido automáticamente (Deezer) — los blast beats suelen salir a la mitad o al doble.",
+  bpmMedian: "Tempo del disco: ~{n} BPM (mediana)",
+  bpmCoverage: "— medido en {znane} de {all} canciones",
   discLabel: "Disco {n}",
 
   morePrefix: "Más de:",
@@ -166,6 +178,10 @@ const de: T = {
   staffSummary: "Alle Übrigen ({n})",
 
   tracksHeading: "Titelliste",
+  bpmValue: "ca. {n} BPM",
+  bpmNote: "Tempo automatisch gemessen (Deezer) — Blastbeats kommen oft halbiert oder verdoppelt heraus.",
+  bpmMedian: "Tempo der Platte: ca. {n} BPM (Median)",
+  bpmCoverage: "— gemessen bei {znane} von {all} Titeln",
   discLabel: "CD {n}",
 
   morePrefix: "Mehr von:",

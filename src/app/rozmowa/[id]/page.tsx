@@ -169,11 +169,16 @@ export default async function RozmowaPage({ params }: { params: Promise<{ id: st
                           rodzaj === "szukam" ? t.chat.stepSearching
                           : rodzaj === "sprawdzam" ? t.chat.stepChecking
                           : rodzaj === "mam" ? t.chat.stepHave
+                          // Dwa nowe kroki: mierzenie tempa i odrzucenie po
+                          // pomiarze. Widać wtedy, że liczba z pytania jest
+                          // sprawdzana, a nie przyjmowana na słowo modelu.
+                          : rodzaj === "tempo" ? t.chat.stepTempo
+                          : rodzaj === "tempoNieTo" ? t.chat.stepTempoOut
                           : t.chat.stepMissing;
                         return (
-                          <li key={j} className={rodzaj === "brak" ? "text-faint line-through" : "text-muted"}>
+                          <li key={j} className={rodzaj === "brak" || rodzaj === "tempoNieTo" ? "text-faint line-through" : "text-muted"}>
                             <span className={rodzaj === "mam" ? "text-accent2" : "text-faint"}>
-                              {rodzaj === "mam" ? "✓" : rodzaj === "brak" ? "✕" : "·"}
+                              {rodzaj === "mam" ? "✓" : rodzaj === "brak" || rodzaj === "tempoNieTo" ? "✕" : "·"}
                             </span>{" "}
                             {podpis}{co ? `: ${co}` : ""}
                           </li>

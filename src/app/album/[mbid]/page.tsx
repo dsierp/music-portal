@@ -391,18 +391,11 @@ export default async function AlbumPage({
         {album.tracks.length > 0 && (
           <section className="mt-8">
             <h2 className="mb-2 text-2xl">{t.album.tracksHeading}</h2>
-            {discs.map((d) => (
-              <ol key={d} className="mb-3 text-sm">
-                {discs.length > 1 && <div className="label my-1">{fmt(t.album.discLabel, { n: d })}</div>}
-                {album.tracks.filter((tr) => tr.disc === d).map((tr) => (
-                  <li key={tr.recordingMbid + tr.position} className="flex gap-3 border-b border-rule/60 py-1">
-                    <span className="w-6 text-right font-mono text-xs text-faint">{tr.number}</span>
-                    <span className="flex-1">{tr.title}</span>
-                    <span className="font-mono text-xs text-muted">{fmtLength(tr.lengthMs)}</span>
-                  </li>
-                ))}
-              </ol>
-            ))}
+            {/* Tempo dochodzi osobnym strumieniem: to pytanie do Deezera, a lista
+                utworów ma się pokazać natychmiast, nawet gdy on milczy. */}
+            <Suspense fallback={<ListaUtworow album={album} discs={discs} t={t} tempo={null} />}>
+              <ListaUtworowZTempem album={album} discs={discs} t={t} />
+            </Suspense>
           </section>
         )}
 
@@ -472,4 +465,78 @@ async function TeledyskiPlyty({
   const items = [...wg.values()];
   if (!items.length) return null;
   return <Teledyski items={items} artysta={artysta} t={{ title: t.common.videosTitle, search: t.common.videosSearch }} />;
+}
+
+/**
+ * Lista utworów — z tempem albo bez.
+ *
+ * Rozdzielona na dwa komponenty świadomie: ten rysuje, a ten niżej pyta.
+ * Dzięki temu strona pokazuje utwory od razu, a kolumna z BPM dokleja się,
+ * gdy Deezer odpowie — i nie ma jej wcale, gdy nie odpowiada.
+ */
+function ListaUtworow({
+  album,
+  discs,
+  t,
+  tempo,
+}: {
+  album: { tracks: { title: string; recordingMbid: string; position: number; number: string; disc: number; lengthMs: number | null }[] };
+  discs: number[];
+  t: Dict;
+  tempo: Map<string, number> | null;
+}) {
+  return (
+    <>
+      {discs.map((d) => (
+        <ol key={d} className="mb-3 text-sm">
+          {discs.length > 1 && <div className="label my-1">{fmt(t.album.discLabel, { n: d })}</div>}
+          {album.tracks.filter((tr) => tr.disc === d).map((tr) => {
+            const bpm = tempo?.get(tr.title.trim().toLowerCase());
+            return (
+              <li key={tr.recordingMbid + tr.position} className="flex gap-3 border-b border-rule/60 py-1">
+                <span className="w-6 text-right font-mono text-xs text-faint">{tr.number}</span>
+                <span className="flex-1">{tr.title}</span>
+                {/* „ok.", bo to pomiar automatu, nie metronom z sesji. */}
+                {bpm ? (
+                  <span className="font-mono text-xs text-accent2" title={t.album.bpmNote}>
+                    {fmt(t.album.bpmValue, { n: bpm })}
+                  </span>
+                ) : (
+                  tempo && <span className="font-mono text-xs text-faint">–</span>
+                )}
+                <span className="font-mono text-xs text-muted">{fmtLength(tr.lengthMs)}</span>
+              </li>
+            );
+          })}
+        </ol>
+      ))}
+    </>
+  );
+}
+
+async function ListaUtworowZTempem({
+  album,
+  discs,
+  t,
+}: {
+  album: { artistText: string; title: string; tracks: { title: string; recordingMbid: string; position: number; number: string; disc: number; lengthMs: number | null }[] };
+  discs: number[];
+  t: Dict;
+}) {
+  const { bpmPlyty } = await import("@/lib/bpm");
+  const dane = await bpmPlyty(album.artistText, album.title).catch(() => null);
+  const tempo = dane?.utwory.length
+    ? new Map(dane.utwory.filter((u) => u.bpm).map((u) => [u.tytul.trim().toLowerCase(), u.bpm!]))
+    : null;
+  return (
+    <>
+      {dane?.mediana && (
+        <p className="mb-2 font-mono text-xs text-muted">
+          {fmt(t.album.bpmMedian, { n: dane.mediana })}{" "}
+          <span className="text-faint">{fmt(t.album.bpmCoverage, { znane: dane.znane, all: dane.utwory.length })}</span>
+        </p>
+      )}
+      <ListaUtworow album={album} discs={discs} t={tempo ? t : t} tempo={tempo} />
+    </>
+  );
 }

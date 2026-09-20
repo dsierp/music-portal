@@ -179,7 +179,21 @@ async function tura(id: string, userId: string) {
       r.czesciowe = [...(r.czesciowe ?? []), z];
       await zapisz(r);
     };
-    const { plyty, odpadlo, awaria } = await potwierdz(odp.propozycje, juz, krok, dodaj);
+    /**
+     * TEMPO: gdy człowiek pyta o BPM, sprawdzamy je NAPRAWDĘ.
+     *
+     * Model podaje tempa z pamięci i robi to z takim samym przekonaniem, gdy
+     * wie, co gdy zgaduje (potrafi przypisać płycie perkusistę, który dołączył
+     * rok później). Liczba w pytaniu jest więc obietnicą, której dotrzymać może
+     * tylko pomiar — po dowiązaniu do MusicBrainz pytamy Deezera i wyrzucamy
+     * to, co nie mieści się w zakresie. Czego Deezer nie zna, zostaje z dopiskiem
+     * „tempa nie znam" — bo „nie wiem" to co innego niż „nie pasuje".
+     */
+    const { zakresBpm } = await import("./bpm");
+    const ostatniaOdCzlowieka = [...r.wiadomosci].reverse().find((w) => w.rola === "ja")?.tekst ?? "";
+    const zakres = zakresBpm(ostatniaOdCzlowieka);
+
+    const { plyty, odpadlo, awaria } = await potwierdz(odp.propozycje, juz, krok, dodaj, zakres);
     r.wiadomosci.push({ rola: "portal", tekst: odp.odpowiedz, plyty, odpadlo });
     r.czesciowe = undefined;
     r.czesciowyTekst = undefined;
@@ -204,6 +218,8 @@ async function potwierdz(
   juz: Set<string>,
   krok?: (linia: string) => Promise<void>,
   dodaj?: (z: Znaleziona) => Promise<void>,
+  /** zakres tempa z pytania — gdy jest, mierzymy i odsiewamy */
+  zakres?: { min: number; max: number } | null,
 ): Promise<{ plyty: Znaleziona[]; odpadlo: number; awaria: boolean }> {
   const plyty: Znaleziona[] = [];
   let odpadlo = 0;
@@ -224,7 +240,22 @@ async function potwierdz(
     }
     if (juz.has(znaleziony.mbid)) continue;
     juz.add(znaleziony.mbid);
-    const z = { album: znaleziony, why: p.why };
+
+    let dopisek = "";
+    if (zakres) {
+      await krok?.(`tempo::${znaleziony.artistText} – ${znaleziony.title}`);
+      const { bpmMediana, wZakresie } = await import("./bpm");
+      const bpm = await bpmMediana(znaleziony.artistText, znaleziony.title).catch(() => null);
+      if (bpm && !wZakresie(bpm, zakres)) {
+        odpadlo++;
+        await krok?.(`tempoNieTo::${znaleziony.artistText} – ${znaleziony.title} (${bpm} BPM)`);
+        continue;
+      }
+      // Dopisek mówi, co wiemy NAPRAWDĘ — obok zdania modelu, które jest
+      // tylko jego opinią.
+      dopisek = bpm ? ` [zmierzone: ok. ${bpm} BPM]` : " [tempa nie znam — Deezer go nie podaje]";
+    }
+    const z = { album: znaleziony, why: `${p.why}${dopisek}`.trim() };
     plyty.push(z);
     await dodaj?.(z);
     await krok?.(`mam::${znaleziony.artistText} – ${znaleziony.title}`);

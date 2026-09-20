@@ -1,4 +1,3 @@
-import Link from "next/link";
 
 /**
  * JEDEN przycisk „posłuchaj" na cały portal — Spotify i Tidal.
@@ -46,15 +45,24 @@ export function SerwisPill({
   title?: string;
   small?: boolean;
 }) {
+  /**
+   * NOWA KARTA, nie ta sama.
+   * Wyjście do serwisu jest odejściem z portalu — człowiek idzie posłuchać
+   * i wraca do tego, co czytał. Gdy otwierało się w miejscu, wracanie
+   * wymagało „wstecz" i przeładowania strony, na której był. Dlatego zwykły
+   * `<a target="_blank">`, a nie nawigacja wewnętrzna: mimo że adres jest
+   * nasz (`/go/…`), kończy się przekierowaniem na zewnątrz.
+   */
   return (
-    <Link
+    <a
       href={href}
-      prefetch={false}
+      target="_blank"
+      rel="noopener"
       title={title}
       className={`${PILL} ${BARWA[serwis]} ${small ? "text-[11px]" : "text-xs"}`}
     >
       {znak(stan)} {NAZWA[serwis]}
-    </Link>
+    </a>
   );
 }
 
