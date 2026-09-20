@@ -400,12 +400,35 @@ async function ArtistDeepContentWewn({ artist: raw, mbid, locale, t, stron }: { 
   // Trzecie podejście: infoboks Wikipedii. Przy Mgle to jedyne miejsce, w którym
   // skład w ogóle jest — MusicBrainz nie ma relacji, a Wikidane encji zespołu
   // nie rozpisały. Bez dat, ale z instrumentami i z uczciwym podpisem skąd.
-  if (!members.length) {
+  // ...a od teraz także jako UZUPEŁNIENIE, nie tylko ostatnia deska ratunku.
+  // Benediction: MusicBrainz ma siedem osób i ani jednego perkusisty na pierwsze
+  // cztery lata, bo nikt nie wpisał tam Iana Treacy'ego (ani Paula Adamsa na
+  // basie). Wykres twierdził wtedy, że zespół nagrywał bez bębnów. Wikipedia
+  // ich wymienia, więc dokładamy tych, których w MusicBrainz nie ma wcale —
+  // bez dat, z podpisem skąd, czyli na wykresie przerywaną ramką i znakiem
+  // zapytania. Lepsze „był, nie wiemy kiedy" niż „nie było go".
+  if (!raw.isPerson) {
     const wiki = await wikiBandMembers(raw.links).catch(() => ({ current: [], past: [] }));
-    members = [
-      ...wiki.current.map((p) => zWiki(p, true)),
-      ...wiki.past.map((p) => zWiki(p, false)),
-    ];
+    const zWikipedii = [...wiki.current.map((p) => zWiki(p, true)), ...wiki.past.map((p) => zWiki(p, false))];
+    // Ta sama osoba bywa zapisana inaczej po obu stronach („Mark »Barney«
+    // Greenway" kontra „Barney Greenway"), więc porównujemy zbiory słów:
+    // gdy jeden mieści się w drugim, to ten sam człowiek i drugiego wiersza
+    // nie robimy.
+    const slowa = (n: string) =>
+      new Set(
+        n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+          .split(/[^a-z0-9]+/).filter((w) => w.length > 1),
+      );
+    const znani = members.map((m) => slowa(m.name));
+    const zawiera = (a: Set<string>, b: Set<string>) => [...b].every((w) => a.has(w));
+    const dodatkowi = zWikipedii.filter((kandydat) => {
+      const k = slowa(kandydat.name);
+      if (!k.size) return false;
+      if (znani.some((z) => zawiera(z, k) || zawiera(k, z))) return false;
+      znani.push(k);
+      return true;
+    });
+    members = [...members, ...dodatkowi];
   }
   // Czwarte podejście, tylko dla ludzi i tylko przy zupełnej pustce: zespół
   // wyczytany z opisu przy artyście („drummer of Mgła"). MusicBrainz zna tam
