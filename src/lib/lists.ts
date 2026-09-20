@@ -102,8 +102,21 @@ export const FLAG_LABELS: Record<string, string> = { ep: "EP", comp: "kompilacja
  * najnowszych dat, ile poproszono, i wszystkie sekcje z tych dat — blok
  * niemetalowy zawsze pod swoim piątkiem, nie zamiast niego.
  */
-export async function latestSections(limit = 2) {
-  const secs = await db.select().from(schema.releaseSections).orderBy(desc(schema.releaseSections.sortDate), asc(schema.releaseSections.kind));
+export async function latestSections(limit = 2, opcje: { tylkoWydane?: boolean } = {}) {
+  const wszystkie = await db.select().from(schema.releaseSections).orderBy(desc(schema.releaseSections.sortDate), asc(schema.releaseSections.kind));
+  /**
+   * `tylkoWydane` — dla strony głównej.
+   *
+   * Premiery prowadzimy do przodu: sekcja na nadchodzący piątek stoi w bazie,
+   * zanim cokolwiek wyjdzie. Na liście premier to ma sens (to jest zapowiedź),
+   * ale strona główna mówi „Premiery dla Ciebie" i dawała płyty, których nie
+   * da się jeszcze posłuchać — guziki Spotify i Tidala prowadziły donikąd.
+   * Tutaj bierzemy więc ostatni piątek, który JUŻ był.
+   */
+  const wydane = opcje.tylkoWydane ? wszystkie.filter((s) => s.sortDate.getTime() <= Date.now()) : wszystkie;
+  // Gdyby wszystko było jeszcze przed premierą (świeży import), lepiej pokazać
+  // zapowiedź niż pustą stronę.
+  const secs = wydane.length ? wydane : wszystkie;
   const terminy = [...new Set(secs.map((s) => s.sortDate.getTime()))].slice(0, limit);
   const wybrane = secs.filter((s) => terminy.includes(s.sortDate.getTime()));
   // NAJNOWSZE NA GÓRZE, a w obrębie jednego terminu: najpierw sekcja główna.

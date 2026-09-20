@@ -173,7 +173,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ w
     const genres = await getGenres(user.id).catch(() => [] as { genre: string; weight: number }[]);
     if (!genres.length) redirect("/ja?witaj=1");
   }
-  const sections = await latestSections(2);
+  // Tylko to, co już wyszło — zapowiedzi na nadchodzący piątek są w Premierach.
+  const sections = await latestSections(2, { tylkoWydane: true });
   const rel = await releasesFor(sections.map((s) => s.id));
   const years = await bestOfYears();
   const best = years[0] ? await bestOf(years[0].year) : null;
