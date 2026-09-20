@@ -137,3 +137,12 @@ a:hover { color: var(--accent2); }
 .polka::-webkit-scrollbar { height: 6px; }
 .polka::-webkit-scrollbar-thumb { background: transparent; border-radius: 3px; }
 .polka:hover::-webkit-scrollbar-thumb { background: var(--color-rule); }
+
+/* Filtry rodzajów wydawnictw na osi czasu (components/os-filtry.tsx).
+   Serwer podpisuje każdy znacznik klasą rodzaju, a guzik przestawia jedną
+   klasę na opakowaniu — dzięki temu wykres zostaje serwerowym SVG. */
+.ukryj-studio .znacznik-studio,
+.ukryj-live .znacznik-live,
+.ukryj-ep .znacznik-ep,
+.ukryj-kompilacja .znacznik-kompilacja,
+.ukryj-inne .znacznik-inne { display: none; }

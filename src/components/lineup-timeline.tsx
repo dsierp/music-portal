@@ -3,6 +3,7 @@ import { fillMissingSpans, mergeSpans, rowRoles, type TimelineRow } from "@/lib/
 import { fmt, plural, type Locale } from "@/lib/i18n";
 import type { Dict } from "@/lib/dict";
 import { instrumentGroup, type InstrumentKey } from "@/lib/instruments";
+import { OsFiltry } from "./os-filtry";
 
 /**
  * Oś czasu — dwa spojrzenia na to samo:
@@ -148,14 +149,12 @@ function Chart({
   rows,
   albums,
   labelWidth,
-  markLabel,
   t,
 }: {
   rows: Row[];
   /** znaczniki na całej wysokości wykresu (dyskografia zespołu / płyty solowe) */
   albums: Mark[];
   labelWidth: number;
-  markLabel: string;
   t: TimelineLabels;
 }) {
   const now = new Date().getFullYear() + 1;
@@ -178,15 +177,29 @@ function Chart({
   const to = Math.ceil(Math.max(...ends, ...(allYears.length ? [Math.max(...allYears)] : [now])));
   const span = Math.max(1, to - from);
 
-  // Geometria: etykiety po lewej, oś lat na dole.
+  /**
+   * PASMA WYDAWNICTW NAD SKŁADEM — po jednym rzędzie na rodzaj.
+   *
+   * Wcześniej wszystkie płyty stały w jednej warstwie pionowych kresek i przy
+   * zespole z długim stażem robił się z tego płot: nie dało się odczytać, czy
+   * w danym roku wyszedł album, czy składanka. Rozbicie na rzędy (studyjne,
+   * koncertowe, EP, składanki) odpowiada na to od razu — a rząd pojawia się
+   * tylko wtedy, gdy zespół naprawdę coś takiego wydał.
+   */
+  const RODZAJE_KOLEJNOSC = ["studio", "live", "ep", "kompilacja", "inne"] as const;
+  const pasma = RODZAJE_KOLEJNOSC.filter((r) => globalPoints.some((p) => p.album.rodzaj === r));
+
+  // Geometria: etykiety po lewej, pasma wydawnictw na górze, oś lat na dole.
   const LABEL_W = labelWidth;
   const ROW_H = 22;
+  const PASMO_H = 16;
   const AXIS_H = 26;
   const W = 900;
-  const H = rows.length * ROW_H + AXIS_H + 18;
+  const PASMA_H = pasma.length ? pasma.length * PASMO_H + 8 : 0;
+  const H = PASMA_H + rows.length * ROW_H + AXIS_H + 18;
   const plotW = W - LABEL_W - 12;
   const x = (year: number) => LABEL_W + ((year - from) / span) * plotW;
-  const baseY = rows.length * ROW_H + 12;
+  const baseY = PASMA_H + rows.length * ROW_H + 12;
 
   // Podziałka co 2, 5 albo 10 lat — tak, żeby podpisów było kilkanaście, nie sto.
   const step = span <= 12 ? 2 : span <= 30 ? 5 : 10;
@@ -201,37 +214,79 @@ function Chart({
 
   const maxName = Math.floor(LABEL_W / 7);
 
+  const obecneRodzaje = (["studio", "live", "ep", "kompilacja", "inne"] as const)
+    .filter((r) => globalPoints.some((p) => p.album.rodzaj === r))
+    .map((r) => ({ rodzaj: r, ...STYL_WYDANIA[r] }));
+
   return (
-    <>
+    <OsFiltry
+      rodzaje={obecneRodzaje}
+      etykiety={{
+        studio: t.markStudio,
+        live: t.markLive,
+        ep: t.markEp,
+        kompilacja: t.markCompilation,
+        inne: t.markOther,
+      }}
+      opis={t.markLegendNote}
+    >
       <div className="mt-3 overflow-x-auto">
         <svg viewBox={`0 0 ${W} ${H}`} width={W} className="min-w-[680px] max-w-full" role="img" aria-label={t.axisAriaLabel}>
           {/* Pionowe kreski = płyty. Kółko na górze jest klikalne i ma podpowiedź
               (SVG <title> = natywny dymek przeglądarki, bez javascriptu). */}
-          {globalPoints.map((p, i) => {
-            const st = STYL_WYDANIA[p.album.rodzaj];
-            // TA płyta: akcentem portalu, grubiej i bez przygaszenia — żeby
-            // od razu było widać, w którym miejscu historii zespołu stoisz.
-            const kolor = p.album.biezaca ? "var(--accent2)" : st.kolor;
-            const szer = p.album.biezaca ? 3 : st.szer;
-            const krycie = p.album.biezaca ? 1 : st.krycie;
+          {/* Pasma wydawnictw: jeden rząd na rodzaj, znacznik w roku wydania.
+              Kreska w dół przez cały wykres zostaje TYLKO przy tej płycie,
+              na której stronie jesteśmy — reszta byłaby płotem. */}
+          {pasma.map((rodzaj, pi) => {
+            const st = STYL_WYDANIA[rodzaj];
+            const yP = pi * PASMO_H + 10;
+            const etykieta =
+              rodzaj === "studio" ? t.markStudio
+              : rodzaj === "live" ? t.markLive
+              : rodzaj === "ep" ? t.markEp
+              : rodzaj === "kompilacja" ? t.markCompilation
+              : t.markOther;
             return (
-              <a key={`al-${i}`} href={`/album/${p.album.mbid}`} className="album-mark">
-                <title>
-                  {`${p.album.artistText} – ${p.album.title}${p.album.year ? ` (${p.album.year})` : ""}${
-                    p.album.biezaca ? ` — ${t.markThisOne}` : ""
-                  }`}
-                </title>
-                <line x1={x(p.year)} x2={x(p.year)} y1={10} y2={baseY} stroke={kolor} strokeWidth={szer} opacity={krycie} />
-                <circle cx={x(p.year)} cy={7} r={p.album.biezaca ? 6 : 5} fill="var(--bg)" stroke={kolor} strokeWidth={szer} />
-                <circle cx={x(p.year)} cy={7} r={p.album.biezaca ? 2.6 : 1.7} fill={kolor} />
-                {/* powiększone pole trafienia — w 5-pikselowe kółko trudno celować */}
-                <rect x={x(p.year) - 9} y={0} width={18} height={baseY} fill="transparent" />
-              </a>
+              <g key={`pas-${rodzaj}`} className={`znacznik-${rodzaj}`}>
+                <rect x={LABEL_W} y={yP - PASMO_H / 2 + 2} width={plotW} height={PASMO_H - 4} fill="var(--surface2)" opacity={0.6} />
+                <text x={LABEL_W - 8} y={yP + 3} textAnchor="end" fontSize="10" fill="var(--muted)" fontFamily="var(--font-mono)">
+                  {etykieta}
+                </text>
+                {globalPoints
+                  .filter((p) => p.album.rodzaj === rodzaj)
+                  .map((p, i) => {
+                    const kolor = p.album.biezaca ? "var(--accent2)" : st.kolor;
+                    return (
+                      <a key={`pm-${rodzaj}-${i}`} href={`/album/${p.album.mbid}`} className="album-mark">
+                        <title>
+                          {`${p.album.artistText} – ${p.album.title}${p.album.year ? ` (${p.album.year})` : ""}${
+                            p.album.biezaca ? ` — ${t.markThisOne}` : ""
+                          }`}
+                        </title>
+                        {p.album.biezaca && (
+                          <line x1={x(p.year)} x2={x(p.year)} y1={yP} y2={baseY} stroke="var(--accent2)" strokeWidth={2} opacity={0.5} />
+                        )}
+                        <rect
+                          x={x(p.year) - (p.album.biezaca ? 2.5 : st.szer / 2)}
+                          y={yP - 5}
+                          width={p.album.biezaca ? 5 : Math.max(2, st.szer)}
+                          height={10}
+                          rx={1}
+                          fill={kolor}
+                          opacity={p.album.biezaca ? 1 : st.krycie + 0.25}
+                        />
+                        {/* powiększone pole trafienia — w dwupikselową kreskę
+                            nie da się celować myszą, a palcem tym bardziej */}
+                        <rect x={x(p.year) - 7} y={yP - PASMO_H / 2} width={14} height={PASMO_H} fill="transparent" />
+                      </a>
+                    );
+                  })}
+              </g>
             );
           })}
           {rows.map((row, i) => {
             const s = roleStyle(rowRoles(row), t);
-            const y = i * ROW_H + 12;
+            const y = PASMA_H + i * ROW_H + 12;
             return (
               <g key={row.mbid}>
                 <rect x={LABEL_W} y={y + 4} width={plotW} height={ROW_H - 8} fill="var(--surface2)" />
@@ -323,21 +378,9 @@ function Chart({
               {label}
             </span>
           ))}
-          {/* Legenda rodzajów — tylko te, które naprawdę są na wykresie.
-              Pokazywanie „koncertówka" przy zespole bez koncertówki to
-              zaśmiecanie podpisu rzeczami, których nie ma. */}
-          {globalPoints.length > 0 &&
-            (["studio", "live", "ep", "kompilacja"] as const)
-              .filter((r) => globalPoints.some((p) => p.album.rodzaj === r))
-              .map((r) => (
-                <span key={r} className="flex items-center gap-1.5">
-                  <span
-                    className="inline-block h-3"
-                    style={{ width: STYL_WYDANIA[r].szer + 1, background: STYL_WYDANIA[r].kolor, opacity: STYL_WYDANIA[r].krycie + 0.25 }}
-                  />
-                  {r === "studio" ? t.markStudio : r === "live" ? t.markLive : r === "ep" ? t.markEp : t.markCompilation}
-                </span>
-              ))}
+          {/* Rodzaje wydawnictw nie stoją już w tej legendzie — są niżej,
+              jako guziki, które te rodzaje CHOWAJĄ (components/os-filtry.tsx).
+              Legenda i filtr to to samo, więc nie ma po co pisać dwa razy. */}
           {globalPoints.some((p) => p.album.biezaca) && (
             <span className="flex items-center gap-1.5">
               <span className="inline-block h-3 w-[3px] bg-accent2" />
@@ -383,7 +426,7 @@ function Chart({
         )}
         <p className="mt-1 text-[10px] text-faint">{t.footnote}</p>
       </div>
-    </>
+    </OsFiltry>
   );
 }
 
@@ -413,7 +456,7 @@ export function LineupTimeline({
     // i kiedy. Kto nie chce, zwinie.
     <details className="mt-6" open>
       <summary className="cursor-pointer text-muted hover:text-accent2">{plural(locale, rows.length, t.lineupSummary)}</summary>
-      <Chart rows={rows} albums={albums.map((a) => markOf(a, biezacaPlyta))} labelWidth={150} markLabel={t.markAlbumLabel} t={t} />
+      <Chart rows={rows} albums={albums.map((a) => markOf(a, biezacaPlyta))} labelWidth={150} t={t} />
     </details>
   );
 }
@@ -485,7 +528,6 @@ export function CareerTimeline({
         rows={wszystkie}
         albums={wlasnyWiersz ? [] : wlasneZnaczniki}
         labelWidth={180}
-        markLabel={t.markOwnLabel}
         t={t}
       />
     </details>
