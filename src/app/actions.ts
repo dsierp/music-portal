@@ -755,6 +755,13 @@ export async function powtorzPytanie(formData: FormData) {
  * a komu brakowało nazwy, tego pokazywał jako fragment adresu e-mail. Nikt się
  * na to nie pisał.
  */
+/** Własne wskazówki dla doradcy — z ekranu profilu. */
+export async function setWskazowkiAction(formData: FormData) {
+  const u = await requireUser();
+  await ud.setWskazowki(u.id, String(formData.get("wskazowki") ?? ""));
+  revalidatePath("/ja");
+}
+
 export async function setSharingAction(formData: FormData) {
   const u = await requireUser();
   await ud.setSharingProfile(u.id, String(formData.get("nick") ?? ""), formData.get("discoverable") === "1");

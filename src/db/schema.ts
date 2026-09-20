@@ -35,6 +35,14 @@ export const users = pgTable("user", {
    * bo to jest ta sama odpowiedź, a brak decyzji nie może znaczyć „można".
    */
   discoverable: boolean("discoverable").notNull().default(false),
+  /**
+   * Własne wskazówki dla modelu — „nie proponuj mi black metalu", „pisz krótko",
+   * „lubię długie, powolne płyty". Portal ma jedną instrukcję dla wszystkich
+   * i to jest jedyne miejsce, w którym człowiek może ją zagiąć pod siebie.
+   * Dopisujemy je na KOŃCU pytania, jako jego słowa — nie do systemowej
+   * instrukcji, bo tam nikt postronny nie powinien nic wpisywać.
+   */
+  wskazowki: text("wskazowki"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 

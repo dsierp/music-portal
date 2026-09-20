@@ -68,7 +68,7 @@ export async function potwierdz(propozycje: Propozycja[], limit = 10): Promise<W
 /** Cała droga naraz: opis → gotowe przystanki. */
 export async function ulozPodroz(
   opis: string,
-  kontekst: { style?: string[]; zna?: string[] },
+  kontekst: { style?: string[]; zna?: string[]; wskazowki?: string },
   ile = 10,
 ): Promise<WynikPodrozy> {
   // Z zapasem: przy niszowych rzeczach nawet co trzecia propozycja może nie

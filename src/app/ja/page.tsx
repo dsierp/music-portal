@@ -2,9 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { currentUser } from "@/lib/auth";
-import { getAreas, getFavoriteArtists, getGenres, getLikedAlbums, getUserLocale, myRatings, usersCount, getSharingProfile } from "@/lib/user-data";
+import { getAreas, getFavoriteArtists, getGenres, getLikedAlbums, getUserLocale, myRatings, usersCount, getSharingProfile, getWskazowki } from "@/lib/user-data";
 import { isAdmin } from "@/lib/admin";
-import { addAreaAction, connectSpotify, connectTidal, disconnectSpotify, disconnectTidal, removeAreaAction, setGenreAction, setSharingAction, skipOnboarding, toggleFavorite, toggleLike } from "@/app/actions";
+import { addAreaAction, connectSpotify, connectTidal, disconnectSpotify, disconnectTidal, removeAreaAction, setGenreAction, setSharingAction, setWskazowkiAction, skipOnboarding, toggleFavorite, toggleLike } from "@/app/actions";
 import { spotifyConfigured, spotifyConnected, spotifyKto } from "@/lib/spotify";
 import { MAIN_CATEGORIES } from "@/lib/genres";
 import { orderByPopularity } from "@/lib/popularity";
@@ -28,6 +28,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   if (!user) redirect("/login?callbackUrl=/ja");
   const profileLocale = await getUserLocale(user.id).catch(() => null);
   const widocznosc = await getSharingProfile(user.id).catch(() => ({ nick: "", discoverable: false }));
+  const wskazowki = await getWskazowki(user.id).catch(() => "");
   const { locale, t } = await i18n(profileLocale);
   // Etykiety wag (1–5) trzymamy w słowniku profilu, nie w lib/genres.ts —
   // ten plik jest wspólny i nie tłumaczymy go tutaj.
@@ -183,6 +184,28 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           </label>
           <p className="text-xs text-faint">{t.profile.sharingNeedsNick}</p>
           <button className="btn">{t.profile.sharingSave}</button>
+        </form>
+      </section>
+
+      {/* Wskazówki dla doradcy. Stoją przy profilu, bo to jest ustawienie
+          człowieka, a nie ustawienie rozmowy — mają działać wszędzie tak samo. */}
+      <section id="wskazowki">
+        <h2 className="text-2xl">{t.profile.hintsTitle}</h2>
+        <p className="mb-3 text-sm text-muted">{t.profile.hintsIntro}</p>
+        <form action={setWskazowkiAction} className="space-y-2">
+          <label className="block text-sm text-muted">
+            {t.profile.hintsLabel}
+            <textarea
+              name="wskazowki"
+              defaultValue={wskazowki}
+              maxLength={600}
+              rows={3}
+              placeholder={t.profile.hintsPlaceholder}
+              className="input mt-1 py-1 text-sm"
+            />
+          </label>
+          <p className="text-xs text-faint">{t.profile.hintsNote}</p>
+          <button className="btn">{t.profile.hintsSave}</button>
         </form>
       </section>
 

@@ -128,12 +128,14 @@ async function tura(id: string, userId: string) {
     // Co portal o nim wie. To jest cała przewaga nad zwykłym czatem: „poszukaj
     // czegoś pod to, co lubię" ma sens tylko wtedy, gdy druga strona naprawdę
     // widzi jego półkę.
-    const [style, lubiane, odrzucone, ulubieniArtysci, odrzuceniArtysci] = await Promise.all([
+    const [style, lubiane, odrzucone, ulubieniArtysci, odrzuceniArtysci, wskazowki] = await Promise.all([
       ud.getGenres(userId).then((g) => g.map((x) => x.genre)).catch(() => [] as string[]),
       ud.getLikedAlbums(userId).catch(() => []),
       ud.getLikedAlbums(userId, "dislike").catch(() => []),
       ud.getFavoriteArtists(userId).catch(() => []),
       ud.getFavoriteArtists(userId, "dislike").catch(() => []),
+      // Jego własne wskazówki do modelu — lecą na samym końcu pytania.
+      ud.getWskazowki(userId).catch(() => ""),
     ]);
     const podpis = (a: { artistName: string; title: string }) => `${a.artistName} – ${a.title}`;
     const lubi = lubiane.map(podpis);
@@ -149,6 +151,7 @@ async function tura(id: string, userId: string) {
           ulubieni: ulubieniArtysci.map((a) => a.name),
           nieLubi,
           zna: [...lubi, ...odrzucone.map(podpis)],
+          wskazowki,
         },
       );
     } catch (e) {

@@ -570,6 +570,21 @@ export async function findUsersByNick(userId: string, q: string) {
   return rows.filter((u) => u.id !== userId).map((u) => ({ id: u.id, name: u.nick ?? "", me: false }));
 }
 
+/**
+ * Własne wskazówki dla modelu. Trzymamy je surowo, jak je napisał — to jego
+ * zdanie do doradcy, nie nasza konfiguracja.
+ */
+export async function getWskazowki(userId: string): Promise<string> {
+  const u = await db.query.users.findFirst({ where: eq(schema.users.id, userId), columns: { wskazowki: true } });
+  return u?.wskazowki ?? "";
+}
+
+/** Limit 600 znaków: to ma być kilka zdań, a nie druga instrukcja portalu. */
+export async function setWskazowki(userId: string, tekst: string) {
+  const czysty = tekst.trim().slice(0, 600);
+  await db.update(schema.users).set({ wskazowki: czysty || null }).where(eq(schema.users.id, userId));
+}
+
 /** Nazwa i zgoda — do ekranu profilu. */
 export async function getSharingProfile(userId: string) {
   const u = await db.query.users.findFirst({ where: eq(schema.users.id, userId), columns: { nick: true, discoverable: true } });

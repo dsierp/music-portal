@@ -52,10 +52,12 @@ async function wykonaj(id: string, userId: string, opis: string) {
     // Co już zna: ulubione i ocenione. Bez tego model proponuje rzeczy, które
     // ten człowiek ma na półce od dwudziestu lat.
     const zna = (await ud.getLikedAlbums(userId).catch(() => [])).map((a) => `${a.artistName} – ${a.title}`);
+    // Jego własne wskazówki z profilu — dopisywane na końcu pytania.
+    const wskazowki = await ud.getWskazowki(userId).catch(() => "");
 
     let wynik;
     try {
-      wynik = await ulozPodroz(opis, { style, zna });
+      wynik = await ulozPodroz(opis, { style, zna, wskazowki });
     } catch (e) {
       // Szczegół idzie NA EKRAN, a nie tylko do logów: „odrzucony klucz",
       // „brak środków" i „zły model" to trzy różne rzeczy do zrobienia.

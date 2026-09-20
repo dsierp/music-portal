@@ -343,21 +343,24 @@ export async function zaproponujPlyty(opis: string, kontekst: {
   zna?: string[];
   /** ile pozycji poprosić — bierzemy z zapasem, bo część nie przejdzie weryfikacji */
   ile?: number;
+  /** jego własne wskazówki z profilu — dopisywane na samym końcu, jako jego słowa */
+  wskazowki?: string;
 }): Promise<Propozycja[]> {
   const ile = kontekst.ile ?? 15;
   const system = [
-    "Jesteś doradcą muzycznym w portalu dla ludzi słuchających metalu, proga i jazzu.",
+    "Jesteś doradcą muzycznym. Znasz płyty ze wszystkich gatunków.",
     "Dostajesz opis tego, czego ktoś chce posłuchać. Zwracasz listę KONKRETNYCH ALBUMÓW.",
     "",
     "Zasady:",
     "- Tylko albumy, które NAPRAWDĘ istnieją. Jeśli nie jesteś pewien tytułu, pomiń pozycję.",
     "- Celuj w rzeczy mniej oczywiste. Nie podawaj płyt, które zna każdy, chyba że opis wprost o nie prosi.",
     "- Różnicuj: nie więcej niż jedna płyta tego samego artysty.",
-    // Zdanie o metalu, progu i jazzie mówi, KOGO portal czyta — a bywało
-    // brane za zakaz: na prośbę o hip hop model zamiast płyt pisał rozważania
-    // o tym, że nie jest od hip hopu. Gatunek portalu to punkt wyjścia,
-    // nie legitymacja do odmowy.
-    "- Pytanie o inny gatunek (hip hop, elektronika, klasyka, cokolwiek) obsługujesz tak samo: konkretne albumy, bez tłumaczenia się z gatunku.",
+    // ŻADNYCH GATUNKÓW W INSTRUKCJI. Stało tu, że portal jest dla słuchaczy
+    // metalu, proga i jazzu — i model wziął to za zakaz: na prośbę o hip hop
+    // zamiast płyt napisał rozważania o tym, że nie jest od hip hopu. Czego
+    // słucha ten konkretny człowiek, mówimy niżej, przy pytaniu, bo to jest
+    // fakt o nim, a nie granica tematu.
+    "- Nigdy nie piszesz rozważań o sobie ani o tym, czego od ciebie chcą. Nie masz pewnych tytułów — zwracasz pustą listę.",
     "- `why` to JEDNO zdanie po polsku, konkretne — co w tej płycie odpowiada na opis. Bez przymiotników bez pokrycia.",
     "",
     "Odpowiadasz WYŁĄCZNIE danymi JSON, bez komentarza i bez bloku kodu:",
@@ -366,15 +369,35 @@ export async function zaproponujPlyty(opis: string, kontekst: {
   ].join("\n");
 
   const czesci = [`Opis: ${opis.slice(0, 2000)}`];
-  if (kontekst.style?.length) czesci.push(`Style z profilu: ${kontekst.style.slice(0, 20).join(", ")}`);
+  if (kontekst.style?.length) czesci.push(`Ten człowiek słucha: ${kontekst.style.slice(0, 20).join(", ")}. To jest jego półka, nie granica pytania.`);
   if (kontekst.zna?.length) czesci.push(`To już zna — NIE proponuj tego: ${kontekst.zna.slice(0, 60).join("; ")}`);
   czesci.push(`Podaj ${ile} pozycji.`);
+  czesci.push(wskazowkiCzlowieka(kontekst.wskazowki));
 
-  const tekst = await zapytaj(system, czesci.join("\n\n"));
+  const tekst = await zapytaj(system, czesci.filter(Boolean).join("\n\n"));
   const wynik = parsujPropozycje(tekst);
   // Zero pozycji to nie jest odpowiedź — to model, który nie zrozumiał zadania.
   if (!wynik.length) throw new AiError("Model nie podał ani jednej płyty.", true);
   return wynik;
+}
+
+/**
+ * Wskazówki spisane przez samego zainteresowanego — na SAMYM KOŃCU pytania.
+ *
+ * Portal ma jedną instrukcję dla wszystkich i to jest jedyne miejsce, w którym
+ * człowiek zagina ją pod siebie („nie dawaj mi black metalu", „pisz krócej",
+ * „lubię długie, powolne płyty"). Idą jako jego słowa przy pytaniu, a nie do
+ * instrukcji systemowej: tam wpisuje portal, nie użytkownik — i tylko dzięki
+ * temu prośba typu „zapomnij o poprzednich poleceniach" nie ma się o co oprzeć.
+ * Format odpowiedzi i zakaz zmyślania płyt zostają po naszej stronie.
+ */
+function wskazowkiCzlowieka(tekst?: string): string {
+  const czysty = (tekst ?? "").trim().slice(0, 600);
+  if (!czysty) return "";
+  return [
+    "Na koniec jego własne wskazówki — stosuj je, o ile nie każą zmyślać płyt ani zmieniać formatu odpowiedzi:",
+    czysty,
+  ].join("\n");
 }
 
 /** JSON.parse, który zamiast rzucać zwraca null. */
@@ -537,10 +560,12 @@ export async function porozmawiaj(
     nieLubi?: string[];
     /** wszystko, co już zna: lubiane, odrzucone i ocenione */
     zna?: string[];
+    /** jego własne wskazówki z profilu */
+    wskazowki?: string;
   },
 ): Promise<OdpowiedzRozmowy> {
   const system = [
-    "Jesteś rozmówcą w portalu dla ludzi słuchających metalu, proga i jazzu.",
+    "Jesteś rozmówcą w portalu o płytach. Znasz muzykę ze wszystkich gatunków.",
     "Rozmawiasz PO POLSKU, krótko i konkretnie — jak znajomy, który zna się na płytach.",
     "",
     "Zasady:",
@@ -550,7 +575,6 @@ export async function porozmawiaj(
     "- Nie powtarzasz płyt, które padły wcześniej w tej rozmowie.",
     "- `why` to jedno zdanie: co w tej płycie odpowiada na pytanie. Bez przymiotników bez pokrycia.",
     "- Gdy ktoś pyta o coś innego niż muzyka, odpowiadasz krótko i wracasz do płyt.",
-    "- Pytanie o inny gatunek niż metal, prog i jazz (hip hop, elektronika, klasyka) obsługujesz tak samo — konkretne albumy, bez tłumaczenia się, że to nie twoja działka.",
     "- Nigdy nie piszesz rozważań o sobie ani o tym, czego od ciebie chcą. Gdy naprawdę nie masz pewnych tytułów, zwracasz pustą listę płyt i mówisz to w jednym zdaniu.",
     "- Gdy prosi o coś „pod to, co lubię\" — jego ulubione zespoły i płyty są KOMPASEM, nie listą zakazaną.",
     "  Szukaj rzeczy pokrewnych: ta sama scena, ten sam producent, ci sami ludzie w składzie, ten sam rodzaj brzmienia.",
@@ -562,7 +586,7 @@ export async function porozmawiaj(
   ].join("\n");
 
   const czesci: string[] = [];
-  if (kontekst.style?.length) czesci.push(`Style z jego profilu: ${kontekst.style.slice(0, 20).join(", ")}`);
+  if (kontekst.style?.length) czesci.push(`Ten człowiek słucha: ${kontekst.style.slice(0, 20).join(", ")}. To jest jego półka, nie granica pytania.`);
   // Gust osobno od listy zakazanej. Wcześniej lubiane płyty szły WYŁĄCZNIE jako
   // „nie proponuj tego" — więc na prośbę „poszukaj czegoś pod to, co lubię"
   // model dostawał jego półkę wyłącznie po to, żeby ją ominąć.
@@ -574,8 +598,9 @@ export async function porozmawiaj(
     ["Rozmowa do tej pory:", ...historia.slice(-12).map((h) => `${h.rola === "ja" ? "ON" : "TY"}: ${h.tekst}`)].join("\n"),
   );
   czesci.push("Odpowiedz na ostatnią wiadomość.");
+  czesci.push(wskazowkiCzlowieka(kontekst.wskazowki));
 
-  const tekst = await zapytaj(system, czesci.join("\n\n"));
+  const tekst = await zapytaj(system, czesci.filter(Boolean).join("\n\n"));
   const dane = wyluskaj(tekst);
   if (dane === null) throw new AiError(bezJsonu(tekst), true);
   const obj = (dane && typeof dane === "object" && !Array.isArray(dane) ? dane : {}) as Record<string, unknown>;
