@@ -253,7 +253,10 @@ async function potwierdz(
       }
       // Dopisek mówi, co wiemy NAPRAWDĘ — obok zdania modelu, które jest
       // tylko jego opinią.
-      dopisek = bpm ? ` [zmierzone: ok. ${bpm} BPM]` : " [tempa nie znam — Deezer go nie podaje]";
+      // Bez nazw naszych źródeł: czytelnika nie obchodzi, skąd portal bierze
+      // liczby, tylko czy może im wierzyć. „Zmierzone" kontra „nie zmierzyłem"
+      // mówi dokładnie tyle, ile trzeba.
+      dopisek = bpm ? ` [zmierzone: ok. ${bpm} BPM]` : " [tempa nie zmierzyłem]";
     }
     const z = { album: znaleziony, why: `${p.why}${dopisek}`.trim() };
     plyty.push(z);

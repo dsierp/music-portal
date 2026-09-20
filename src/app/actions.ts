@@ -465,6 +465,26 @@ export async function powiedzCos(_prev: unknown, formData: FormData): Promise<{ 
 }
 
 /**
+ * „Spróbuj jeszcze raz" — powtórzenie OSTATNIEGO pytania w tej samej rozmowie.
+ *
+ * Po nieudanej turze człowiek stał przed wyborem: przepisać pytanie ręcznie
+ * albo je stracić. A najczęstsza przyczyna błędu (model odpowiedział nie w tej
+ * formie, co trzeba, albo się zaciął) mija sama przy powtórzeniu. Wątek zostaje
+ * ten sam, więc model dalej wie, o czym rozmawiamy.
+ */
+export async function ponowPytanie(formData: FormData) {
+  const u = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const { wczytajRozmowe, powiedz } = await import("@/lib/rozmowa");
+  const r = await wczytajRozmowe(id);
+  if (!r || r.userId !== u.id) redirect("/rozmowa");
+  const ostatnie = [...r.wiadomosci].reverse().find((w) => w.rola === "ja")?.tekst;
+  if (!ostatnie) redirect(`/rozmowa/${id}`);
+  await powiedz(u.id, ostatnie, id);
+  redirect(`/rozmowa/${id}`);
+}
+
+/**
  * „Daj co masz" — kończy turę tym, co już się potwierdziło.
  *
  * Dwie sytuacje, jedna odpowiedź: albo robota w tle została ucięta i nikt jej

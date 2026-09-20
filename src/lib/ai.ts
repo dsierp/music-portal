@@ -419,6 +419,29 @@ function pole(x: Record<string, unknown>, nazwy: string[]): string {
  * przed listą albo po prostu urywają się w połowie, gdy skończą im się znaki.
  */
 /**
+ * ODMOWA MODELU to nie awaria — i nie wolno jej tak nazywać.
+ *
+ * Model czasem po prostu nie chce odpowiedzieć: uzna pytanie za
+ * niestosowne, poprosi o doprecyzowanie albo zacznie tłumaczyć, czemu nie
+ * poda listy. Wtedy nie ma w odpowiedzi żadnego JSON-a — a portal mówił
+ * „odpowiedź modelu nie jest poprawnym JSON-em", czyli komunikat dla
+ * programisty przy zdarzeniu, które programistą nie jest.
+ *
+ * Rozpoznajemy to po tym, jak takie zdania wyglądają w obu językach, i po
+ * tym, że tekst jest krótki i bez nawiasów. Nie musi być stuprocentowo
+ * pewne: gorszy przypadek to nazwanie dziwnej odpowiedzi odmową, a i tak
+ * pokazujemy człowiekowi to, co model naprawdę napisał.
+ */
+const ODMOWA = /\b(nie mog[ęe]|nie jestem w stanie|nie podam|nie b[ęe]d[ęe]|przepraszam|niestety)\b|\b(i can'?t|i cannot|i'?m sorry|i am sorry|as an ai|i won'?t)\b/i;
+
+export function toOdmowa(tekst: string): boolean {
+  const t = tekst.trim();
+  if (!t || t.length > 600) return false;
+  if (/[[{]/.test(t)) return false; // coś, co wygląda na dane, nie na zdanie
+  return ODMOWA.test(t);
+}
+
+/**
  * Komunikat o odpowiedzi, z której nie da się wyłuskać JSON-a — Z POCZĄTKIEM
  * TEGO, CO MODEL NAPRAWDĘ PRZYSŁAŁ.
  *
@@ -428,7 +451,8 @@ function pole(x: Record<string, unknown>, nazwy: string[]): string {
  * a zobaczy je tylko właściciel portalu — pod ramką błędu, małym drukiem.
  */
 function bezJsonu(tekst: string): string {
-  const poczatek = tekst.trim().replace(/\s+/g, " ").slice(0, 200);
+  const poczatek = tekst.trim().replace(/\s+/g, " ").slice(0, 300);
+  if (toOdmowa(tekst)) return `ODMOWA::${poczatek}`;
   return `Odpowiedź modelu nie jest poprawnym JSON-em.${poczatek ? ` Model napisał: „${poczatek}…"` : ""}`;
 }
 

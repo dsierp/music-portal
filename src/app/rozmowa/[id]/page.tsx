@@ -5,12 +5,13 @@ import { AlbumCard } from "@/components/cards";
 
 import { currentUser } from "@/lib/auth";
 import { wczytajRozmowe, plytyZRozmowy, utknela } from "@/lib/rozmowa";
+import { wyjasnijBlad } from "@/lib/ai-bledy";
 import { i18n } from "@/lib/t";
 import { fmt } from "@/lib/i18n";
 import { RozmowaForm } from "@/components/rozmowa-form";
 import { Odswiezaj } from "@/components/odswiezanie";
 import { Pytanie } from "@/components/rozmowa-pytanie";
-import { kawalkiZRozmowy, podrozZRozmowy, domknijRozmowe } from "@/app/actions";
+import { kawalkiZRozmowy, podrozZRozmowy, ponowPytanie, domknijRozmowe } from "@/app/actions";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await i18n();
@@ -40,6 +41,8 @@ export default async function RozmowaPage({ params }: { params: Promise<{ id: st
   const user = await currentUser();
   const r = await wczytajRozmowe(id);
   const bledy = t.chat.errors as Record<string, string>;
+  // Tłumaczenie surowego komunikatu na polski dla człowieka — patrz lib/ai-bledy.ts.
+  const wyjasnienie = wyjasnijBlad(r?.szczegol);
   const mojaRozmowa = !!r && !!user && r.userId === user.id;
   const plyty = r ? plytyZRozmowy(r) : [];
   /**
@@ -205,15 +208,34 @@ export default async function RozmowaPage({ params }: { params: Promise<{ id: st
                 <div className="flex items-start gap-3">
                   <span className="mt-0.5 shrink-0 text-lg leading-none text-warn" aria-hidden>!</span>
                   <div className="min-w-0">
-                    <p className="font-medium text-warn">{bledy[r.blad ?? "nieznany"] ?? bledy.nieznany}</p>
+                    <p className="font-medium text-warn">{wyjasnienie?.co ?? bledy[r.blad ?? "nieznany"] ?? bledy.nieznany}</p>
+                    {/* Co powiedział sam model, gdy to była jego odmowa —
+                        w cudzysłowie, bo to jego zdanie, nie nasze. */}
+                    {wyjasnienie?.cytat && (
+                      <p className="mt-1 text-sm italic text-text2">&bdquo;{wyjasnienie.cytat}&rdquo;</p>
+                    )}
+                    {wyjasnienie?.rada && <p className="mt-1 text-sm text-text2">{wyjasnienie.rada}</p>}
                     {/* Co POWIEDZIAŁ dostawca modelu. „Nie udało się nic
                         wyszukać" nie mówi nic: to samo zdanie pada przy złym
                         kluczu, nieistniejącej nazwie modelu i przy chwilowej
                         awarii — a to trzy różne rzeczy do zrobienia. Rozmowa
                         jest prywatna (widzi ją tylko właściciel), więc surowy
                         komunikat od dostawcy może tu stać. */}
+                    {/* Surowy komunikat zostaje — ale małym drukiem i POD
+                        wyjaśnieniem, bo to materiał do szukania przyczyny,
+                        a nie odpowiedź dla czytelnika. */}
                     {r.szczegol && (
-                      <p className="mt-1 break-words font-mono text-[11px] text-faint">{r.szczegol.slice(0, 300)}</p>
+                      <p className="mt-2 break-words font-mono text-[11px] text-faint">
+                        {r.szczegol.replace(/^ODMOWA::/, "").slice(0, 300)}
+                      </p>
+                    )}
+                    {/* Powtórzenie pytania jednym kliknięciem — przy kaprysie
+                        modelu to zwykle wystarcza, a przepisywanie pytania
+                        ręcznie jest karą za cudzy błąd. */}
+                    {(wyjasnienie?.ponow ?? true) && (
+                      <p className="mt-3">
+                        <button formAction={ponowPytanie} className="btn">{t.chat.retry}</button>
+                      </p>
                     )}
                     
                   </div>
