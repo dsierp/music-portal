@@ -5,6 +5,7 @@ import { logout } from "@/app/actions";
 import { SearchBox } from "./search-box";
 import { LanguagePicker } from "./language-picker";
 import { Wstecz } from "./wstecz";
+import { Udostepnij } from "./udostepnij";
 import { i18n } from "@/lib/t";
 import { getUserLocale } from "@/lib/user-data";
 
@@ -18,6 +19,8 @@ export async function Nav() {
     <header className="sticky top-0 z-20 border-b border-rule bg-bg/90 backdrop-blur">
       <div className="mx-auto flex max-w-[min(96rem,95vw)] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
         <Wstecz label={t.nav.back} />
+        {/* Para „wstecz + adres" — to, czego na telefonie nie ma pasek przeglądarki. */}
+        <Udostepnij label={t.nav.share} copied={t.nav.shareCopied} failed={t.nav.shareFailed} />
         <Link href="/" className="display text-2xl font-bold tracking-wide text-text hover:text-accent2">
           PURE <span className="text-accent">NEW</span> SHIT
         </Link>
