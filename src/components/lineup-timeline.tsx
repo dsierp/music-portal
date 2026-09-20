@@ -214,8 +214,12 @@ function Chart({
 
   const maxName = Math.floor(LABEL_W / 7);
 
+  // Filtry biorą pod uwagę i pionowe kreski, i romby w wierszach. Na osi
+  // kariery muzyka (CareerTimeline) pasm nie ma wcale — cały dorobek siedzi
+  // w rombach — a filtry i tak muszą być, bo to właśnie tam najtrudniej
+  // odróżnić studyjną płytę od koncertówki.
   const obecneRodzaje = (["studio", "live", "ep", "kompilacja", "inne"] as const)
-    .filter((r) => globalPoints.some((p) => p.album.rodzaj === r))
+    .filter((r) => globalPoints.some((p) => p.album.rodzaj === r) || rowPoints.some((ps) => ps.some((p) => p.album.rodzaj === r)))
     .map((r) => ({ rodzaj: r, ...STYL_WYDANIA[r] }));
 
   return (
@@ -279,21 +283,35 @@ function Chart({
                   const inSpan = row.spans.some(
                     (sp) => p.year >= toYear(sp.begin, -Infinity) && p.year <= (sp.current ? now : toYear(sp.end, now)),
                   );
+                  // RODZAJ WIDAĆ TAKŻE NA ROMBACH.
+                  // Wszystkie wyglądały tak samo, więc przy muzyku z długim
+                  // stażem (Nick Barker) rząd był ścianą rombów, w której
+                  // koncertówka ważyła tyle co album studyjny. Teraz kolor
+                  // i wielkość są te same co w pasmach, a klasa rodzaju daje
+                  // te same guziki do wyłączania.
+                  const st = STYL_WYDANIA[p.album.rodzaj];
+                  const bok = p.album.rodzaj === "studio" ? 8 : 6;
                   return (
-                    <a key={`rm-${j}`} href={`/album/${p.album.mbid}`} className="album-mark">
+                    <a key={`rm-${j}`} href={`/album/${p.album.mbid}`} className={`album-mark znacznik-${p.album.rodzaj}`}>
                       <title>
-                        {`${p.album.artistText} – ${p.album.title}${p.album.year ? ` (${p.album.year})` : ""}${inSpan ? "" : t.outOfSpanSuffix}`}
+                        {`${p.album.artistText} – ${p.album.title}${p.album.year ? ` (${p.album.year})` : ""} — ${
+                          p.album.rodzaj === "studio" ? t.markStudio
+                          : p.album.rodzaj === "live" ? t.markLive
+                          : p.album.rodzaj === "ep" ? t.markEp
+                          : p.album.rodzaj === "kompilacja" ? t.markCompilation
+                          : t.markOther
+                        }${inSpan ? "" : t.outOfSpanSuffix}`}
                       </title>
                       <rect
-                        x={x(p.year) - 4}
-                        y={y + ROW_H / 2 - 4}
-                        width={8}
-                        height={8}
+                        x={x(p.year) - bok / 2}
+                        y={y + ROW_H / 2 - bok / 2}
+                        width={bok}
+                        height={bok}
                         transform={`rotate(45 ${x(p.year)} ${y + ROW_H / 2})`}
-                        fill={inSpan ? "var(--text)" : "var(--bg)"}
-                        stroke="var(--text)"
+                        fill={inSpan ? st.kolor : "var(--bg)"}
+                        stroke={st.kolor}
                         strokeWidth={1.4}
-                        opacity={inSpan ? 1 : 0.45}
+                        opacity={inSpan ? (p.album.rodzaj === "studio" ? 1 : 0.85) : 0.45}
                       />
                       <rect x={x(p.year) - 7} y={y} width={14} height={ROW_H} fill="transparent" />
                     </a>
