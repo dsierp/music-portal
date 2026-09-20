@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Cover } from "./cover";
-import { SerwisyPills } from "./serwisy";
 
 export interface Kafelek {
   key: string;
@@ -14,9 +13,13 @@ export interface Kafelek {
   /** jedno słowo z boku: gatunek, data, cokolwiek — trzeci wiersz, przygaszony */
   meta?: string | null;
   /**
-   * „Artysta – Tytuł" — gdy jest, pod kafelkiem pojawiają się przyciski
-   * wyjścia w Spotify i Tidala. Półka bez nich wymaga dwóch kliknięć na to,
-   * po co człowiek tu przyszedł: żeby tego posłuchać.
+   * „Artysta – Tytuł". ZOSTAJE JAKO PODPIS, ale nie robi już guzików.
+   *
+   * Kafelki miały pod spodem Spotify i Tidala, a nigdzie indziej w portalu
+   * płyta na liście ich nie ma — wchodzi się w płytę i guziki są na miejscu.
+   * Dwa sposoby pokazywania tej samej rzeczy to jeden za dużo, a na półce
+   * robiły z tego poszarpany rząd: kafelek z podpisem „z portalu" miał je
+   * niżej niż kafelek bez.
    */
   etykieta?: string | null;
 }
@@ -68,9 +71,6 @@ export function Kafelki({ items }: { items: Kafelek[] }) {
             {k.subtitle && <div className="truncate text-xs text-muted" title={k.subtitle}>{k.subtitle}</div>}
             {k.meta && <div className="truncate font-mono text-[10px] text-faint">{k.meta}</div>}
           </Link>
-          {/* Poza <Link>, bo odnośnik w odnośniku to niepoprawny HTML —
-              przeglądarka rozrywa taki kafelek na kawałki. */}
-          {k.etykieta && <SerwisyPills etykieta={k.etykieta} mbid={k.mbid} small className="mt-1.5" />}
         </li>
       ))}
     </ul>
