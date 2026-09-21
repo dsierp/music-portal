@@ -180,6 +180,7 @@ export default async function PremieryPage({ searchParams }: { searchParams: Pro
             genresLabel: t.releases.genresLabel,
             viewLabel: t.releases.viewLabel,
             starOnly: t.releases.starOnly,
+            genreEmpty: t.releases.genreEmpty,
             showFlagged: t.releases.showFlagged,
             footnote: t.releases.footnote,
             noMatch: t.releases.noMatch,

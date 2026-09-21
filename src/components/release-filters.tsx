@@ -63,6 +63,8 @@ export interface TekstyFiltru {
   topLabel: string;
   showMore: string;
   showLess: string;
+  /** zdanie w gatunku, w którym nic nie wyszło */
+  genreEmpty: string;
 }
 
 /** Ile pozycji pokazujemy w gatunku, zanim trzeba kliknąć „pokaż resztę". */
@@ -158,14 +160,28 @@ export function ReleaseFilters({
           // nad wszystkim). Pick wypadał z „topu", ale zostawał w grupach
           // gatunkowych — i przez to jedyna płyta, którą wyróżniliśmy
           // najmocniej, była jedyną pokazaną dwa razy.
-          const wTopie = new Set([...top.map((i) => i.id), ...(pickWidoczny && s.pickId ? [s.pickId] : [])]);
-          const reszta = moje.filter((i) => !wTopie.has(i.id));
+          /**
+           * WYRÓŻNIONE PŁYTY WRACAJĄ DO SWOICH GATUNKÓW.
+           *
+           * Płyta z gwiazdką szła na górę i z listy gatunku znikała — więc
+           * przy piątku, w którym cały black metal to jedno wyróżnienie,
+           * sekcja „Black metal" nie istniała i wyglądało to na brak premier.
+           * Powtórzenie jest tańsze niż ta pomyłka: na górze stoi odpowiedź na
+           * „co ważnego dziś wyszło", a w gatunku pełny obraz tego gatunku.
+           */
+          /**
+           * Pokazujemy KAŻDY zaznaczony gatunek, także pusty.
+           *
+           * Znikający nagłówek to była najgorsza z możliwych odpowiedzi: nie
+           * dało się odróżnić „nic w tym tygodniu nie wyszło" od „portal tego
+           * nie znalazł" ani od „filtr to wyciął". Pusta sekcja mówi wprost.
+           */
           const grupy = cats
-            .filter((g) => reszta.some((i) => i.g === g))
-            .map((g) => ({ g, items: reszta.filter((i) => i.g === g) }));
+            .filter((g) => wybrane.has(g))
+            .map((g) => ({ g, items: moje.filter((i) => i.g === g) }));
           // Tło nagłówka bierzemy z gatunku, który po odfiltrowaniu został
           // w sekcji na pierwszym miejscu — tak jak przed przejściem na klienta.
-          const lead = grupy[0]?.g ?? "db";
+          const lead = grupy.find((x) => x.items.length)?.g ?? "db";
           return (
             <div key={s.id}>
               <section className="mb-12">
@@ -197,9 +213,13 @@ export function ReleaseFilters({
                       <span className="absolute inset-0 bg-gradient-to-r from-bg via-bg/80 to-transparent" />
                       <span className="relative">{catLabels[g] ?? g}</span>
                     </h3>
-                    <ul className="space-y-3">
-                      {(rozwiniete.has(g) ? wiersze : wiersze.slice(0, NA_GATUNEK)).map((i) => i.node)}
-                    </ul>
+                    {wiersze.length ? (
+                      <ul className="space-y-3">
+                        {(rozwiniete.has(g) ? wiersze : wiersze.slice(0, NA_GATUNEK)).map((i) => i.node)}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-muted">{teksty.genreEmpty}</p>
+                    )}
                     {wiersze.length > NA_GATUNEK && (
                       <button
                         type="button"
@@ -227,7 +247,7 @@ export function ReleaseFilters({
                     w dniu premiery, a tagi gatunków przychodzą jeszcze później)
                     — zdanie o filtrach jest po prostu nieprawdą i każe szukać
                     winy u siebie. */}
-                {!grupy.length && !pickWidoczny && (
+                {!moje.length && !pickWidoczny && (
                   items.some((i) => i.sectionId === s.id) ? (
                     <div className="mt-3 text-sm text-muted">
                       <p>{teksty.noMatch}</p>
