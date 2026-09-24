@@ -96,6 +96,35 @@ export default async function AlbumPage({
   const liked = likedS.value;
   const likes = likesS.value;
   const others = more.filter((a) => a.mbid !== mbid && a.primaryType === "Album" && !a.secondaryTypes.length).slice(0, 8);
+
+  /**
+   * TEN SAM TYTUŁ DRUGI RAZ W MUSICBRAINZ.
+   *
+   * Morgoth: „Resurrection Absurd / The Eternal Fall" figuruje tam dwa razy —
+   * raz jako wydanie z 1990, raz jako osobna grupa dla wznowienia Century
+   * Media z 2013. Portal pokazuje to, co w danej grupie stoi, więc płyta
+   * z 1990 wyświetlała się jako „album 2013" i wyglądało to na naszą pomyłkę.
+   * Nie zgadujemy, który wpis jest właściwy — to praca dla redaktorów
+   * MusicBrainz — ale mówimy, że drugi istnieje, i prowadzimy do niego.
+   *
+   * Dopasowanie po tytule ze zignorowaniem kolejności części po ukośniku:
+   * „A / B" i „B / A" to dla ludzi ta sama składanka, dla bazy dwa napisy.
+   * Liczymy z dyskografii, która i tak jest już wczytana — zero zapytań.
+   */
+  const kluczTytulu = (x: string) =>
+    x
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .split("/")
+      .map((cz) => cz.replace(/[^a-z0-9]+/g, " ").trim())
+      .filter(Boolean)
+      .sort()
+      .join(" | ");
+  const tenSamTytul = kluczTytulu(album.title);
+  const blizniaki = more
+    .filter((x) => x.mbid !== mbid && kluczTytulu(x.title) === tenSamTytul)
+    .slice(0, 3);
   const [mojeListy, naListach, wKolejce] = user
     ? await Promise.all([
         getMyLists(user.id).catch(() => []),
@@ -196,6 +225,19 @@ export default async function AlbumPage({
               {album.releaseDate && <span>{fmt(t.album.releasedOn, { date: formatDate(album.releaseDate, locale) })}</span>}
               {album.labels.length > 0 && <span>{album.labels.join(", ")}</span>}
             </div>
+            {blizniaki.length > 0 && (
+              <p className="mt-2 text-xs text-faint">
+                {t.album.duplicateNote}{" "}
+                {blizniaki.map((x, i) => (
+                  <span key={x.mbid}>
+                    {i > 0 && ", "}
+                    <Link href={`/album/${x.mbid}`} className="underline hover:text-accent2">
+                      {x.title}{x.year ? ` (${x.year})` : ""}
+                    </Link>
+                  </span>
+                ))}
+              </p>
+            )}
             {album.genres.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1">
                 {album.genres.map((g) => <Link key={g} href={`/szukaj?q=${encodeURIComponent(g)}`} className="chip">{g}</Link>)}
