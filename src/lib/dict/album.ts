@@ -11,6 +11,7 @@ const pl = {
   noCoverLabel: "brak okładki",
   fullSizeCover: "okładka w pełnym rozmiarze ↗",
   releasedOn: "wydano {date}",
+  thisEntryYear: "ten wpis: {year}",
   duplicateNote: "MusicBrainz ma ten sam tytuł także jako osobne wydawnictwo — bywa, że to wznowienie wpisane obok oryginału:",
   coverLabel: "Okładka",
 
@@ -63,6 +64,7 @@ const en: T = {
   noCoverLabel: "no cover art",
   fullSizeCover: "full-size cover ↗",
   releasedOn: "released {date}",
+  thisEntryYear: "this entry: {year}",
   duplicateNote: "MusicBrainz also has this title as a separate release group — often a reissue entered next to the original:",
   coverLabel: "Cover art",
 
@@ -113,6 +115,7 @@ const es: T = {
   noCoverLabel: "sin portada",
   fullSizeCover: "portada a tamaño completo ↗",
   releasedOn: "publicado el {date}",
+  thisEntryYear: "esta entrada: {year}",
   duplicateNote: "MusicBrainz también tiene este título como lanzamiento aparte — suele ser una reedición junto al original:",
   coverLabel: "Portada",
 
@@ -163,6 +166,7 @@ const de: T = {
   noCoverLabel: "kein Cover",
   fullSizeCover: "Cover in voller Größe ↗",
   releasedOn: "veröffentlicht am {date}",
+  thisEntryYear: "dieser Eintrag: {year}",
   duplicateNote: "MusicBrainz führt denselben Titel auch als eigene Veröffentlichung — oft eine Wiederveröffentlichung neben dem Original:",
   coverLabel: "Cover",
 

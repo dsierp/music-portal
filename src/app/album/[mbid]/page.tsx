@@ -125,6 +125,24 @@ export default async function AlbumPage({
   const blizniaki = more
     .filter((x) => x.mbid !== mbid && kluczTytulu(x.title) === tenSamTytul)
     .slice(0, 3);
+  /**
+   * ROK BIERZEMY Z NAJWCZEŚNIEJSZEGO WYSTĄPIENIA TEGO TYTUŁU.
+   *
+   * Przy Morgothu wpis, na który trafia portal, to wznowienie z 2013 — więc
+   * nagłówek mówił „album 2013" o materiale z 1990. Data pierwszego wydania
+   * grupy jest prawdziwa dla TEJ grupy, ale nieprawdziwa dla płyty, o którą
+   * człowiekowi chodzi. Skoro widzimy drugi wpis z tym samym tytułem
+   * i wcześniejszą datą, to on mówi, kiedy ta rzecz wyszła po raz pierwszy.
+   * Datę samego wydania z tego wpisu zostawiamy niżej, w linijce „wydano" —
+   * nic nie ukrywamy, tylko porządkujemy, co jest czym.
+   */
+  const rocznik = (x: { year: string | null }) => (x.year && /^\d{4}$/.test(x.year) ? x.year : null);
+  const rokNajwczesniejszy = [album, ...blizniaki]
+    .map(rocznik)
+    .filter((r): r is string => !!r)
+    .sort()[0] ?? album.year;
+  const rokZWpisu = rocznik(album);
+  const rokInny = !!rokNajwczesniejszy && !!rokZWpisu && rokNajwczesniejszy !== rokZWpisu;
   const [mojeListy, naListach, wKolejce] = user
     ? await Promise.all([
         getMyLists(user.id).catch(() => []),
@@ -217,7 +235,10 @@ export default async function AlbumPage({
             </a>
           </div>
           <div className="min-w-0">
-            <div className="label">{typeLabel(album)}{album.year ? ` · ${album.year}` : ""}</div>
+            <div className="label">
+              {typeLabel(album)}{rokNajwczesniejszy ? ` · ${rokNajwczesniejszy}` : ""}
+              {rokInny && <span className="ml-2 text-faint">{fmt(t.album.thisEntryYear, { year: rokZWpisu! })}</span>}
+            </div>
             <h1 className="text-4xl leading-tight">{album.title}</h1>
             <div className="mt-1 text-xl text-text2"><CreditLinks credit={album.credit} /></div>
             {album.disambiguation && <div className="text-sm text-muted">{album.disambiguation}</div>}
