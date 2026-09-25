@@ -268,7 +268,7 @@ export async function zapamietajAdresPlyty(artist: string, album: string, url: s
   const id = url?.match(/album\/([A-Za-z0-9]+)/)?.[1] ?? "";
   if (!artist || !album || !url || !id) return;
   try {
-    const klucz = `spotify:album:v1:${artist.toLowerCase()}|${album.toLowerCase()}`;
+    const klucz = `spotify:album:v2:${artist.toLowerCase()}|${album.toLowerCase()}`;
     const NA_ZAWSZE = 60 * 60 * 24 * 3650;
     // `cached` zapisuje tylko wtedy, gdy w buforze nic nie ma — czyli nie
     // nadpisujemy wyniku wyszukiwania i nie piszemy do bazy przy każdym
@@ -749,7 +749,7 @@ export async function spotifyFindAlbum(
   title: string,
 ): Promise<{ id: string; url: string; title: string; artists: string } | null> {
   if (!spotifyConfigured() || !title) return null;
-  const klucz = `spotify:album:v1:${artist.toLowerCase()}|${title.toLowerCase()}`;
+  const klucz = `spotify:album:v2:${artist.toLowerCase()}|${title.toLowerCase()}`;
   // BRAKU NIE PAMIĘTAMY W OGÓLE — pamiętamy tylko trafienie.
   //
   // Premiery pokazujemy ZAPOWIEDZIAMI, więc pierwsze kliknięcie w płytę pada
@@ -781,10 +781,28 @@ export async function spotifyFindAlbum(
     // owszem.
     let items = await proba(zapytanieOAlbum(artist, title));
     if (!items.length) items = await proba([artist, title].filter(Boolean).join(" "));
-    // Bierzemy pierwsze trafienie o zgodnym tytule; gdy takiego nie ma —
-    // pierwsze z brzegu jest gorsze niż nic, bo prowadziłoby na obcą płytę.
+    /**
+     * TYTUŁ **I** ARTYSTA — sam tytuł to za mało.
+     *
+     * „Solaris" The Oceana prowadziło do singla „Solaris" niejakiego Calila:
+     * tytuł zgadzał się co do litery, więc braliśmy pierwsze trafienie i guzik
+     * z premier wysyłał w zupełnie obcą płytę. Przy tytułach jednowyrazowych
+     * (Solaris, Eden, Mirage) to nie jest rzadki wypadek, tylko norma.
+     *
+     * Reguła dopasowania artysty ta sama co w Tidalu: wystarczy, że któraś ze
+     * stron zawiera drugą — „Mastodon" i „Mastodon & Friends" to ten sam
+     * zespół, „Sleep" i „Sleep Token" już nie.
+     */
     const chce = kluczTytulu(title);
-    const traf = items.find((a) => kluczTytulu(a.name) === chce) ?? null;
+    const szukanyArtysta = kluczTytulu(artist);
+    const traf =
+      items.find((a) => {
+        if (kluczTytulu(a.name) !== chce) return false;
+        if (!szukanyArtysta) return true;
+        const nazwy = (a.artists ?? []).map((x) => kluczTytulu(x.name)).filter(Boolean);
+        if (!nazwy.length) return true;
+        return nazwy.some((n) => n === szukanyArtysta || n.includes(szukanyArtysta) || szukanyArtysta.includes(n));
+      }) ?? null;
     if (!traf) return null;
     return {
       id: traf.id,
