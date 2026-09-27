@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "api_cache_fetched_at" ON "api_cache" USING btree ("fetched_at");

@@ -34,18 +34,63 @@ function zaGruby(v: unknown): boolean {
   }
 }
 
-/** Kasuje wpisy starsze niż MAX_WIEK_DNI. Cicha, bo to sprzątanie w tle. */
-export async function cacheSweep(): Promise<number> {
+/**
+ * Wpisy trzymane bez terminu (`NA_ZAWSZE`): trafienia płyty w Spotify, Tidalu
+ * i Deezerze. Sprzątanie po wieku ich nie rusza — inaczej po miesiącu portal
+ * zapomina adresy, które się nie zmieniają, i pyta o nie od nowa.
+ */
+const PREFIKSY_TRWALE = ["spotify:album:v2:", "tidal:album:", "bpm:album:"];
+
+/**
+ * Kasuje jedną porcję wpisów starszych niż MAX_WIEK_DNI. Zwraca, ile poszło.
+ *
+ * DLACZEGO PORCJAMI: stara wersja kasowała wszystko naraz, bez indeksu na
+ * dacie i z `returning` każdego klucza. Przy trzech milionach wpisów (boty
+ * chodzące po artystach) jedno sprzątanie oznaczało przejście przez gigabajty,
+ * a że odpalane było „w tle" funkcji, która kończy się po odpowiedzi — nie
+ * kończyło się nigdy. Bufor rósł bez końca. Teraz: indeks na `fetched_at`,
+ * porcja po kilka tysięcy, i nic, co mogłoby się rozrosnąć z tabelą.
+ */
+export async function cacheSweep(porcja = 2000): Promise<number> {
   try {
+    const trwale = sql.join(
+      PREFIKSY_TRWALE.map((p) => sql`${schema.apiCache.key} not like ${p + "%"}`),
+      sql` and `,
+    );
     const usuniete = await db
       .delete(schema.apiCache)
-      .where(lt(schema.apiCache.fetchedAt, sql`now() - interval '${sql.raw(String(MAX_WIEK_DNI))} days'`))
+      .where(
+        inArray(
+          schema.apiCache.key,
+          db
+            .select({ k: schema.apiCache.key })
+            .from(schema.apiCache)
+            .where(sql`${schema.apiCache.fetchedAt} < now() - interval '${sql.raw(String(MAX_WIEK_DNI))} days' and ${trwale}`)
+            .limit(porcja),
+        ),
+      )
       .returning({ k: schema.apiCache.key });
     return usuniete.length;
   } catch {
     return 0;
   }
 }
+
+/**
+ * Sprzątanie do skutku, porcja po porcji, ale nie dłużej niż `maxMs`.
+ * Woła je zadanie w tle (premiery) — tam jest czas, żeby poczekać.
+ */
+export async function cacheSweepDoSkutku(maxMs = 60_000, porcja = 5000): Promise<number> {
+  const start = Date.now();
+  let razem = 0;
+  while (Date.now() - start < maxMs) {
+    const n = await cacheSweep(porcja);
+    razem += n;
+    if (n < porcja) break;
+  }
+  return razem;
+}
+
 /**
  * Pobrania, które właśnie trwają.
  *
@@ -87,7 +132,7 @@ async function cachedWewn<T>(key: string, ttlSeconds: number, fetcher: () => Pro
       .onConflictDoUpdate({ target: schema.apiCache.key, set: { json: value as object, fetchedAt: new Date() } });
     // Sprzątamy przy okazji zapisu, raz na jakiś czas: bez osobnego zadania
     // w tle, a bufor nie ma szans urosnąć ponad to, co naprawdę świeże.
-    if (Math.random() < SZANSA_SPRZATANIA) void cacheSweep();
+    if (Math.random() < SZANSA_SPRZATANIA) void cacheSweep(500);
   } catch {
     /* ignore */
   }

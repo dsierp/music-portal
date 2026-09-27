@@ -30,7 +30,11 @@ export async function GET(req: NextRequest) {
     // zapowiedzi, więc nie ma powodu czekać z nimi do premiery.
     const teraz = await zaciagnijPremiery();
     const nastepny = await zaciagnijPremiery(zaTydzien()).catch(() => null);
-    return NextResponse.json({ ok: true, ...teraz, nastepnyTydzien: nastepny });
+    // Przy okazji: porządne sprzątanie bufora. Tu jest czas, żeby poczekać,
+    // czego nie ma przy zwykłym wejściu na stronę.
+    const { cacheSweepDoSkutku } = await import("@/lib/cache");
+    const sprzatniete = await cacheSweepDoSkutku(60_000).catch(() => 0);
+    return NextResponse.json({ ok: true, ...teraz, nastepnyTydzien: nastepny, sprzatniete });
   } catch (e) {
     return NextResponse.json({ ok: false, blad: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }

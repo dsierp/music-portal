@@ -382,11 +382,16 @@ export const bestOfEntries = pgTable(
 
 // ---------- Cache zewnętrznych API ----------
 
-export const apiCache = pgTable("api_cache", {
-  key: text("key").primaryKey(),
-  json: jsonb("json").notNull(),
-  fetchedAt: timestamp("fetched_at", { mode: "date" }).defaultNow().notNull(),
-});
+export const apiCache = pgTable(
+  "api_cache",
+  {
+    key: text("key").primaryKey(),
+    json: jsonb("json").notNull(),
+    fetchedAt: timestamp("fetched_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  // Bez tego indeksu sprzątanie po dacie czyta całą tabelę — patrz cacheSweep.
+  (t) => [index("api_cache_fetched_at").on(t.fetchedAt)],
+);
 
 /**
  * Co naprawdę leciało — dziennik odsłuchań.
