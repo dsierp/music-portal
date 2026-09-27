@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import "./globals.css";
 import { Nav } from "@/components/nav";
 import { NavProgress } from "@/components/nav-progress";
+import { SerwisPopup } from "@/components/serwis-popup";
 import { i18n } from "@/lib/t";
 
 /** Tytuł zostaje wspólny (to nazwa własna), opis idzie w języku czytelnika. */
@@ -31,6 +32,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           <NavProgress />
         </Suspense>
         <Nav />
+        <SerwisPopup locale={locale} />
         <main className="mx-auto max-w-[min(96rem,95vw)] px-4 py-6">{children}</main>
         <footer className="mx-auto max-w-[min(96rem,95vw)] px-4 py-10 text-xs text-faint">{t.nav.footer}</footer>
       </body>
