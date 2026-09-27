@@ -23,6 +23,10 @@
 set -euo pipefail
 
 : "${DATABASE_URL:?Brak DATABASE_URL (Neon)}"
+# Sekret wklejany ze schowka łatwo łapie końcowy znak nowej linii — psql
+# czyta go wtedy jako część ostatniego parametru („channel_binding=require\n")
+# i odmawia. Obcinamy białe znaki z obu końców, zanim cokolwiek z nim zrobimy.
+DATABASE_URL=$(printf '%s' "$DATABASE_URL" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 ROBOCZA_URL=${ROBOCZA_URL:-postgresql://postgres:robocza@localhost:5432/postgres}
 MB_DUMP_BASE=${MB_DUMP_BASE:-https://data.metabrainz.org/pub/musicbrainz/data/fullexport}
 MB_CREATE_TABLES=${MB_CREATE_TABLES:-https://raw.githubusercontent.com/metabrainz/musicbrainz-server/master/admin/sql/CreateTables.sql}
@@ -56,6 +60,11 @@ neon() { psql -X -q -v ON_ERROR_STOP=1 "$NEON" "$@"; }
 
 mkdir -p "$WORK"
 cd "$WORK"
+
+# Połączenie z Neonem sprawdzamy NA POCZĄTKU — pierwszy import wywalił się
+# na nim dopiero po pół godzinie pobierania i przeliczania.
+krok "Połączenie z Neonem"
+neon -At -c "select 'ok: ' || current_database() || ', Postgres ' || current_setting('server_version')"
 
 krok "Który zrzut"
 ZRZUT=$(curl -fsSL "$MB_DUMP_BASE/LATEST" | tr -d '[:space:]')
