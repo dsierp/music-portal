@@ -1,0 +1,72 @@
+# Import MusicBrainz do Neona (schemat `mb`) — raz w tygodniu i na żądanie.
+#
+# MusicBrainz publikuje pełny zrzut w środy i soboty. Bierzemy sobotni,
+# w nocy z soboty na niedzielę (UTC), kiedy portal ma najmniej ruchu.
+# Ręcznie: zakładka Actions → „Import MusicBrainz" → Run workflow.
+#
+# Wymaga jednego sekretu w repozytorium: DATABASE_URL (ten sam adres Neona,
+# którego używa portal). Nic więcej.
+name: Import MusicBrainz
+
+on:
+  schedule:
+    - cron: "0 1 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mb-import
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/mb
+
+      - name: Miejsce na dysku
+        # Obraz maszyny ma kilkanaście GB zajętych przez narzędzia, których
+        # tu nie potrzebujemy. Dane robocze i tak idą na /mnt (większy dysk).
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          sudo mkdir -p /mnt/mbwork /mnt/pgdata
+          sudo chown -R "$USER" /mnt/mbwork
+          df -h / /mnt
+
+      - name: Narzędzia
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lbzip2 postgresql-client-16
+          psql --version
+
+      - name: Robocza baza (lokalna, wyrzucana po imporcie)
+        # Bez fsync i pełnych stron: to baza na godzinę, po awarii i tak
+        # zaczynamy od zera. Dzięki temu ładowanie jest kilka razy szybsze.
+        run: |
+          docker run -d --name robocza -p 5432:5432 \
+            -e POSTGRES_PASSWORD=robocza --shm-size=2g \
+            -v /mnt/pgdata:/var/lib/postgresql/data \
+            postgres:16 \
+            -c shared_buffers=1GB -c work_mem=256MB -c maintenance_work_mem=1GB \
+            -c max_wal_size=16GB -c checkpoint_timeout=30min \
+            -c fsync=off -c synchronous_commit=off -c full_page_writes=off
+          for i in $(seq 1 60); do
+            pg_isready -h localhost -p 5432 -U postgres && break
+            sleep 2
+          done
+
+      - name: Import
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ROBOCZA_URL: postgresql://postgres:robocza@localhost:5432/postgres
+          WORK: /mnt/mbwork
+        run: bash scripts/mb/import.sh
+
+      - name: Stan dysku po imporcie
+        if: always()
+        run: df -h / /mnt

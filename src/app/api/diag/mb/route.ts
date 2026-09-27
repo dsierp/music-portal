@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { odmowaDlaNieadmina } from "@/lib/admin-guard";
 import { mbBase, mbMinGapMs, mbUserAgent } from "@/lib/musicbrainz";
+import { mbLokalnieArtysta, mbLokalnieStan } from "@/lib/mb-lokalnie";
 
 /**
  * Diagnostyka MusicBrainz — dokąd portal właściwie pyta i jak szybko odpowiada.
@@ -61,6 +62,15 @@ export async function GET() {
   } catch (e) {
     wynik.proba = { ms: Date.now() - start, blad: e instanceof Error ? e.message : String(e) };
   }
+
+  // Własna baza (schemat `mb` w Neonie): z którego zrzutu i jak szybko
+  // odpowiada ta sama płyta Pink Floyd, którą wyżej sprawdzamy w sieci.
+  const stan = await mbLokalnieStan();
+  const startLokalnie = Date.now();
+  const lokalnie = stan ? await mbLokalnieArtysta("83d91898-7763-47d7-b03b-b92132375c47") : null;
+  wynik.bazaWlasna = stan
+    ? { ...stan, proba: { ms: Date.now() - startLokalnie, nazwa: lokalnie?.name ?? null } }
+    : "Brak schematu mb — import jeszcze nie przeszedł (albo MB_LOKALNIE=0).";
 
   return NextResponse.json(wynik);
 }

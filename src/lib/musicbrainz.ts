@@ -9,6 +9,7 @@
  * Muzycy (osoby) w MB też są "artist" — dzięki temu jedna strona /artist/[mbid]
  * obsługuje i zespół, i człowieka, a "podróż" po składach to zwykłe linki.
  */
+import { mbLokalnieArtysta, mbLokalnieDyskografia } from "./mb-lokalnie";
 import { cached, TTL } from "./cache";
 import { createThrottle } from "./throttle";
 import { czytelnaRola } from "./instruments";
@@ -901,11 +902,16 @@ export async function getArtist(mbid: string): Promise<Artist> {
   // wykonawcy i sesyjne kredyty wyglądały jak sieroty: „Sacred Love", a nie
   // „Sting – Sacred Love". Przy perkusiście to pół informacji — bo najciekawsze
   // jest właśnie U KOGO grał.
-  const a = await cached(`mb:artist:v2:${mbid}`, TTL.lookup, () =>
-    mbFetch<MbArtist>(`/artist/${mbid}`, {
-      inc: "artist-rels+release-rels+release-group-rels+url-rels+genres+tags+aliases+artist-credits",
-    }),
-  );
+  //
+  // Najpierw własna kopia MusicBrainz (schemat `mb`, patrz mb-lokalnie.ts) —
+  // ten sam kształt odpowiedzi, bez kolejki. Sieć tylko, gdy kopia milczy.
+  const a =
+    (await mbLokalnieArtysta(mbid)) ??
+    (await cached(`mb:artist:v2:${mbid}`, TTL.lookup, () =>
+      mbFetch<MbArtist>(`/artist/${mbid}`, {
+        inc: "artist-rels+release-rels+release-group-rels+url-rels+genres+tags+aliases+artist-credits",
+      }),
+    ));
   const members: Membership[] = [];
   const memberOf: Membership[] = [];
   for (const r of a.relations ?? []) {
@@ -988,7 +994,8 @@ export async function getArtist(mbid: string): Promise<Artist> {
 
 /** Dyskografia (release-groups, w których artysta jest w artist credit). */
 export async function getDiscography(mbid: string): Promise<AlbumSummary[]> {
-  const data = await cached(`mb:rg-browse:${mbid}`, TTL.lookup, async () => {
+  const lokalnie = await mbLokalnieDyskografia(mbid);
+  const data = lokalnie ?? await cached(`mb:rg-browse:${mbid}`, TTL.lookup, async () => {
     const out: MbReleaseGroup[] = [];
     for (let offset = 0; offset < 300; offset += 100) {
       const page = await mbFetch<{ "release-groups": MbReleaseGroup[]; "release-group-count": number }>("/release-group/", {
