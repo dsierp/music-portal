@@ -34,6 +34,7 @@ export async function GET() {
     playNeedsConsent: t.nav.playNeedsConsent,
     playPremium: t.nav.playPremium,
     playFailed: t.nav.playFailed,
+    tidalNotFound: t.nav.tidalNotFound,
   };
   const { currentUser } = await import("@/lib/auth");
   const user = await currentUser().catch(() => null);

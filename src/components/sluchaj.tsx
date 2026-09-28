@@ -33,6 +33,7 @@ type Teksty = {
   playNeedsConsent: string;
   playPremium: string;
   playFailed: string;
+  tidalNotFound: string;
 };
 type Konta = { zalogowany: boolean; spotify: boolean; tidal: boolean; teksty: Teksty };
 
@@ -212,8 +213,10 @@ export function Sluchaj({
           // już minął, zostaje link do kliknięcia w komunikacie.
           window.location.href = w.appUrl;
           setKomunikat({ tekst: "", link: { href: w.appUrl, tekst: t.openTidalApp } });
-        } else if (w.url) {
-          setKomunikat({ tekst: "", link: { href: w.url, tekst: t.tidalWeb } });
+        } else {
+          // Płyty nie ma w katalogu Tidala (albo nie umiemy jej dopasować) —
+          // mówimy to wprost i dajemy wyszukiwarkę Tidala, zamiast milczeć.
+          setKomunikat({ tekst: t.tidalNotFound, link: w.url ? { href: w.url, tekst: t.tidalWeb } : undefined });
         }
         return;
       }
