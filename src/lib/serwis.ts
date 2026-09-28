@@ -16,7 +16,7 @@
 import type { Locale } from "@/lib/i18n";
 
 export const SERWIS = {
-  wlaczone: true,
+  wlaczone: false,
 
   /** Podbij przy każdej zmianie treści — inaczej stali czytelnicy jej nie zobaczą. */
   wersja: 1,
