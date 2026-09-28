@@ -303,12 +303,216 @@ FROM (
 JOIN pom.artist a ON a.id = d.artist;
 ALTER TABLE mb_nowe.dyskografia ADD PRIMARY KEY (gid);
 
+
+-- ---------- gotowe: płyta (release group) i jej wybrane wydanie ----------
+--
+-- Strona płyty pyta /ws/2 dwa razy: o grupę wydawniczą (tytuł, gatunki,
+-- linki, lista wydań) i o JEDNO wydanie (utwory, kto grał, wytwórnia).
+-- Które wydanie — wybiera `pickRelease` w portalu; tu robimy to samo w SQL,
+-- żeby dla każdej płyty trzymać tylko to jedno, a nie wszystkie reedycje.
+
+CREATE TABLE pom.rel_status AS SELECT id::int, name FROM src.release_status;
+CREATE TABLE pom.med_format AS SELECT id::int, name FROM src.medium_format;
+
+CREATE TABLE pom.rel_tc AS
+SELECT release::int AS release, sum(track_count::int) AS tc
+FROM src.medium GROUP BY release::int;
+CREATE UNIQUE INDEX ON pom.rel_tc (release);
+
+CREATE TABLE pom.rel_full AS
+SELECT r.id, r.gid, r.name, r.ac, r.rg, r.date_s, d.country,
+       st.name AS status, coalesce(tc.tc, 0) AS tc
+FROM pom.release r
+JOIN src.release sr ON sr.id::int = r.id
+LEFT JOIN pom.rel_status st ON st.id = sr.status::int
+LEFT JOIN pom.rel_data d ON d.release = r.id
+LEFT JOIN pom.rel_tc tc ON tc.release = r.id;
+CREATE INDEX ON pom.rel_full (rg);
+
+-- pickRelease: najpierw oficjalne (albo bez statusu), z nich te z co najmniej
+-- 60% utworów najpełniejszego, a z tych najwcześniejsze; remis — więcej utworów.
+CREATE TABLE pom.wybrane AS
+WITH p AS (
+  SELECT f.*,
+         (f.status IS NULL OR f.status = 'Official') AS zwykle,
+         bool_or(f.status IS NULL OR f.status = 'Official') OVER (PARTITION BY f.rg) AS sa_zwykle
+  FROM pom.rel_full f
+), pula AS (
+  SELECT * FROM p WHERE zwykle OR NOT sa_zwykle
+), m AS (
+  SELECT *, max(tc) OVER (PARTITION BY rg) AS maks FROM pula
+)
+SELECT DISTINCT ON (rg) rg, id AS release
+FROM m
+WHERE maks = 0 OR tc >= maks * 0.6
+ORDER BY rg, coalesce(date_s, '9999'), tc DESC;
+CREATE UNIQUE INDEX ON pom.wybrane (rg);
+CREATE UNIQUE INDEX ON pom.wybrane (release);
+
+-- adresy: grupa → URL, wydanie → URL, nagranie → URL
+CREATE TABLE pom.url_rels AS
+SELECT 'rg'::text AS co, x.entity0::int AS id,
+       pom.rel(l, la.j, 'forward', 'url') || jsonb_build_object('url', jsonb_build_object('id', u.gid, 'resource', u.url)) AS j
+FROM src.l_release_group_url x
+JOIN pom.link l ON l.id = x.link::int
+LEFT JOIN pom.link_attrs la ON la.link = l.id
+JOIN src.url u ON u.id = x.entity1;
+INSERT INTO pom.url_rels
+SELECT 'rel', x.entity0::int,
+       pom.rel(l, la.j, 'forward', 'url') || jsonb_build_object('url', jsonb_build_object('id', u.gid, 'resource', u.url))
+FROM src.l_release_url x
+JOIN pom.wybrane w ON w.release = x.entity0::int
+JOIN pom.link l ON l.id = x.link::int
+LEFT JOIN pom.link_attrs la ON la.link = l.id
+JOIN src.url u ON u.id = x.entity1;
+CREATE INDEX ON pom.url_rels (co, id);
+
+-- gatunki i tagi płyty
+CREATE TABLE pom.rg_tagi AS
+SELECT t2.release_group::int AS rg,
+       coalesce(jsonb_agg(jsonb_build_object('name', t.name, 'count', t2.count::int) ORDER BY t2.count::int DESC)
+         FILTER (WHERE g.name IS NOT NULL), '[]'::jsonb) AS genres,
+       jsonb_agg(jsonb_build_object('name', t.name, 'count', t2.count::int) ORDER BY t2.count::int DESC) AS tags
+FROM src.release_group_tag t2
+JOIN src.tag t ON t.id = t2.tag
+LEFT JOIN (SELECT DISTINCT lower(name) AS name FROM src.genre) g ON g.name = lower(t.name)
+WHERE t2.count::int > 0
+GROUP BY t2.release_group::int;
+CREATE UNIQUE INDEX ON pom.rg_tagi (rg);
+
+CREATE TABLE pom.rg_wydania AS
+SELECT rg, jsonb_agg(jsonb_build_object('id', gid, 'title', name, 'status', status, 'date', coalesce(date_s, ''),
+                                        'country', country, 'track-count', tc) ORDER BY coalesce(date_s, '9999')) AS j
+FROM (SELECT *, row_number() OVER (PARTITION BY rg ORDER BY coalesce(date_s, '9999')) AS nr FROM pom.rel_full) x
+WHERE nr <= 100
+GROUP BY rg;
+CREATE UNIQUE INDEX ON pom.rg_wydania (rg);
+
+CREATE TABLE mb_nowe.plyta AS
+SELECT g.gid,
+       (d.j - 'rating') || jsonb_build_object(
+         'rating', coalesce(g.rating, jsonb_build_object('value', NULL, 'votes-count', 0)),
+         'genres', coalesce(t.genres, '[]'::jsonb),
+         'tags', coalesce(t.tags, '[]'::jsonb),
+         'releases', coalesce(w.j, '[]'::jsonb),
+         'relations', coalesce((SELECT jsonb_agg(u.j) FROM pom.url_rels u WHERE u.co = 'rg' AND u.id = g.id), '[]'::jsonb)
+       ) AS doc
+FROM pom.rg g
+JOIN pom.rg_doc d ON d.id = g.id
+LEFT JOIN pom.rg_tagi t ON t.rg = g.id
+LEFT JOIN pom.rg_wydania w ON w.rg = g.id;
+ALTER TABLE mb_nowe.plyta ADD PRIMARY KEY (gid);
+
+-- nagrania z wybranych wydań: kto grał (relacje artysta→nagranie) i klipy
+CREATE TABLE pom.med AS
+SELECT m.id::int AS id, m.release::int AS release, m.position::int AS pos, f.name AS format, m.name
+FROM src.medium m
+JOIN pom.wybrane w ON w.release = m.release::int
+LEFT JOIN pom.med_format f ON f.id = m.format::int;
+CREATE UNIQUE INDEX ON pom.med (id);
+
+CREATE UNLOGGED TABLE pom.trk AS
+SELECT t.medium::int AS medium, t.position::int AS pos, t.number, t.name, t.length::int AS len,
+       t.recording::int AS recording
+FROM src.track t
+JOIN pom.med m ON m.id = t.medium::int;
+CREATE INDEX ON pom.trk (recording);
+CREATE INDEX ON pom.trk (medium);
+
+CREATE UNLOGGED TABLE pom.rec_rels (recording int NOT NULL, j jsonb NOT NULL);
+INSERT INTO pom.rec_rels
+SELECT x.entity1::int, pom.rel(l, la.j, 'backward', 'artist') || jsonb_build_object('artist', am.j)
+FROM src.l_artist_recording x
+JOIN (SELECT DISTINCT recording FROM pom.trk) r ON r.recording = x.entity1::int
+JOIN pom.link l ON l.id = x.link::int
+LEFT JOIN pom.link_attrs la ON la.link = l.id
+JOIN pom.artist_mini am ON am.id = x.entity0::int;
+INSERT INTO pom.rec_rels
+SELECT x.entity0::int, pom.rel(l, la.j, 'forward', 'url') || jsonb_build_object('url', jsonb_build_object('id', u.gid, 'resource', u.url))
+FROM src.l_recording_url x
+JOIN (SELECT DISTINCT recording FROM pom.trk) r ON r.recording = x.entity0::int
+JOIN pom.link l ON l.id = x.link::int
+LEFT JOIN pom.link_attrs la ON la.link = l.id
+JOIN src.url u ON u.id = x.entity1;
+CREATE TABLE pom.rec_rels_agg AS SELECT recording, jsonb_agg(j) AS j FROM pom.rec_rels GROUP BY recording;
+CREATE UNIQUE INDEX ON pom.rec_rels_agg (recording);
+
+CREATE TABLE pom.rec AS
+SELECT r.id::int AS id, r.gid, r.length::int AS len
+FROM src.recording r
+JOIN (SELECT DISTINCT recording FROM pom.trk) t ON t.recording = r.id::int;
+CREATE UNIQUE INDEX ON pom.rec (id);
+
+CREATE TABLE pom.med_doc AS
+SELECT m.release,
+       jsonb_agg(jsonb_build_object(
+         'position', m.pos, 'format', m.format, 'title', m.name,
+         'tracks', coalesce(tr.j, '[]'::jsonb)) ORDER BY m.pos) AS j
+FROM pom.med m
+LEFT JOIN (
+  SELECT t.medium,
+         jsonb_agg(jsonb_build_object(
+           'position', t.pos, 'number', t.number, 'title', t.name, 'length', t.len,
+           'recording', jsonb_build_object('id', rc.gid, 'length', rc.len, 'relations', coalesce(rr.j, '[]'::jsonb))
+         ) ORDER BY t.pos) AS j
+  FROM pom.trk t
+  JOIN pom.rec rc ON rc.id = t.recording
+  LEFT JOIN pom.rec_rels_agg rr ON rr.recording = t.recording
+  GROUP BY t.medium
+) tr ON tr.medium = m.id
+GROUP BY m.release;
+CREATE UNIQUE INDEX ON pom.med_doc (release);
+
+CREATE TABLE pom.rel_etykiety AS
+SELECT rl.release::int AS release,
+       jsonb_agg(jsonb_build_object('label', CASE WHEN lb.id IS NULL THEN NULL ELSE jsonb_build_object('id', lb.gid, 'name', lb.name) END,
+                                    'catalog-number', rl.catalog_number)) AS j
+FROM src.release_label rl
+JOIN pom.wybrane w ON w.release = rl.release::int
+LEFT JOIN src.label lb ON lb.id = rl.label
+GROUP BY rl.release::int;
+CREATE UNIQUE INDEX ON pom.rel_etykiety (release);
+
+-- relacje artysta→wydanie widziane OD STRONY WYDANIA (kierunek backward)
+CREATE TABLE pom.rel_art_rels AS
+SELECT x.entity1::int AS release,
+       jsonb_agg(pom.rel(l, la.j, 'backward', 'artist') || jsonb_build_object('artist', am.j)) AS j
+FROM src.l_artist_release x
+JOIN pom.wybrane w ON w.release = x.entity1::int
+JOIN pom.link l ON l.id = x.link::int
+LEFT JOIN pom.link_attrs la ON la.link = l.id
+JOIN pom.artist_mini am ON am.id = x.entity0::int
+GROUP BY x.entity1::int;
+CREATE UNIQUE INDEX ON pom.rel_art_rels (release);
+
+CREATE TABLE mb_nowe.wydanie AS
+SELECT g.gid AS rg_gid, f.gid,
+       jsonb_build_object(
+         'id', f.gid, 'title', f.name, 'date', coalesce(f.date_s, ''), 'country', f.country, 'status', f.status,
+         'artist-credit', coalesce(ac.j, '[]'::jsonb),
+         'label-info', coalesce(e.j, '[]'::jsonb),
+         'relations', coalesce(ar.j, '[]'::jsonb)
+           || coalesce((SELECT jsonb_agg(u.j) FROM pom.url_rels u WHERE u.co = 'rel' AND u.id = f.id), '[]'::jsonb),
+         'media', coalesce(md.j, '[]'::jsonb)
+       ) AS doc
+FROM pom.wybrane w
+JOIN pom.rel_full f ON f.id = w.release
+JOIN pom.rg g ON g.id = w.rg
+LEFT JOIN pom.ac ac ON ac.id = f.ac
+LEFT JOIN pom.rel_etykiety e ON e.release = f.id
+LEFT JOIN pom.rel_art_rels ar ON ar.release = f.id
+LEFT JOIN pom.med_doc md ON md.release = f.id;
+ALTER TABLE mb_nowe.wydanie ADD PRIMARY KEY (rg_gid);
+CREATE INDEX ON mb_nowe.wydanie (gid);
+
 -- ---------- stan importu ----------
 
 CREATE TABLE mb_nowe.stan (klucz text PRIMARY KEY, wartosc text NOT NULL);
 INSERT INTO mb_nowe.stan VALUES
   ('artysci', (SELECT count(*) FROM mb_nowe.artysta)::text),
   ('dyskografie', (SELECT count(*) FROM mb_nowe.dyskografia)::text),
+  ('plyty', (SELECT count(*) FROM mb_nowe.plyta)::text),
+  ('wydania', (SELECT count(*) FROM mb_nowe.wydanie)::text),
   ('przeliczono', now()::text);
 
 DROP SCHEMA pom CASCADE;

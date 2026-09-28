@@ -44,10 +44,12 @@ CORE=(artist artist_type area iso_3166_1 artist_alias artist_credit artist_credi
       release_group release_group_primary_type release_group_secondary_type
       release_group_secondary_type_join release release_country release_unknown_country
       link link_type link_attribute link_attribute_type
-      l_artist_artist l_artist_url l_artist_release l_artist_release_group url genre)
+      l_artist_artist l_artist_url l_artist_release l_artist_release_group url genre
+      release_status medium medium_format track recording l_artist_recording l_recording_url
+      label release_label l_release_url l_release_group_url)
 # Tagi i oceny siedzą w archiwum „derived". Szukamy wszystkiego w obu —
 # nie zakładamy na sztywno, w którym archiwum MusicBrainz trzyma którą tabelę.
-DERIVED=(tag artist_tag release_group_meta)
+DERIVED=(tag artist_tag release_group_tag release_group_meta)
 WSZYSTKIE=("${CORE[@]}" "${DERIVED[@]}")
 
 # lbzip2 rozpakowuje na wszystkich rdzeniach — przy kilku GB to różnica

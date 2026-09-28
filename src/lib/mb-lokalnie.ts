@@ -17,40 +17,44 @@
  */
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
-import type { MbArtist, MbReleaseGroup } from "./musicbrainz";
+import type { MbArtist, MbRelease, MbReleaseGroup } from "./musicbrainz";
 
 /**
  * Pamięć „schematu nie ma" — żeby przed pierwszym importem nie pukać do bazy
  * z pytaniem skazanym na błąd przy każdym artyście. Po kwadransie sprawdzamy
  * znowu: import mógł właśnie się zakończyć.
  */
-let brakDo = 0;
+/**
+ * Osobno dla każdej tabeli: po dołożeniu nowej (np. `plyta`) stary import jej
+ * jeszcze nie ma — i to nie może wyłączać odczytu artystów, które są.
+ */
+const brakDo = new Map<string, number>();
 const PRZERWA_MS = 15 * 60 * 1000;
 
-function wlaczone(): boolean {
+function wlaczone(tabela: string): boolean {
   if ((process.env.MB_LOKALNIE ?? "").trim() === "0") return false;
   if (process.env.MB_FIXTURES) return false; // testy mają czytać swoje pliki
-  return Date.now() >= brakDo;
+  return Date.now() >= (brakDo.get(tabela) ?? 0);
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-async function wiersz<T>(zapytanie: ReturnType<typeof sql>): Promise<T | null> {
+async function wiersz<T>(tabela: string, zapytanie: ReturnType<typeof sql>): Promise<T | null> {
   try {
     const wynik = (await db.execute(zapytanie)) as unknown as { rows: T[] };
     return wynik.rows?.[0] ?? null;
   } catch (e) {
     // 42P01 = nie ma takiej tabeli, 3F000 = nie ma takiego schematu.
     const kod = (e as { code?: string; cause?: { code?: string } })?.code ?? (e as { cause?: { code?: string } })?.cause?.code;
-    if (kod === "42P01" || kod === "3F000") brakDo = Date.now() + PRZERWA_MS;
+    if (kod === "42P01" || kod === "3F000") brakDo.set(tabela, Date.now() + PRZERWA_MS);
     return null;
   }
 }
 
 /** Artysta z relacjami, gatunkami, aliasami — jak /ws/2/artist/{id}?inc=… */
 export async function mbLokalnieArtysta(mbid: string): Promise<MbArtist | null> {
-  if (!wlaczone() || !UUID.test(mbid)) return null;
-  const r = await wiersz<{ doc: MbArtist }>(sql`select doc from mb.artysta where gid = ${mbid}::uuid`);
+  if (!wlaczone("artysta") || !UUID.test(mbid)) return null;
+  const r = await wiersz<{ doc: MbArtist }>("artysta", sql`select doc from mb.artysta where gid = ${mbid}::uuid`);
   return r?.doc ?? null;
 }
 
@@ -61,12 +65,28 @@ export async function mbLokalnieArtysta(mbid: string): Promise<MbArtist | null> 
  * `null` — inaczej każdy taki człowiek wracałby do sieci po nic.
  */
 export async function mbLokalnieDyskografia(mbid: string): Promise<MbReleaseGroup[] | null> {
-  if (!wlaczone() || !UUID.test(mbid)) return null;
+  if (!wlaczone("dyskografia") || !UUID.test(mbid)) return null;
   const r = await wiersz<{ doc: MbReleaseGroup[] | null }>(
+    "dyskografia",
     sql`select d.doc from mb.artysta a left join mb.dyskografia d on d.gid = a.gid where a.gid = ${mbid}::uuid`,
   );
   if (!r) return null;
   return r.doc ?? [];
+}
+
+/**
+ * Płyta (grupa wydawnicza) i jej wybrane wydanie — jak /ws/2/release-group/{id}
+ * plus /ws/2/release/{id} dla wydania, które wybrałby `pickRelease`.
+ * Import wybiera to wydanie tą samą regułą, więc strona płyty dostaje oba
+ * dokumenty jednym odczytem. `wydanie` bywa puste (płyta bez żadnego wydania).
+ */
+export async function mbLokalniePlyta(mbid: string): Promise<{ plyta: MbReleaseGroup; wydanie: MbRelease | null } | null> {
+  if (!wlaczone("plyta") || !UUID.test(mbid)) return null;
+  const r = await wiersz<{ plyta: MbReleaseGroup; wydanie: MbRelease | null }>(
+    "plyta",
+    sql`select p.doc as plyta, w.doc as wydanie from mb.plyta p left join mb.wydanie w on w.rg_gid = p.gid where p.gid = ${mbid}::uuid`,
+  );
+  return r ? { plyta: r.plyta, wydanie: r.wydanie ?? null } : null;
 }
 
 /** Stan kopii: z którego zrzutu, ilu artystów — dla /api/diag/mb. */

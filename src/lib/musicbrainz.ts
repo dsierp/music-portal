@@ -9,7 +9,7 @@
  * Muzycy (osoby) w MB też są "artist" — dzięki temu jedna strona /artist/[mbid]
  * obsługuje i zespół, i człowieka, a "podróż" po składach to zwykłe linki.
  */
-import { mbLokalnieArtysta, mbLokalnieDyskografia } from "./mb-lokalnie";
+import { mbLokalnieArtysta, mbLokalnieDyskografia, mbLokalniePlyta } from "./mb-lokalnie";
 import { cached, TTL } from "./cache";
 import { createThrottle } from "./throttle";
 import { czytelnaRola } from "./instruments";
@@ -230,7 +230,7 @@ interface MbRecording {
   relations?: MbArtistRel[];
   releases?: MbReleaseStub[];
 }
-interface MbRelease {
+export interface MbRelease {
   id: string;
   title: string;
   date?: string;
@@ -801,13 +801,18 @@ function pickRelease(releases: MbReleaseStub[] | undefined): MbReleaseStub | nul
 }
 
 export async function getAlbum(mbid: string): Promise<Album> {
-  const rg = await cached(`mb:rg:${mbid}`, TTL.lookup, () =>
-    mbFetch<MbReleaseGroup>(`/release-group/${mbid}`, { inc: "artist-credits+releases+url-rels+genres+tags+ratings" }),
-  );
+  // Najpierw własna kopia (schemat `mb`): płyta i wybrane wydanie jednym
+  // odczytem. Sieć tylko wtedy, gdy kopia tej płyty nie zna.
+  const lokalnie = await mbLokalniePlyta(mbid);
+  const rg =
+    lokalnie?.plyta ??
+    (await cached(`mb:rg:${mbid}`, TTL.lookup, () =>
+      mbFetch<MbReleaseGroup>(`/release-group/${mbid}`, { inc: "artist-credits+releases+url-rels+genres+tags+ratings" }),
+    ));
   const summary = normReleaseGroup(rg);
   const chosen = pickRelease(rg.releases);
-  let rel: MbRelease | null = null;
-  if (chosen) {
+  let rel: MbRelease | null = lokalnie?.wydanie ?? null;
+  if (chosen && !rel) {
     rel = await cached(`mb:release:${chosen.id}`, TTL.lookup, () =>
       mbFetch<MbRelease>(`/release/${chosen.id}`, {
         inc: "recordings+artist-credits+artist-rels+recording-level-rels+labels+url-rels",
