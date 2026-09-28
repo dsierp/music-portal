@@ -256,11 +256,22 @@ export async function albumyZTidala(userId: string, playlistId: string): Promise
  * także dla gościa, który nie ma i nie będzie miał konta Tidala. Katalog jest
  * wspólny, więc wystarczy, że portal przedstawi się jako on sam.
  */
-async function tokenAplikacji(): Promise<string | null> {
+async function tokenAplikacji(odswiez = false): Promise<string | null> {
   if (!tidalConfigured()) return null;
-  const { cached } = await import("./cache");
-  // Token żyje dobę; trzymamy go krócej, żeby nie trafić w moment wygaśnięcia.
-  const dane = await cached<{ t: string } | null>("tidal:app-token:v1", 60 * 60 * 20, async () => {
+  const { kvGet, kvSet } = await import("./cache");
+  /**
+   * Token trzymamy tak długo, jak Tidal POWIE, że żyje (`expires_in`), a nie
+   * na sztywne 20 godzin. Stara wersja zakładała dobę; Tidal wydaje krótsze
+   * tokeny, więc przez większość czasu portal pytał katalog przeterminowanym
+   * tokenem, dostawał 401 i po cichu kierował do wyszukiwarki Tidala — każda
+   * płyta „nie istniała w katalogu".
+   */
+  const KLUCZ = "tidal:app-token:v2";
+  if (!odswiez) {
+    const zapisany = await kvGet<{ t: string; wygasa: number }>(KLUCZ).catch(() => null);
+    if (zapisany?.t && zapisany.wygasa - 60_000 > Date.now()) return zapisany.t;
+  }
+  try {
     const basic = Buffer.from(`${process.env.TIDAL_CLIENT_ID}:${process.env.TIDAL_CLIENT_SECRET}`).toString("base64");
     const res = await fetch(TOKEN_URL, {
       method: "POST",
@@ -269,12 +280,35 @@ async function tokenAplikacji(): Promise<string | null> {
       cache: "no-store",
       signal: AbortSignal.timeout(15_000),
     });
-    if (!res.ok) throw new Error(`tidal token ${res.status}`);
-    const j = (await res.json()) as { access_token?: string };
-    if (!j.access_token) throw new Error("tidal token bez access_token");
-    return { t: j.access_token };
-  }).catch(() => null);
-  return dane?.t ?? null;
+    if (!res.ok) return null;
+    const j = (await res.json()) as { access_token?: string; expires_in?: number };
+    if (!j.access_token) return null;
+    const zyje = Math.max(60, Math.min(j.expires_in ?? 3600, 60 * 60 * 20)) * 1000;
+    await kvSet(KLUCZ, { t: j.access_token, wygasa: Date.now() + zyje }).catch(() => {});
+    return j.access_token;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Zapytanie do katalogu tokenem aplikacji — z jedną powtórką po 401.
+ * Token może wygasnąć przed czasem (albo Tidal go unieważni); wtedy bierzemy
+ * świeży i pytamy jeszcze raz, zamiast udawać, że płyty nie ma.
+ */
+async function katalogTidala(sciezka: string): Promise<Response | null> {
+  for (const odswiez of [false, true]) {
+    const token = await tokenAplikacji(odswiez);
+    if (!token) return null;
+    const res = await fetch(`${API}${sciezka}`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.api+json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
+    }).catch(() => null);
+    if (!res) return null;
+    if (res.status !== 401) return res;
+  }
+  return null;
 }
 
 /**
@@ -303,18 +337,11 @@ export async function tidalAlbumUrl(artist: string, title: string): Promise<stri
   const NA_ZAWSZE = 60 * 60 * 24 * 3650;
 
   const znalezione = await cached<string | null>(klucz, NA_ZAWSZE, async () => {
-    const token = await tokenAplikacji();
-    if (!token) return null;
     const fraza = [artist, title].filter(Boolean).join(" ");
-    const url =
-      `${API}/searchResults/${encodeURIComponent(fraza)}` +
-      `?countryCode=${kraj()}&include=albums,albums.artists`;
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.api+json" },
-      cache: "no-store",
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!res.ok) return null;
+    const res = await katalogTidala(
+      `/searchResults/${encodeURIComponent(fraza)}?countryCode=${kraj()}&include=albums,albums.artists`,
+    );
+    if (!res || !res.ok) return null;
     type Atr = { title?: string; name?: string; externalLinks?: { href?: string }[] };
     const dane = (await res.json()) as JsonApiDoc<Atr, Atr>;
     const dolaczone = dane.included ?? [];
@@ -350,14 +377,10 @@ export async function tidalAlbumUrl(artist: string, title: string): Promise<stri
  * i każdą znalezioną płytę z wykonawcami, bez filtrowania i bez bufora.
  */
 export async function tidalSzukajSurowo(fraza: string) {
-  const token = await tokenAplikacji();
-  if (!token) return { blad: "brak tokenu aplikacji" };
-  const url = `${API}/searchResults/${encodeURIComponent(fraza)}?countryCode=${kraj()}&include=albums,albums.artists`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.api+json" },
-    cache: "no-store",
-    signal: AbortSignal.timeout(15_000),
-  });
+  const res = await katalogTidala(
+    `/searchResults/${encodeURIComponent(fraza)}?countryCode=${kraj()}&include=albums,albums.artists`,
+  );
+  if (!res) return { blad: "brak tokenu aplikacji albo 401 dwa razy z rzędu" };
   const tekst = await res.text();
   if (!res.ok) return { status: res.status, tresc: tekst.slice(0, 400) };
   type Atr = { title?: string; name?: string; externalLinks?: { href?: string }[] };
