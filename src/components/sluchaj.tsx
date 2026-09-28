@@ -99,6 +99,34 @@ export function Sluchaj({
   const [pracuje, setPracuje] = useState(false);
   const [ostatnia, setOstatnia] = useState<Opcja | null>(null);
   const ramka = useRef<HTMLDivElement>(null);
+  /**
+   * Adres płyty w aplikacji Tidala, ustalony ZAWCZASU — przy najechaniu myszą.
+   *
+   * Przeglądarka otwiera aplikację (`tidal://…`) tylko wtedy, gdy dzieje się
+   * to wprost w geście kliknięcia. Gdy najpierw pytaliśmy serwer (sekunda,
+   * dwie), przeglądarka za pierwszym razem jeszcze pytała „otworzyć Tidala?",
+   * a przy kolejnych po cichu nic nie robiła. Z adresem w ręku kliknięcie
+   * otwiera aplikację od razu, bez czekania na nic.
+   */
+  const tidalZawczasu = useRef<{ appUrl?: string; url?: string | null } | null>(null);
+  const tidalWToku = useRef(false);
+  function przygotujTidala() {
+    if (tidalWToku.current || tidalZawczasu.current) return;
+    tidalWToku.current = true;
+    fetch("/api/sluchaj", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ serwis: "tidal", typ, mbid: mbid ?? "", etykieta, tryb: "adres" }),
+    })
+      .then((r) => r.json())
+      .then((w: { ok?: boolean; appUrl?: string; url?: string | null }) => {
+        tidalZawczasu.current = { appUrl: w.ok ? w.appUrl : undefined, url: w.url };
+      })
+      .catch(() => {})
+      .finally(() => {
+        tidalWToku.current = false;
+      });
+  }
 
   useEffect(() => {
     let zyje = true;
@@ -186,6 +214,19 @@ export function Sluchaj({
       return;
     }
 
+    // Tidal z adresem ustalonym zawczasu: otwieramy aplikację w tym samym
+    // geście kliknięcia, a ślad w dzienniku wysyłamy obok, bez czekania.
+    if (o === "app-tidal" && tidalZawczasu.current?.appUrl) {
+      window.location.href = tidalZawczasu.current.appUrl;
+      const cialo = JSON.stringify({ serwis: "tidal", typ, mbid: mbid ?? "", etykieta, tryb: "zapisz" });
+      try {
+        navigator.sendBeacon("/api/sluchaj", new Blob([cialo], { type: "application/json" }));
+      } catch {
+        /* dziennik to dodatek */
+      }
+      return;
+    }
+
     setPracuje(true);
     try {
       const res = await fetch("/api/sluchaj", {
@@ -251,6 +292,8 @@ export function Sluchaj({
         <button
           type="button"
           onClick={() => wykonaj(domyslna)}
+          onPointerEnter={() => domyslna === "app-tidal" && przygotujTidala()}
+          onFocus={() => domyslna === "app-tidal" && przygotujTidala()}
           disabled={pracuje}
           className={`rounded-l-full border px-3 py-1 font-mono transition-colors ${barwa} ${rozmiar} ${pracuje ? "opacity-60" : ""}`}
         >
@@ -262,7 +305,12 @@ export function Sluchaj({
           aria-expanded={otwarte}
           aria-label={t.playMore}
           title={t.playMore}
-          onClick={() => setOtwarte((x) => !x)}
+          onClick={() => {
+            // Menu się otwiera — Tidal może zaraz zostać wybrany, więc
+            // ustalamy jego adres, zanim ręka dojedzie do pozycji.
+            przygotujTidala();
+            setOtwarte((x) => !x);
+          }}
           className={`rounded-r-full border border-l-0 px-2 py-1 font-mono transition-colors ${barwa} ${rozmiar}`}
         >
           ▾

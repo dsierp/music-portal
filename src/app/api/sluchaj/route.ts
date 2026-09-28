@@ -61,11 +61,15 @@ export async function POST(req: NextRequest) {
   const etykieta = String(b.etykieta ?? "").slice(0, 400);
 
   const { url, znalezione } = await adresWSerwisie({ serwis, typ, mbid, etykieta });
-  await zapiszWyjscie({ serwis, typ, mbid, etykieta, url, znalezione });
+  // `adres` = przygotowanie zawczasu (najechanie myszą na guzik) — to jeszcze
+  // nie jest słuchanie, więc nic nie zapisujemy. Zapis przychodzi osobno,
+  // jako `zapisz`, dopiero w chwili kliknięcia.
+  if (b.tryb !== "adres") await zapiszWyjscie({ serwis, typ, mbid, etykieta, url, znalezione });
+  if (b.tryb === "zapisz") return NextResponse.json({ ok: true });
   const bezpieczny = adresBezpieczny(url) ? url : null;
   const id = znalezione ? idPlyty(serwis, url) : null;
 
-  if (b.tryb === "aplikacja" && serwis === "tidal") {
+  if ((b.tryb === "aplikacja" || b.tryb === "adres") && serwis === "tidal") {
     return NextResponse.json(id ? { ok: true, appUrl: `tidal://album/${id}`, url: bezpieczny } : { ok: false, powod: "brak-plyty", url: bezpieczny });
   }
 
