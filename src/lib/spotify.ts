@@ -793,16 +793,13 @@ export async function spotifyFindAlbum(
      * stron zawiera drugą — „Mastodon" i „Mastodon & Friends" to ten sam
      * zespół, „Sleep" i „Sleep Token" już nie.
      */
-    const chce = kluczTytulu(title);
     const szukanyArtysta = kluczTytulu(artist);
-    const traf =
-      items.find((a) => {
-        if (kluczTytulu(a.name) !== chce) return false;
-        if (!szukanyArtysta) return true;
-        const nazwy = (a.artists ?? []).map((x) => kluczTytulu(x.name)).filter(Boolean);
-        if (!nazwy.length) return true;
-        return nazwy.some((n) => n === szukanyArtysta || n.includes(szukanyArtysta) || szukanyArtysta.includes(n));
-      }) ?? null;
+    const traf = najlepszyTytul(items, (a) => a.name, title, (a) => {
+      if (!szukanyArtysta) return true;
+      const nazwy = (a.artists ?? []).map((x) => kluczTytulu(x.name)).filter(Boolean);
+      if (!nazwy.length) return true;
+      return nazwy.some((n) => n === szukanyArtysta || n.includes(szukanyArtysta) || szukanyArtysta.includes(n));
+    });
     if (!traf) return null;
     return {
       id: traf.id,
@@ -877,6 +874,51 @@ export function kluczTytulu(t: string): string {
     .replace(/\s*[-–—]\s*(?:deluxe|remaster(?:ed)?|reissue|.*edition).*$/g, "")
     .replace(/[^a-z0-9]+/g, "")
     .trim();
+}
+
+/**
+ * Jak dobrze tytuł z katalogu (Spotify, Tidal) pasuje do tytułu z MusicBrainz.
+ *   2 — ten sam tytuł (po uproszczeniu `kluczTytulu`),
+ *   1 — ten sam tytuł z DOPISKIEM wydawcy na końcu, w nawiasie albo po myślniku,
+ *   0 — co innego.
+ *
+ * Po co „1": katalogi doklejają do tytułów, co chcą. „Beyond the Sky" Lateefa
+ * i Rudolpha stoi w Tidalu jako „Beyond The Sky (Digital Only)" — lista znanych
+ * dopisków (deluxe, remaster, edition…) nie nadąży za wydawcami, a przez jeden
+ * brakujący guzik prowadził do wyszukiwarki zamiast na płytę.
+ *
+ * Czego NIE uznajemy za dopisek: wersji, które są inną płytą — koncertowej,
+ * demówki, instrumentalnej, remiksów, singla. Gdy MusicBrainz sam ma „(Live)"
+ * w tytule, porównanie i tak idzie ścieżką „2".
+ */
+const INNA_PLYTA = /\b(live|concert|koncert|demo|instrumental|remix(es)?|acoustic|karaoke|commentary|single|ep)\b/i;
+export function tytulPasuje(zKatalogu: string, szukany: string): 0 | 1 | 2 {
+  const k = kluczTytulu(zKatalogu);
+  const s = kluczTytulu(szukany);
+  if (!k || !s) return 0;
+  if (k === s) return 2;
+  // Dopisek odcinamy na surowym tekście — po `kluczTytulu` nie ma już nawiasów.
+  const m = zKatalogu.match(/^(.*?)\s*(?:[([](.+)[)\]]|[-–—]\s+(.+))\s*$/);
+  if (!m) return 0;
+  const rdzen = m[1];
+  const dopisek = m[2] ?? m[3] ?? "";
+  if (INNA_PLYTA.test(dopisek)) return 0;
+  return kluczTytulu(rdzen) === s ? 1 : 0;
+}
+
+/**
+ * Z listy kandydatów: najpierw dokładny tytuł, dopiero potem ten z dopiskiem.
+ * Wspólne dla Spotify i Tidala — jedna reguła, jedno miejsce na poprawki.
+ */
+export function najlepszyTytul<T>(kandydaci: T[], tytul: (x: T) => string, szukany: string, dodatkowo: (x: T) => boolean = () => true): T | null {
+  let luzny: T | null = null;
+  for (const x of kandydaci) {
+    const ocena = tytulPasuje(tytul(x), szukany);
+    if (!ocena || !dodatkowo(x)) continue;
+    if (ocena === 2) return x;
+    luzny ??= x;
+  }
+  return luzny;
 }
 
 /**

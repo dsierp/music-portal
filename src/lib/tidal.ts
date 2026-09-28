@@ -12,7 +12,7 @@
  */
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { kluczTytulu } from "./spotify";
+import { kluczTytulu, najlepszyTytul } from "./spotify";
 
 const API = "https://openapi.tidal.com/v2";
 const TOKEN_URL = "https://auth.tidal.com/v1/oauth2/token";
@@ -319,23 +319,22 @@ export async function tidalAlbumUrl(artist: string, title: string): Promise<stri
     const dane = (await res.json()) as JsonApiDoc<Atr, Atr>;
     const dolaczone = dane.included ?? [];
     const artysci = new Map(dolaczone.filter((x) => x.type === "artists").map((x) => [x.id, x.attributes?.name ?? ""]));
-    const szukanyTytul = uproszcz(title);
     const szukanyArtysta = uproszcz(artist);
-    for (const al of dolaczone.filter((x) => x.type === "albums")) {
-      const tytul = al.attributes?.title ?? "";
-      if (uproszcz(tytul) !== szukanyTytul) continue;
-      if (szukanyArtysta) {
-        const rel = al.relationships?.artists?.data;
-        const ids = Array.isArray(rel) ? rel.map((r) => r.id) : rel ? [rel.id] : [];
-        const nazwy = ids.map((i) => uproszcz(artysci.get(i) ?? "")).filter(Boolean);
-        // Wystarczy, że któraś ze stron zawiera drugą: „Mastodon" vs
-        // „Mastodon & Friends" to ta sama płyta, „Sleep" vs „Sleep Token" nie.
-        const pasuje = nazwy.some((n) => n === szukanyArtysta || n.includes(szukanyArtysta) || szukanyArtysta.includes(n));
-        if (nazwy.length && !pasuje) continue;
-      }
-      return al.attributes?.externalLinks?.find((l) => l.href)?.href ?? `https://tidal.com/album/${al.id}`;
-    }
-    return null;
+    const albumy = dolaczone.filter((x) => x.type === "albums");
+    // Dokładny tytuł wygrywa z tytułem z dopiskiem („(Digital Only)") —
+    // reguła wspólna ze Spotify, patrz `tytulPasuje`.
+    const al = najlepszyTytul(albumy, (x) => x.attributes?.title ?? "", title, (x) => {
+      if (!szukanyArtysta) return true;
+      const rel = x.relationships?.artists?.data;
+      const ids = Array.isArray(rel) ? rel.map((r) => r.id) : rel ? [rel.id] : [];
+      const nazwy = ids.map((i) => uproszcz(artysci.get(i) ?? "")).filter(Boolean);
+      // Wystarczy, że któraś ze stron zawiera drugą: „Mastodon" vs
+      // „Mastodon & Friends" to ta sama płyta, „Sleep" vs „Sleep Token" nie.
+      if (!nazwy.length) return true;
+      return nazwy.some((n) => n === szukanyArtysta || n.includes(szukanyArtysta) || szukanyArtysta.includes(n));
+    });
+    if (!al) return null;
+    return al.attributes?.externalLinks?.find((l) => l.href)?.href ?? `https://tidal.com/album/${al.id}`;
   }).catch(() => null);
 
   if (!znalezione) await cacheForget(klucz).catch(() => {});

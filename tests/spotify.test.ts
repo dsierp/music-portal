@@ -51,3 +51,23 @@ test("zapytanie do Spotify: wartości w cudzysłowie", () => {
   // Cudzysłów w tytule wycinamy, żeby nie rozwalił zapytania.
   assert.equal(zapytanieOAlbum("AC/DC", 'Back in "Black"'), 'album:"Back in Black" artist:"AC/DC"');
 });
+
+test("tytuł z katalogu: dokładny, z dopiskiem wydawcy i inna płyta", async () => {
+  const { tytulPasuje, najlepszyTytul } = await import("../src/lib/spotify.ts");
+  assert.equal(tytulPasuje("Beyond The Sky", "Beyond the Sky"), 2);
+  assert.equal(tytulPasuje("Beyond The Sky (Digital Only)", "Beyond the Sky"), 1);
+  assert.equal(tytulPasuje("Deadwing - Deluxe", "Deadwing"), 2); // znany dopisek: kluczTytulu tnie go sam
+  assert.equal(tytulPasuje("Deadwing (Bonus Tracks)", "Deadwing"), 1);
+  assert.equal(tytulPasuje("Blackwater Park [20th Anniversary]", "Blackwater Park"), 1);
+  // inna płyta, nie dopisek
+  assert.equal(tytulPasuje("Beyond The Sky (Live)", "Beyond the Sky"), 0);
+  assert.equal(tytulPasuje("Solaris - Single", "Solaris"), 0);
+  assert.equal(tytulPasuje("Leviathan (Demo)", "Leviathan"), 0);
+  assert.equal(tytulPasuje("Beyond the Skyline", "Beyond the Sky"), 0);
+  // gdy MB sam ma „(Live)", porównanie jest dokładne
+  assert.equal(tytulPasuje("Alive (Live)", "Alive (Live)"), 2);
+  // dokładny wygrywa z dopiskiem, niezależnie od kolejności
+  const lista = [{ t: "Beyond The Sky (Digital Only)" }, { t: "Beyond the Sky" }];
+  assert.equal(najlepszyTytul(lista, (x) => x.t, "Beyond the Sky")?.t, "Beyond the Sky");
+  assert.equal(najlepszyTytul([lista[0]], (x) => x.t, "Beyond the Sky")?.t, "Beyond The Sky (Digital Only)");
+});
