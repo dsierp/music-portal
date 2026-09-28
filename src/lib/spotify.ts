@@ -77,6 +77,12 @@ export const SPOTIFY_SCOPES = [
   "playlist-modify-private",
   "playlist-read-private",
   "playlist-read-collaborative",
+  // Guzik „Graj w Spotify": puszczenie płyty na urządzeniu, na którym człowiek
+  // ma otwarte Spotify, i sprawdzenie, jakie urządzenia w ogóle ma. Kto
+  // podłączył konto wcześniej, musi połączyć je od nowa — do tego czasu guzik
+  // mówi wprost, czego brakuje, i otwiera płytę zwyczajnie.
+  "user-modify-playback-state",
+  "user-read-playback-state",
 ].join(" ");
 
 export function spotifyConfigured(): boolean {
@@ -934,4 +940,76 @@ export function tylkoNoweTytuly(zeSpotify: SpotifyAlbum[], znane: string[]): Spo
     widziane.add(k);
     return true;
   });
+}
+
+
+// ---------- „Graj w Spotify" ----------
+
+export type WynikGrania =
+  | { ok: true; urzadzenie: string | null }
+  | { ok: false; powod: "brak-konta" | "brak-zgody" | "brak-urzadzenia" | "premium" | "blad" };
+
+/**
+ * Puszcza płytę na koncie człowieka — tam, gdzie ma otwarte Spotify.
+ *
+ * Kolejność prób, każda z innego doświadczenia:
+ * 1. zwykłe „graj" — trafia w urządzenie, na którym Spotify ostatnio grało;
+ * 2. gdy Spotify odpowie „brak aktywnego urządzenia" (otwarte, ale nic nie
+ *    grało od dawna), bierzemy pierwsze urządzenie z listy i gramy NA NIM;
+ * 3. gdy lista jest pusta — mówimy, żeby otworzył Spotify. Nie zgadujemy.
+ *
+ * Odmowy rozróżniamy, bo każda wymaga od człowieka czego innego: brak zgody
+ * (stare połączenie bez nowych zakresów) → połącz jeszcze raz; brak Premium →
+ * tego nie przeskoczymy; reszta → otwieramy płytę zwyczajnie.
+ *
+ * Tu NIE idziemy przez `api()`: potrzebujemy kodu odpowiedzi i powodu odmowy,
+ * a `api()` połyka jedno i drugie. I celowo nie zapisujemy blokady konta —
+ * odmowa grania nie może schować „słuchasz teraz", które działa.
+ */
+export async function spotifyGraj(userId: string, albumId: string): Promise<WynikGrania> {
+  const token = await tokenDla(userId).catch(() => null);
+  if (!token) return { ok: false, powod: "brak-konta" };
+  const naglowki = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+  const cialo = JSON.stringify({ context_uri: `spotify:album:${albumId}` });
+
+  const graj = (urzadzenie?: string) =>
+    fetch(`${API}/me/player/play${urzadzenie ? `?device_id=${encodeURIComponent(urzadzenie)}` : ""}`, {
+      method: "PUT",
+      headers: naglowki,
+      body: cialo,
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
+  const powodOdmowy = async (res: Response): Promise<WynikGrania> => {
+    const tekst = await res.text().catch(() => "");
+    if (/PREMIUM_REQUIRED/i.test(tekst)) return { ok: false, powod: "premium" };
+    if (res.status === 401 || /scope|permission/i.test(tekst)) return { ok: false, powod: "brak-zgody" };
+    return { ok: false, powod: "blad" };
+  };
+
+  type Urzadzenie = { id: string | null; name: string; is_active: boolean; is_restricted: boolean };
+  const urzadzenia = async (): Promise<Urzadzenie[] | null> => {
+    const res = await fetch(`${API}/me/player/devices`, { headers: naglowki, cache: "no-store", signal: AbortSignal.timeout(10_000) }).catch(() => null);
+    if (!res || !res.ok) return null;
+    return ((await res.json().catch(() => null)) as { devices?: Urzadzenie[] } | null)?.devices ?? [];
+  };
+
+  try {
+    let res = await graj();
+    if (res.ok) {
+      const aktywne = (await urzadzenia())?.find((d) => d.is_active);
+      return { ok: true, urzadzenie: aktywne?.name ?? null };
+    }
+    if (res.status !== 404) return powodOdmowy(res);
+
+    const lista = await urzadzenia();
+    if (lista === null) return { ok: false, powod: "brak-zgody" };
+    const cel = lista.find((d) => d.id && !d.is_restricted);
+    if (!cel?.id) return { ok: false, powod: "brak-urzadzenia" };
+    res = await graj(cel.id);
+    if (res.ok) return { ok: true, urzadzenie: cel.name };
+    return powodOdmowy(res);
+  } catch {
+    return { ok: false, powod: "blad" };
+  }
 }

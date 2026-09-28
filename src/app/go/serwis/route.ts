@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { adresBezpieczny, adresWSerwisie, zapiszWyjscie } from "@/lib/adres-plyty";
 
 /**
- * Wyjście do Spotify albo Tidala ze strony płyty i artysty.
+ * Wyjście do Spotify albo Tidala ze strony płyty i artysty (nowa karta).
  *
  * DLACZEGO NIE ZWYKŁY LINK: adres w serwisie znamy dopiero po zapytaniu.
  * MusicBrainz trzyma go jako relację URL, ale przy PŁYCIE wisi on zwykle przy
@@ -10,10 +11,9 @@ import { NextResponse, type NextRequest } from "next/server";
  * Pytamy więc dopiero przy kliknięciu: jedno zapytanie zamiast kilkudziesięciu
  * przy każdym wejściu na stronę, a wynik i tak ląduje w buforze.
  *
- * Kolejność: MusicBrainz → szukanie po nazwie w Spotify → wyszukiwarka.
+ * Samo ustalanie adresu siedzi w lib/adres-plyty.ts — ten sam kod obsługuje
+ * guzik „słuchaj" (`/api/sluchaj`).
  */
-const DOZWOLONE = ["open.spotify.com", "tidal.com", "listen.tidal.com"];
-
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const serwis = sp.get("serwis") === "tidal" ? "tidal" : "spotify";
@@ -21,66 +21,9 @@ export async function GET(req: NextRequest) {
   const mbid = sp.get("mbid") ?? "";
   const etykieta = sp.get("etykieta") ?? "";
 
-  const { linkSerwisu, HOST_SPOTIFY, HOST_TIDAL } = await import("@/lib/musicbrainz");
-  let cel = mbid
-    ? await linkSerwisu(typ, mbid, serwis === "tidal" ? HOST_TIDAL : HOST_SPOTIFY).catch(() => null)
-    : null;
+  const { url, znalezione } = await adresWSerwisie({ serwis, typ, mbid, etykieta });
+  await zapiszWyjscie({ serwis, typ, mbid, etykieta, url, znalezione });
 
-  // Oba serwisy mają jeszcze własne szukanie po nazwie — działa dla płyt.
-  // Tidal doszedł, gdy portal dostał u nich własną aplikację; wcześniej jego
-  // odnośniki z definicji prowadziły do wyszukiwarki.
-  if (!cel && typ === "release-group" && etykieta) {
-    const { rozbijEtykiete } = await import("@/lib/spotify");
-    const { artist, title } = rozbijEtykiete(etykieta);
-    if (serwis === "spotify") {
-      const { spotifyAlbumUrl } = await import("@/lib/spotify");
-      cel = await spotifyAlbumUrl(artist, title).catch(() => null);
-    } else {
-      const { tidalAlbumUrl } = await import("@/lib/tidal");
-      cel = await tidalAlbumUrl(artist, title).catch(() => null);
-    }
-  }
-
-  const fraza = encodeURIComponent(etykieta.replace(/\s+[–—-]\s+/, " "));
-  const znalezione = !!cel;
-  cel = cel ?? (serwis === "tidal" ? `https://tidal.com/search?q=${fraza}` : `https://open.spotify.com/search/${fraza}`);
-
-  // Zapamiętujemy wynik, żeby strona mogła pokazać z góry, czy odnośnik
-  // prowadzi prosto w płytę, czy do wyszukiwarki.
-  if (mbid) {
-    const { kvSet } = await import("@/lib/cache");
-    await kvSet(`link:${serwis}:${mbid}`, { url: znalezione ? cel : null }).catch(() => {});
-  }
-
-  // Wyjście w serwis to jedyny ślad odsłuchania, jaki mamy przy Tidalu — ten
-  // nie oddaje ani historii, ani stanu odtwarzania. Zapisujemy więc sam fakt
-  // kliknięcia: człowiek poszedł tego posłuchać.
-  {
-    const { currentUser } = await import("@/lib/auth");
-    const user = await currentUser().catch(() => null);
-    if (user && etykieta) {
-      const { rozbijEtykiete } = await import("@/lib/names");
-      const { artist, title } = rozbijEtykiete(etykieta);
-      const { zapiszOdsluch } = await import("@/lib/grane");
-      await zapiszOdsluch(user.id, {
-        artist: artist || etykieta,
-        title: title || etykieta,
-        album: title || null,
-        mbid: typ === "release-group" ? mbid || null : null,
-        source: "klik",
-      });
-    }
-  }
-
-  let adres: URL;
-  try {
-    adres = new URL(cel);
-  } catch {
-    return NextResponse.redirect(new URL("/", req.nextUrl));
-  }
-  const host = adres.hostname.replace(/^www\./, "");
-  if (adres.protocol !== "https:" || !DOZWOLONE.some((d) => host === d || host.endsWith(`.${d}`))) {
-    return NextResponse.redirect(new URL("/", req.nextUrl));
-  }
-  return NextResponse.redirect(adres.toString());
+  if (!adresBezpieczny(url)) return NextResponse.redirect(new URL("/", req.nextUrl));
+  return NextResponse.redirect(url);
 }

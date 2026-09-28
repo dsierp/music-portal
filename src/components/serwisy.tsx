@@ -18,6 +18,8 @@
  * ZNAK PRZED NAZWĄ niesie treść i dlatego został: strzałka „wchodzisz prosto
  * w płytę", lupka „to będzie szukanie", kropka „jeszcze nie sprawdzaliśmy".
  */
+import { Sluchaj } from "./sluchaj";
+
 export type StanLinku = boolean | undefined;
 
 const PILL = "rounded-full border px-3 py-1 font-mono transition-colors";
@@ -66,7 +68,14 @@ export function SerwisPill({
   );
 }
 
-/** Para guzików dla płyty (albo artysty) — domyślna droga przez `/go/serwis`. */
+/**
+ * Guzik „słuchaj" dla płyty (albo artysty) — wszędzie ten sam.
+ *
+ * Dla kogoś bez podłączonego Spotify/Tidala: para guzików jak dotąd, przez
+ * `/go/serwis`. Dla kogoś z podłączonym kontem: jeden rozwijany guzik z akcją
+ * domyślną („Graj w Spotify" / „Otwórz w aplikacji Tidal") — patrz sluchaj.tsx.
+ * Podpowiedzi liczymy tutaj, bo do komponentu klienckiego funkcji podać nie można.
+ */
 export function SerwisyPills({
   etykieta,
   mbid,
@@ -90,16 +99,17 @@ export function SerwisyPills({
   small?: boolean;
   className?: string;
 }) {
-  const adres = (serwis: "spotify" | "tidal") =>
-    `/go/serwis?serwis=${serwis}&typ=${typ}&mbid=${encodeURIComponent(mbid ?? "")}&etykieta=${encodeURIComponent(etykieta)}`;
   return (
-    <div className={`flex flex-wrap items-center gap-2 ${className}`}>
-      {(["spotify", "tidal"] as const).map((s) => {
-        const stan = s === "spotify" ? stanSpotify : stanTidal;
-        return (
-          <SerwisPill key={s} serwis={s} href={adres(s)} stan={stan} title={tytul?.(s, stan)} small={small} />
-        );
-      })}
-    </div>
+    <Sluchaj
+      etykieta={etykieta}
+      mbid={mbid}
+      typ={typ}
+      stanSpotify={stanSpotify}
+      stanTidal={stanTidal}
+      tytulSpotify={tytul?.("spotify", stanSpotify)}
+      tytulTidal={tytul?.("tidal", stanTidal)}
+      small={small}
+      className={className}
+    />
   );
 }
