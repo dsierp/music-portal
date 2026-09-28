@@ -296,6 +296,20 @@ async function tokenAplikacji(odswiez = false): Promise<string | null> {
  * Token może wygasnąć przed czasem (albo Tidal go unieważni); wtedy bierzemy
  * świeży i pytamy jeszcze raz, zamiast udawać, że płyty nie ma.
  */
+/**
+ * Adres szukania w katalogu Tidala.
+ *
+ * Tidal zmienił ten punkt: fraza szła dawniej w ścieżce (`/searchResults/{fraza}`),
+ * teraz idzie jako filtr (`/searchResults?filter[query]=…`). Stara postać
+ * dostawała 400 INVALID_RESOURCE_ID, czyli — po cichu — „płyty nie ma".
+ */
+function sciezkaSzukania(fraza: string): string {
+  return (
+    `/searchResults?filter%5Bquery%5D=${encodeURIComponent(fraza)}` +
+    `&countryCode=${kraj()}&explicitFilter=INCLUDE&include=albums,albums.artists`
+  );
+}
+
 async function katalogTidala(sciezka: string): Promise<Response | null> {
   for (const odswiez of [false, true]) {
     const token = await tokenAplikacji(odswiez);
@@ -339,7 +353,7 @@ export async function tidalAlbumUrl(artist: string, title: string): Promise<stri
   const znalezione = await cached<string | null>(klucz, NA_ZAWSZE, async () => {
     const fraza = [artist, title].filter(Boolean).join(" ");
     const res = await katalogTidala(
-      `/searchResults/${encodeURIComponent(fraza)}?countryCode=${kraj()}&include=albums,albums.artists`,
+      sciezkaSzukania(fraza),
     );
     if (!res || !res.ok) return null;
     type Atr = { title?: string; name?: string; externalLinks?: { href?: string }[] };
@@ -378,7 +392,7 @@ export async function tidalAlbumUrl(artist: string, title: string): Promise<stri
  */
 export async function tidalSzukajSurowo(fraza: string) {
   const res = await katalogTidala(
-    `/searchResults/${encodeURIComponent(fraza)}?countryCode=${kraj()}&include=albums,albums.artists`,
+    sciezkaSzukania(fraza),
   );
   if (!res) return { blad: "brak tokenu aplikacji albo 401 dwa razy z rzędu" };
   const tekst = await res.text();
