@@ -340,3 +340,48 @@ export async function tidalAlbumUrl(artist: string, title: string): Promise<stri
   if (!znalezione) await cacheForget(klucz).catch(() => {});
   return znalezione;
 }
+
+/**
+ * Surowe wyniki szukania płyt w katalogu — tylko dla /api/diag/tidal.
+ *
+ * Gdy `tidalAlbumUrl` oddaje pustkę, nie wiadomo, czy Tidal płyty nie ma,
+ * czy odpowiedział błędem, czy nasze dopasowanie tytułu ją odrzuciło. Ta
+ * funkcja pokazuje wszystko po kolei: kod odpowiedzi, początek treści błędu
+ * i każdą znalezioną płytę z wykonawcami, bez filtrowania i bez bufora.
+ */
+export async function tidalSzukajSurowo(fraza: string) {
+  const token = await tokenAplikacji();
+  if (!token) return { blad: "brak tokenu aplikacji" };
+  const url = `${API}/searchResults/${encodeURIComponent(fraza)}?countryCode=${kraj()}&include=albums,albums.artists`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.api+json" },
+    cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
+  });
+  const tekst = await res.text();
+  if (!res.ok) return { status: res.status, tresc: tekst.slice(0, 400) };
+  type Atr = { title?: string; name?: string; externalLinks?: { href?: string }[] };
+  let dane: JsonApiDoc<Atr, Atr>;
+  try {
+    dane = JSON.parse(tekst) as JsonApiDoc<Atr, Atr>;
+  } catch {
+    return { status: res.status, tresc: tekst.slice(0, 400) };
+  }
+  const dolaczone = dane.included ?? [];
+  const artysci = new Map(dolaczone.filter((x) => x.type === "artists").map((x) => [x.id, x.attributes?.name ?? ""]));
+  return {
+    status: res.status,
+    rodzajeDolaczonych: [...new Set(dolaczone.map((x) => x.type))],
+    albumy: dolaczone
+      .filter((x) => x.type === "albums")
+      .map((al) => {
+        const rel = al.relationships?.artists?.data;
+        const ids = Array.isArray(rel) ? rel.map((r) => r.id) : rel ? [rel.id] : [];
+        return {
+          tytul: al.attributes?.title ?? "",
+          artysci: ids.map((i) => artysci.get(i) ?? `?${i}`),
+          link: al.attributes?.externalLinks?.find((l) => l.href)?.href ?? null,
+        };
+      }),
+  };
+}

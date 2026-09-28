@@ -62,6 +62,10 @@ export async function GET(req: NextRequest) {
       pytanie: { artysta, tytul: reszta.join(" - ") },
       adres: await tidalAlbumUrl(artysta ?? "", reszta.join(" - ")).catch((e) => String(e)),
     };
+    // Co Tidal w ogóle oddał — bez naszego dopasowania, żeby było widać, czy
+    // płyty nie ma, czy odrzuca ją porównanie tytułu albo wykonawcy.
+    const { tidalSzukajSurowo } = await import("@/lib/tidal");
+    wynik.surowo = await tidalSzukajSurowo([artysta, reszta.join(" - ")].filter(Boolean).join(" ")).catch((e) => String(e));
   }
 
   return NextResponse.json(wynik);
