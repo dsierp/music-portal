@@ -66,7 +66,7 @@ const pl = {
     title: "Strona płyty",
     lead: "Wszystko o jednym wydawnictwie i drogi dalej.",
     steps: [
-      { h: "Posłuchaj", p: "Linki do Spotify i Tidala są na górze — portal nie odtwarza, tylko prowadzi." },
+      { h: "Posłuchaj", p: "Z podłączonym Spotify guzik „Graj w Spotify” puszcza płytę tam, gdzie masz otwarte Spotify (trzeba mieć Premium). Pod strzałką ▾ są aplikacja Tidala i oba serwisy w przeglądarce. To, co wybierzesz, staje się guzikiem na następny raz — portal pamięta to w tej przeglądarce." },
       { h: "Oceń albo odrzuć", p: "„Nie moja bajka” to nie ocena 1/10, tylko „nie mój klimat” — portal przestanie to podsuwać." },
       { h: "Zobacz, kto grał", p: "Skład i kredyty produkcyjne; każde nazwisko jest odnośnikiem." },
       { h: "Do podróży", p: "Odłóż na później albo dołóż do trasy, którą komuś polecisz." },
@@ -145,7 +145,7 @@ const en: T = {
     title: "An album page",
     lead: "Everything about one release, and the ways onward.",
     steps: [
-      { h: "Listen", p: "Spotify and Tidal links sit at the top — the portal doesn't play music, it points you to it." },
+      { h: "Listen", p: "With Spotify connected, “Play on Spotify” starts the album wherever you have Spotify open (Premium required). Under the ▾ arrow you’ll find the Tidal app and both services in the browser. Whatever you pick becomes the button next time — the site remembers it in this browser." },
       { h: "Rate it, or pass", p: "“Not my thing” isn't a 1/10 — it means the style isn't yours, and the portal stops suggesting it." },
       { h: "See who played", p: "Line-up and production credits; every name is a link." },
       { h: "To a journey", p: "Save it for later or add it to a route you'll recommend to someone." },
@@ -220,7 +220,7 @@ const es: T = {
     title: "Página del disco",
     lead: "Todo sobre un lanzamiento y por dónde seguir.",
     steps: [
-      { h: "Escucha", p: "Los enlaces a Spotify y Tidal están arriba: el portal no reproduce, te lleva." },
+      { h: "Escucha", p: "Con Spotify conectado, «Reproducir en Spotify» pone el disco donde tengas Spotify abierto (hace falta Premium). Bajo la flecha ▾ están la app de Tidal y ambos servicios en el navegador. Lo que elijas será el botón la próxima vez: el portal lo recuerda en este navegador." },
       { h: "Puntúa o descarta", p: "«No es lo mío» no es un 1/10: significa que el estilo no va contigo y el portal deja de proponerlo." },
       { h: "Mira quién tocó", p: "Formación y créditos de producción; cada nombre es un enlace." },
       { h: "A un viaje", p: "Guárdalo para después o añádelo a una ruta que vayas a recomendar." },
@@ -295,7 +295,7 @@ const de: T = {
     title: "Albumseite",
     lead: "Alles zu einer Veröffentlichung und die Wege weiter.",
     steps: [
-      { h: "Hören", p: "Die Links zu Spotify und Tidal stehen oben — das Portal spielt nichts ab, es führt hin." },
+      { h: "Anhören", p: "Mit verbundenem Spotify startet „In Spotify abspielen“ das Album dort, wo Spotify gerade offen ist (Premium nötig). Unter dem Pfeil ▾ gibt es die Tidal-App und beide Dienste im Browser. Was du wählst, wird beim nächsten Mal der Knopf — das Portal merkt es sich in diesem Browser." },
       { h: "Bewerten oder ablehnen", p: "„Nicht mein Ding“ ist keine 1/10 — es heißt, der Stil ist nicht deiner, und das Portal schlägt ihn nicht mehr vor." },
       { h: "Sieh, wer gespielt hat", p: "Besetzung und Produktionscredits; jeder Name ist ein Link." },
       { h: "Auf eine Reise", p: "Für später zurücklegen oder in eine Route packen, die du weitergibst." },
