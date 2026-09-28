@@ -11,9 +11,11 @@ import { adresBezpieczny, adresWSerwisie, idPlyty, zapiszWyjscie } from "@/lib/a
  * POST: akcja na konkretnej płycie.
  *   - `graj` (Spotify): puszcza płytę na urządzeniu, na którym człowiek ma
  *     otwarte Spotify. Gdy się nie da, oddaje powód i zwykły adres płyty.
- *   - `aplikacja` (Tidal): adres `tidal://album/…`, który otwiera płytę
- *     w aplikacji Tidala. Tidal nie daje zewnętrznym aplikacjom sterowania
- *     odtwarzaniem (stan na 2026), więc to jest najbliżej „graj", jak się da.
+ *   - `aplikacja` (Tidal): adres `tidal://album/…?play=true`, który otwiera
+ *     płytę w aplikacji Tidala i od razu ją puszcza. Tidal nie daje
+ *     zewnętrznym aplikacjom sterowania odtwarzaniem przez API (stan na 2026);
+ *     `?play=true` to nieopisany w dokumentacji parametr aplikacji, sprawdzony
+ *     na Macu. Bez niego płyta tylko się otwierała.
  *
  * Zawsze oddajemy też `url` — zwykły adres w serwisie — żeby guzik miał dokąd
  * pójść, gdy sprytniejsza droga zawiedzie.
@@ -70,7 +72,7 @@ export async function POST(req: NextRequest) {
   const id = znalezione ? idPlyty(serwis, url) : null;
 
   if ((b.tryb === "aplikacja" || b.tryb === "adres") && serwis === "tidal") {
-    return NextResponse.json(id ? { ok: true, appUrl: `tidal://album/${id}`, url: bezpieczny } : { ok: false, powod: "brak-plyty", url: bezpieczny });
+    return NextResponse.json(id ? { ok: true, appUrl: `tidal://album/${id}?play=true`, url: bezpieczny } : { ok: false, powod: "brak-plyty", url: bezpieczny });
   }
 
   if (b.tryb === "graj" && serwis === "spotify") {
