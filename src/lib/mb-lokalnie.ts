@@ -89,6 +89,13 @@ export async function mbLokalniePlyta(mbid: string): Promise<{ plyta: MbReleaseG
   return r ? { plyta: r.plyta, wydanie: r.wydanie ?? null } : null;
 }
 
+/** Płyta (grupa wydawnicza), do której należy wydanie — z wybranych wydań w kopii. */
+export async function mbLokalniePlytaWydania(releaseMbid: string): Promise<string | null> {
+  if (!wlaczone("plyta") || !UUID.test(releaseMbid)) return null;
+  const r = await wiersz<{ rg: string }>("plyta", sql`select rg_gid::text as rg from mb.wydanie where gid = ${releaseMbid}::uuid limit 1`);
+  return r?.rg ?? null;
+}
+
 /**
  * Czy jest indeks po nazwie artysty. Bez niego szukanie po nazwie przechodzi
  * przez całą tabelę (sekundy na pytanie) — wtedy lepiej zapytać sieć.

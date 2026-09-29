@@ -392,6 +392,19 @@ WHERE nr <= 100
 GROUP BY rg;
 CREATE UNIQUE INDEX ON pom.rg_wydania (rg);
 
+-- Adresy streamingu ze WSZYSTKICH wydań płyty (Spotify, Tidal, Deezer,
+-- Apple Music, Bandcamp). Linki przy płycie wiszą zwykle przy konkretnym
+-- wydaniu, nie przy grupie — a portal sprawdzał je dotąd przeglądaniem
+-- wydań w sieci przy każdym kliknięciu „posłuchaj".
+CREATE TABLE pom.rg_stream AS
+SELECT r.rg, jsonb_agg(DISTINCT u.url) AS j
+FROM src.l_release_url x
+JOIN pom.release r ON r.id = x.entity0::int
+JOIN src.url u ON u.id = x.entity1
+WHERE u.url ~* '(open\.spotify\.com|tidal\.com|deezer\.com|music\.apple\.com|bandcamp\.com)'
+GROUP BY r.rg;
+CREATE UNIQUE INDEX ON pom.rg_stream (rg);
+
 CREATE TABLE mb_nowe.plyta AS
 SELECT g.gid,
        (d.j - 'rating') || jsonb_build_object(
@@ -399,12 +412,14 @@ SELECT g.gid,
          'genres', coalesce(t.genres, '[]'::jsonb),
          'tags', coalesce(t.tags, '[]'::jsonb),
          'releases', coalesce(w.j, '[]'::jsonb),
+         'stream-urls', coalesce(st.j, '[]'::jsonb),
          'relations', coalesce((SELECT jsonb_agg(u.j) FROM pom.url_rels u WHERE u.co = 'rg' AND u.id = g.id), '[]'::jsonb)
        ) AS doc
 FROM pom.rg g
 JOIN pom.rg_doc d ON d.id = g.id
 LEFT JOIN pom.rg_tagi t ON t.rg = g.id
-LEFT JOIN pom.rg_wydania w ON w.rg = g.id;
+LEFT JOIN pom.rg_wydania w ON w.rg = g.id
+LEFT JOIN pom.rg_stream st ON st.rg = g.id;
 ALTER TABLE mb_nowe.plyta ADD PRIMARY KEY (gid);
 
 -- nagrania z wybranych wydań: kto grał (relacje artysta→nagranie) i klipy

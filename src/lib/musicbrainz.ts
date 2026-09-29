@@ -9,7 +9,7 @@
  * Muzycy (osoby) w MB też są "artist" — dzięki temu jedna strona /artist/[mbid]
  * obsługuje i zespół, i człowieka, a "podróż" po składach to zwykłe linki.
  */
-import { mbLokalnieArtysta, mbLokalnieDyskografia, mbLokalniePlyta, mbLokalniePlytyWykonawcy } from "./mb-lokalnie";
+import { mbLokalnieArtysta, mbLokalnieDyskografia, mbLokalniePlyta, mbLokalniePlytaWydania, mbLokalniePlytyWykonawcy } from "./mb-lokalnie";
 import { cached, TTL } from "./cache";
 import { createThrottle } from "./throttle";
 import { czytelnaRola } from "./instruments";
@@ -645,6 +645,9 @@ export async function mbSearchReleaseGroups(query: string, limit = 25): Promise<
 
 /** release → release-group (nasze strony płyt stoją na release-group). */
 export async function releaseGroupOfRelease(releaseMbid: string): Promise<string | null> {
+  // Kopia zna płytę tylko dla wydań, które trzyma (jedno na płytę). Reszta — sieć.
+  const zKopii = await mbLokalniePlytaWydania(releaseMbid);
+  if (zKopii) return zKopii;
   return cached(`mb:rel2rg:${releaseMbid}`, TTL.lookup, async () => {
     const r = await mbFetch<{ "release-group"?: { id: string } }>(`/release/${releaseMbid}`, { inc: "release-groups" });
     return r["release-group"]?.id ?? null;
@@ -722,9 +725,11 @@ export async function searchArtists(
  * (`npm run verify:mbids`).
  */
 export async function czyTaPlyta(mbid: string, artist: string, album: string): Promise<boolean> {
-  const rg = await cached(`mb:rg-min:${mbid}`, TTL.lookup, () =>
-    mbFetch<MbReleaseGroup>(`/release-group/${mbid}`, { inc: "artist-credits" }),
-  );
+  const rg =
+    (await mbLokalniePlyta(mbid))?.plyta ??
+    (await cached(`mb:rg-min:${mbid}`, TTL.lookup, () =>
+      mbFetch<MbReleaseGroup>(`/release-group/${mbid}`, { inc: "artist-credits" }),
+    ));
   const s = normReleaseGroup(rg);
   return tenSamArtysta(s.artistText, artist) && tenSamTytul(s.title, album);
 }
@@ -1179,13 +1184,19 @@ export async function albumCrew(albums: AlbumSummary[], limit = 6): Promise<Crew
   const wanted = albums.slice(0, limit);
   const people = new Map<string, CrewMember>();
   for (const album of wanted) {
-    const data = await cached(`mb:crew:v1:${album.mbid}`, TTL.lookup, () =>
-      mbFetch<{ releases: (MbRelease & { relations?: MbArtistRel[] })[] }>("/release/", {
-        "release-group": album.mbid,
-        inc: "artist-rels",
-        limit: 1,
-      }).catch(() => ({ releases: [] })),
-    );
+    // Najpierw kopia: wybrane wydanie płyty ma już relacje z ludźmi (producent,
+    // realizator, okładka). Dotąd były to kolejne zapytania do sieci, jedno po
+    // drugim — przy sześciu płytach sześć sekund kolejki na stronie artysty.
+    const lokalne = (await mbLokalniePlyta(album.mbid))?.wydanie;
+    const data = lokalne
+      ? { releases: [lokalne as MbRelease & { relations?: MbArtistRel[] }] }
+      : await cached(`mb:crew:v1:${album.mbid}`, TTL.lookup, () =>
+          mbFetch<{ releases: (MbRelease & { relations?: MbArtistRel[] })[] }>("/release/", {
+            "release-group": album.mbid,
+            inc: "artist-rels",
+            limit: 1,
+          }).catch(() => ({ releases: [] })),
+        );
     for (const rel of data.releases ?? []) {
       for (const r of rel.relations ?? []) {
         if (!r.artist || r["target-type"] !== "artist") continue;
@@ -1409,6 +1420,33 @@ export async function linkSerwisu(
   mbid: string,
   host: RegExp,
 ): Promise<string | null> {
+  /**
+   * Najpierw kopia. Gdy kopia ZNA płytę albo artystę, jej odpowiedź jest
+   * ostateczna — także „linku nie ma": kopia trzyma adresy streamingu ze
+   * wszystkich wydań płyty, więc przeglądanie wydań w sieci niczego by nie
+   * dodało, a kosztowało dwa zapytania w kolejce przy każdym „posłuchaj".
+   * Dalej (szukanie w katalogu Spotify/Tidala) idzie wołający, jak dotąd.
+   */
+  if (typ === "release-group") {
+    const lok = await mbLokalniePlyta(mbid);
+    if (lok) {
+      const kandydaci = [
+        ...(lok.plyta.relations ?? []).map((r) => r.url?.resource),
+        ...((lok.plyta as { "stream-urls"?: string[] })["stream-urls"] ?? []),
+        ...(lok.wydanie?.relations ?? []).map((r) => r.url?.resource),
+      ];
+      const traf = kandydaci.find((u): u is string => !!u && host.test(u));
+      if (traf) return traf;
+      // „Nie ma" wolno uznać tylko wtedy, gdy import zebrał adresy ze
+      // wszystkich wydań (pole stream-urls). Starsza kopia go nie ma —
+      // wtedy dopytujemy sieć jak dotąd.
+      if ("stream-urls" in lok.plyta) return null;
+    }
+  } else if (typ === "artist") {
+    const lok = await mbLokalnieArtysta(mbid);
+    if (lok) return (lok.relations ?? []).map((r) => r.url?.resource).find((u): u is string => !!u && host.test(u)) ?? null;
+  }
+
   const dane = await cached(`mb:urls:${typ}:${mbid}`, TTL.lookup, () =>
     mbFetch<{ relations?: { url?: { resource?: string } }[] }>(`/${typ}/${mbid}`, { inc: "url-rels" }),
   ).catch(() => null);
