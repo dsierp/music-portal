@@ -89,6 +89,57 @@ export async function mbLokalniePlyta(mbid: string): Promise<{ plyta: MbReleaseG
   return r ? { plyta: r.plyta, wydanie: r.wydanie ?? null } : null;
 }
 
+/**
+ * Czy jest indeks po nazwie artysty. Bez niego szukanie po nazwie przechodzi
+ * przez całą tabelę (sekundy na pytanie) — wtedy lepiej zapytać sieć.
+ * Sprawdzamy raz na kwadrans, bo indeks dochodzi z kolejnym importem.
+ */
+let indeksNazwy: { jest: boolean; do: number } | null = null;
+async function jestIndeksNazwy(): Promise<boolean> {
+  if (indeksNazwy && indeksNazwy.do > Date.now()) return indeksNazwy.jest;
+  let jest = false;
+  try {
+    const w = (await db.execute(
+      sql`select 1 from pg_indexes where schemaname = 'mb' and tablename = 'artysta' and indexname = 'artysta_nazwa'`,
+    )) as unknown as { rows: unknown[] };
+    jest = (w.rows?.length ?? 0) > 0;
+  } catch {
+    jest = false;
+  }
+  indeksNazwy = { jest, do: Date.now() + PRZERWA_MS };
+  return jest;
+}
+
+/**
+ * Płyty wykonawcy o tej NAZWIE — do sprawdzania płyt podanych słownie
+ * („Clipse – Let God Sort Em Out") bez pytania wyszukiwarki MusicBrainz.
+ *
+ * Dopasowanie tytułu robi wołający (`findAlbumMbid`) tą samą regułą co dla
+ * wyników z sieci. Przy podpisach zbiorowych („Yusef Lateef & Adam Rudolph")
+ * próbujemy też pierwszej osoby — wspólna płyta i tak leży w jej dyskografii.
+ * `null` = nie wiemy (brak kopii albo indeksu) → pytaj sieć; `[]` = wiemy, że nic.
+ */
+export async function mbLokalniePlytyWykonawcy(artysta: string): Promise<MbReleaseGroup[] | null> {
+  if (!wlaczone("dyskografia") || !artysta.trim()) return null;
+  if (!(await jestIndeksNazwy())) return null;
+  const nazwy = [artysta.trim()];
+  const pierwszy = artysta.split(/\s*(?:&|,|\bfeat\.?|\bft\.?|\band\b|\bi\b|\bwith\b)\s*/i)[0]?.trim();
+  if (pierwszy && pierwszy.toLowerCase() !== nazwy[0].toLowerCase()) nazwy.push(pierwszy);
+  const wynik: MbReleaseGroup[] = [];
+  for (const n of nazwy) {
+    try {
+      const w = (await db.execute(
+        sql`select d.doc from mb.artysta a join mb.dyskografia d on d.gid = a.gid where lower(a.doc->>'name') = lower(${n}) limit 5`,
+      )) as unknown as { rows: { doc: MbReleaseGroup[] }[] };
+      for (const r of w.rows ?? []) wynik.push(...(r.doc ?? []));
+    } catch {
+      return null;
+    }
+    if (wynik.length) break;
+  }
+  return wynik;
+}
+
 /** Stan kopii: z którego zrzutu, ilu artystów — dla /api/diag/mb. */
 export async function mbLokalnieStan(): Promise<Record<string, string> | null> {
   try {

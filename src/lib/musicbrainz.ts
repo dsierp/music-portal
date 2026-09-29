@@ -9,7 +9,7 @@
  * Muzycy (osoby) w MB też są "artist" — dzięki temu jedna strona /artist/[mbid]
  * obsługuje i zespół, i człowieka, a "podróż" po składach to zwykłe linki.
  */
-import { mbLokalnieArtysta, mbLokalnieDyskografia, mbLokalniePlyta } from "./mb-lokalnie";
+import { mbLokalnieArtysta, mbLokalnieDyskografia, mbLokalniePlyta, mbLokalniePlytyWykonawcy } from "./mb-lokalnie";
 import { cached, TTL } from "./cache";
 import { createThrottle } from "./throttle";
 import { czytelnaRola } from "./instruments";
@@ -733,6 +733,25 @@ export async function czyTaPlyta(mbid: string, artist: string, album: string): P
 export async function findAlbumMbid(artist: string, album: string): Promise<AlbumSummary | null> {
   const a = lucene(artist), t = lucene(album);
   if (!a || !t) return null;
+
+  // Najpierw własna kopia: dyskografia wykonawcy o tej nazwie i to samo sito
+  // co niżej. Podróż w nieznane sprawdza kilkanaście płyt naraz — przez sieć
+  // to kilkanaście sekund kolejki, z kopii ułamek sekundy.
+  const zKopii = await mbLokalniePlytyWykonawcy(artist);
+  if (zKopii?.length) {
+    const trafione = zKopii
+      .map((rg) => normReleaseGroup(rg))
+      .filter((s) => tenSamArtysta(s.artistText, artist) && tenSamTytul(s.title, album));
+    // Studyjny album przed kompilacją czy koncertówką o tym samym tytule,
+    // a z kilku takich — najwcześniejszy.
+    trafione.sort(
+      (x, y) =>
+        Number(x.secondaryTypes.length > 0) - Number(y.secondaryTypes.length > 0) ||
+        (x.firstReleaseDate || "9999").localeCompare(y.firstReleaseDate || "9999"),
+    );
+    if (trafione[0]) return trafione[0];
+  }
+
   const pytaj = async (query: string) => {
     // v3: v2 zdążyło zapamiętać trafienia sprzed sita — trzeba je ominąć.
     const data = await cached(`mb:rg-find:v3:${query}`, TTL.lookup, () =>

@@ -266,6 +266,10 @@ LEFT JOIN pom.tagi_agg t ON t.artist = a.id
 LEFT JOIN pom.aliasy al ON al.artist = a.id
 LEFT JOIN pom.rels_agg r ON r.artist = a.id;
 ALTER TABLE mb_nowe.artysta ADD PRIMARY KEY (gid);
+-- Szukanie płyty po nazwie wykonawcy (podróże, rozmowa, „znajdź płytę"):
+-- najpierw artysta po nazwie, potem jego dyskografia. Bez indeksu to przejście
+-- po trzech milionach dokumentów przy każdym pytaniu.
+CREATE INDEX artysta_nazwa ON mb_nowe.artysta (lower(doc->>'name'));
 
 -- ---------- gotowe: dyskografia artysty ----------
 
