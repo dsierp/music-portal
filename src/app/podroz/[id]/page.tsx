@@ -8,7 +8,7 @@ import { spotifyConfigured, spotifyConnected } from "@/lib/spotify";
 import { connectSpotify, deleteListAction, kawalkiZListy, removeFromListAction, sendJourneyToSpotify, shareListAction, toggleVisitAction } from "@/app/actions";
 import { Cover } from "@/components/cover";
 import { i18n } from "@/lib/t";
-import { SerwisPill } from "@/components/serwisy";
+import { Sluchaj } from "@/components/sluchaj";
 import { fmt, formatDate, plural } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
@@ -105,6 +105,13 @@ export default async function ListPage({
   // przez co nie trafiał żaden link. Teraz robi to trasa /go/stop w chwili
   // kliknięcia: jedno wyjście = jedno zapytanie.
 
+  const tytulStopu = (nazwa: string, stan: boolean | undefined) =>
+    stan === true
+      ? fmt(t.lists.openIn, { name: nazwa })
+      : stan === false
+        ? fmt(t.lists.onlySearch, { name: nazwa })
+        : fmt(t.lists.notChecked, { name: nazwa });
+
   return (
     <div className="space-y-6">
       <header>
@@ -172,41 +179,21 @@ export default async function ListPage({
                     drodze stawia ptaszek — „znam to" bierze się z tego, co
                     człowiek i tak robi, a nie z pamiętania o odhaczeniu. */}
                 {it.targetType !== "CONCERT" && (
-                  <div className="mt-1 flex flex-wrap items-center gap-2">
-                    {[
-                      // Oba serwisy dobiera teraz trasa /go/stop przy kliknięciu:
-                      // najpierw adres z MusicBrainz (działa też dla utworu i —
-                      // co ważniejsze — dla Tidala, który bez klucza dewelopera
-                      // nie ma czego szukać), potem szukanie po nazwie
-                      // w Spotify, a na końcu wyszukiwarka.
-                      { nazwa: "Spotify", serwis: "spotify" },
-                      { nazwa: "Tidal", serwis: "tidal" },
-                    ].map((s) => ({
-                      ...s,
-                      param: `&serwis=${s.serwis}&etykieta=${encodeURIComponent(it.label)}`,
-                      // Wiemy z poprzedniego kliknięcia, że tu nic nie ma? Lupka
-                      // zamiast strzałki, żeby nikt nie liczył na wejście prosto
-                      // w płytę i nie zdziwił się wyszukiwarką.
-                      stan: stanLinku.get(`${s.serwis}:${it.targetMbid}`),
-                    })).map((s) => (
-                      // TEN SAM guzik co wszędzie indziej (components/serwisy.tsx);
-                      // inny jest tylko adres, bo przystanek idzie przez /go/stop,
-                      // które dodatkowo stawia ptaszek „znam to".
-                      <SerwisPill
-                        key={s.nazwa}
-                        serwis={s.serwis as "spotify" | "tidal"}
-                        href={`/go/stop?listId=${encodeURIComponent(id)}&type=${it.targetType}&mbid=${encodeURIComponent(it.targetMbid)}${s.param}`}
-                        stan={s.stan}
-                        small
-                        title={
-                          s.stan === true
-                            ? fmt(t.lists.openIn, { name: s.nazwa })
-                            : s.stan === false
-                              ? fmt(t.lists.onlySearch, { name: s.nazwa })
-                              : fmt(t.lists.notChecked, { name: s.nazwa })
-                        }
-                      />
-                    ))}
+                  <div className="mt-1">
+                    {/* TEN SAM guzik co wszędzie (components/sluchaj.tsx); w trybie
+                        przystanku wyjścia idą przez /go/stop, a granie przez
+                        /api/sluchaj z numerem listy — oba stawiają ptaszek. */}
+                    <Sluchaj
+                      etykieta={it.label}
+                      mbid={it.targetMbid}
+                      typ={it.targetType === "ARTIST" ? "artist" : it.targetType === "RECORDING" ? "recording" : "release-group"}
+                      przystanek={{ listId: id, typ: it.targetType as "ALBUM" | "ARTIST" | "RECORDING" }}
+                      stanSpotify={stanLinku.get(`spotify:${it.targetMbid}`)}
+                      stanTidal={stanLinku.get(`tidal:${it.targetMbid}`)}
+                      tytulSpotify={tytulStopu("Spotify", stanLinku.get(`spotify:${it.targetMbid}`))}
+                      tytulTidal={tytulStopu("Tidal", stanLinku.get(`tidal:${it.targetMbid}`))}
+                      small
+                    />
                   </div>
                 )}
               </div>

@@ -22,58 +22,11 @@ import { Sluchaj } from "./sluchaj";
 
 export type StanLinku = boolean | undefined;
 
-const PILL = "rounded-full border px-3 py-1 font-mono transition-colors";
-const BARWA: Record<"spotify" | "tidal", string> = {
-  spotify: "border-spotify/40 text-spotify hover:bg-spotify/10",
-  tidal: "border-tidal/40 text-tidal hover:bg-tidal/10",
-};
-const NAZWA: Record<"spotify" | "tidal", string> = { spotify: "Spotify", tidal: "Tidal" };
-
-function znak(stan: StanLinku): string {
-  return stan === true ? "▸" : stan === false ? "⌕" : "·";
-}
-
-/** Pojedynczy guzik — do użycia tam, gdzie adres buduje wywołujący (podróż). */
-export function SerwisPill({
-  serwis,
-  href,
-  stan,
-  title,
-  small = false,
-}: {
-  serwis: "spotify" | "tidal";
-  href: string;
-  stan?: StanLinku;
-  title?: string;
-  small?: boolean;
-}) {
-  /**
-   * NOWA KARTA, nie ta sama.
-   * Wyjście do serwisu jest odejściem z portalu — człowiek idzie posłuchać
-   * i wraca do tego, co czytał. Gdy otwierało się w miejscu, wracanie
-   * wymagało „wstecz" i przeładowania strony, na której był. Dlatego zwykły
-   * `<a target="_blank">`, a nie nawigacja wewnętrzna: mimo że adres jest
-   * nasz (`/go/…`), kończy się przekierowaniem na zewnątrz.
-   */
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener"
-      title={title}
-      className={`${PILL} ${BARWA[serwis]} ${small ? "text-[11px]" : "text-xs"}`}
-    >
-      {znak(stan)} {NAZWA[serwis]}
-    </a>
-  );
-}
-
 /**
  * Guzik „słuchaj" dla płyty (albo artysty) — wszędzie ten sam.
  *
- * Dla kogoś bez podłączonego Spotify/Tidala: para guzików jak dotąd, przez
- * `/go/serwis`. Dla kogoś z podłączonym kontem: jeden rozwijany guzik z akcją
- * domyślną („Graj w Spotify" / „Otwórz w aplikacji Tidal") — patrz sluchaj.tsx.
+ * Jeden rozwijany guzik z akcją domyślną dla każdego — patrz sluchaj.tsx.
+ * W podróży ten sam komponent, z parametrem `przystanek`.
  * Podpowiedzi liczymy tutaj, bo do komponentu klienckiego funkcji podać nie można.
  */
 export function SerwisyPills({

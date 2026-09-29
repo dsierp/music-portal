@@ -56,6 +56,8 @@ export async function POST(req: NextRequest) {
     mbid?: string;
     etykieta?: string;
     tryb?: string;
+    listId?: string;
+    typPrzystanku?: string;
   };
   const serwis = b.serwis === "tidal" ? "tidal" : "spotify";
   const typ = b.typ === "artist" ? "artist" : "release-group";
@@ -67,6 +69,21 @@ export async function POST(req: NextRequest) {
   // nie jest słuchanie, więc nic nie zapisujemy. Zapis przychodzi osobno,
   // jako `zapisz`, dopiero w chwili kliknięcia.
   if (b.tryb !== "adres") await zapiszWyjscie({ serwis, typ, mbid, etykieta, url, znalezione });
+
+  /**
+   * Guzik stoi przy pozycji podróży — wyjście stawia ptaszek „znam to",
+   * tak samo jak zwykłe wyjście przez /go/stop. Tylko przy prawdziwym
+   * kliknięciu, nie przy przygotowaniu adresu zawczasu.
+   */
+  const typP = b.typPrzystanku;
+  if (b.tryb !== "adres" && b.listId && mbid && (typP === "ALBUM" || typP === "ARTIST" || typP === "RECORDING")) {
+    const { currentUser } = await import("@/lib/auth");
+    const user = await currentUser().catch(() => null);
+    if (user) {
+      const { markVisited } = await import("@/lib/user-data");
+      await markVisited(user.id, String(b.listId).slice(0, 64), typP, mbid, "link").catch(() => {});
+    }
+  }
   if (b.tryb === "zapisz") return NextResponse.json({ ok: true });
   const bezpieczny = adresBezpieczny(url) ? url : null;
   const id = znalezione ? idPlyty(serwis, url) : null;

@@ -4,18 +4,23 @@ import { useEffect, useRef, useState } from "react";
 /**
  * Guzik „słuchaj" — rozwijany, z akcją domyślną zależną od podłączonych kont.
  *
- * Kto nie ma w portalu podłączonego ani Spotify, ani Tidala (albo nie jest
- * zalogowany), widzi dokładnie to, co dotąd: dwa guziki „Spotify" i „Tidal",
- * które otwierają płytę w nowej karcie. Nic się dla niego nie zmienia.
- *
- * Kto ma podłączone konto, dostaje jeden guzik z akcją domyślną i strzałką:
+ * Ten sam guzik widzi KAŻDY — zalogowany czy nie, z kontami czy bez. Dwie
+ * osobne pigułki „Spotify" / „Tidal" zostały tylko dla utworów w podróży
+ * (utworu nie da się puścić jako płyty). Akcja domyślna:
  * - Spotify podłączone → „Graj w Spotify": płyta rusza tam, gdzie człowiek ma
  *   otwarte Spotify (komputer, telefon, głośnik). Bez nowej karty.
  * - Tidal podłączony → „Otwórz w aplikacji Tidal": Tidal nie daje zewnętrznym
  *   aplikacjom sterowania odtwarzaniem, więc najbliżej „graj" jest otwarcie
  *   płyty prosto w ich aplikacji zamiast w przeglądarce.
- * - oba → to, czego człowiek użył ostatnio (pamiętamy w przeglądarce),
- *   a za pierwszym razem Spotify, bo tylko ono naprawdę gra.
+ * - zawsze pierwsze jest to, czego człowiek użył ostatnio (pamiętamy
+ *   w przeglądarce); za pierwszym razem „Graj w Spotify", gdy Spotify jest
+ *   podłączone, a bez niego Spotify w przeglądarce.
+ * „Graj w Tidalu" nie wymaga konta Tidala u nas — to tylko adres, który
+ * otwiera ich aplikację na komputerze człowieka.
+ *
+ * W podróży (`przystanek`) wyjścia w przeglądarce idą przez /go/stop,
+ * a granie i aplikacja wysyłają listę do /api/sluchaj — w obu przypadkach
+ * przystanek dostaje ptaszek „znam to".
  * Pod strzałką zawsze reszta: druga aplikacja i oba serwisy w przeglądarce.
  *
  * Stan kont pobieramy RAZ na stronę (wspólna obietnica niżej): na premierach
@@ -76,6 +81,7 @@ export function Sluchaj({
   etykieta,
   mbid,
   typ = "release-group",
+  przystanek,
   stanSpotify,
   stanTidal,
   tytulSpotify,
@@ -85,7 +91,9 @@ export function Sluchaj({
 }: {
   etykieta: string;
   mbid?: string | null;
-  typ?: "release-group" | "artist";
+  typ?: "release-group" | "artist" | "recording";
+  /** pozycja podróży — wyjście stawia przy niej ptaszek */
+  przystanek?: { listId: string; typ: "ALBUM" | "ARTIST" | "RECORDING" };
   stanSpotify?: boolean;
   stanTidal?: boolean;
   tytulSpotify?: string;
@@ -108,6 +116,16 @@ export function Sluchaj({
    * a przy kolejnych po cichu nic nie robiła. Z adresem w ręku kliknięcie
    * otwiera aplikację od razu, bez czekania na nic.
    */
+  const typApi = typ === "artist" ? "artist" : "release-group";
+  const cialoPost = (serwis: "spotify" | "tidal", tryb: string) =>
+    JSON.stringify({
+      serwis,
+      typ: typApi,
+      mbid: mbid ?? "",
+      etykieta,
+      tryb,
+      ...(przystanek ? { listId: przystanek.listId, typPrzystanku: przystanek.typ } : {}),
+    });
   const tidalZawczasu = useRef<{ appUrl?: string; url?: string | null } | null>(null);
   const tidalWToku = useRef(false);
   function przygotujTidala() {
@@ -116,7 +134,7 @@ export function Sluchaj({
     fetch("/api/sluchaj", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ serwis: "tidal", typ, mbid: mbid ?? "", etykieta, tryb: "adres" }),
+      body: cialoPost("tidal", "adres"),
     })
       .then((r) => r.json())
       .then((w: { ok?: boolean; appUrl?: string; url?: string | null }) => {
@@ -160,7 +178,9 @@ export function Sluchaj({
   }, [komunikat]);
 
   const adresWyjscia = (serwis: "spotify" | "tidal") =>
-    `/go/serwis?serwis=${serwis}&typ=${typ}&mbid=${encodeURIComponent(mbid ?? "")}&etykieta=${encodeURIComponent(etykieta)}`;
+    przystanek
+      ? `/go/stop?listId=${encodeURIComponent(przystanek.listId)}&type=${przystanek.typ}&mbid=${encodeURIComponent(mbid ?? "")}&serwis=${serwis}&etykieta=${encodeURIComponent(etykieta)}`
+      : `/go/serwis?serwis=${serwis}&typ=${typApi}&mbid=${encodeURIComponent(mbid ?? "")}&etykieta=${encodeURIComponent(etykieta)}`;
 
   const zwykleGuziki = (
     <div className={`flex flex-wrap items-center gap-2 ${className}`}>
@@ -182,7 +202,24 @@ export function Sluchaj({
     </div>
   );
 
-  if (!konta || !konta.zalogowany || (!konta.spotify && !konta.tidal)) return zwykleGuziki;
+  // Utwór: grać umiemy tylko płyty, więc zostają dwa zwykłe wyjścia.
+  if (typ === "recording") return zwykleGuziki;
+
+  /**
+   * Zanim przyjdzie odpowiedź o kontach (ułamek sekundy, raz na stronę) —
+   * ten sam kształt guzika, tylko jeszcze nieczynny. Wcześniej w tym czasie
+   * stały stare pigułki i strona „przeskakiwała".
+   */
+  if (!konta) {
+    const r = small ? "text-[11px]" : "text-xs";
+    const b = BARWA[ostatnia?.endsWith("tidal") ? "tidal" : "spotify"];
+    return (
+      <div className={`inline-flex opacity-60 ${className}`} aria-busy="true">
+        <span className={`rounded-l-full border px-3 py-1 font-mono ${b} ${r}`}>▶ {ostatnia?.endsWith("tidal") ? "Tidal" : "Spotify"}</span>
+        <span className={`rounded-r-full border border-l-0 px-2 py-1 font-mono ${b} ${r}`}>▾</span>
+      </div>
+    );
+  }
   const t = konta.teksty;
 
   const opcje: Opcja[] = [
@@ -192,7 +229,7 @@ export function Sluchaj({
     "web-tidal",
   ];
   const domyslna: Opcja =
-    ostatnia && opcje.includes(ostatnia) ? ostatnia : konta.spotify ? "graj-spotify" : "app-tidal";
+    ostatnia && opcje.includes(ostatnia) ? ostatnia : konta.spotify ? "graj-spotify" : "web-spotify";
 
   const nazwa: Record<Opcja, string> = {
     "graj-spotify": `▶ ${t.playSpotify}`,
@@ -218,7 +255,7 @@ export function Sluchaj({
     // geście kliknięcia, a ślad w dzienniku wysyłamy obok, bez czekania.
     if (o === "app-tidal" && tidalZawczasu.current?.appUrl) {
       window.location.href = tidalZawczasu.current.appUrl;
-      const cialo = JSON.stringify({ serwis: "tidal", typ, mbid: mbid ?? "", etykieta, tryb: "zapisz" });
+      const cialo = cialoPost("tidal", "zapisz");
       try {
         navigator.sendBeacon("/api/sluchaj", new Blob([cialo], { type: "application/json" }));
       } catch {
@@ -232,13 +269,7 @@ export function Sluchaj({
       const res = await fetch("/api/sluchaj", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          serwis: serwisOpcji(o),
-          typ,
-          mbid: mbid ?? "",
-          etykieta,
-          tryb: o === "graj-spotify" ? "graj" : "aplikacja",
-        }),
+        body: cialoPost(serwisOpcji(o), o === "graj-spotify" ? "graj" : "aplikacja"),
       });
       const w = (await res.json().catch(() => ({}))) as {
         ok?: boolean;
