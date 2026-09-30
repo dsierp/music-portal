@@ -16,6 +16,12 @@
 \set ON_ERROR_STOP 1
 SET work_mem = '256MB';
 SET maintenance_work_mem = '1GB';
+-- Równoległy hash join trzyma tablicę mieszającą w pamięci współdzielonej
+-- (/dev/shm kontenera). Przy złączeniach utworów i nagrań (dziesiątki
+-- milionów wierszy) import #3 wyczerpał ją i padł na „could not resize
+-- shared memory segment". Zwykły hash join na procesie robi to samo,
+-- wylewając nadmiar na dysk zamiast wywracać cały import.
+SET enable_parallel_hash = off;
 
 DROP SCHEMA IF EXISTS pom CASCADE;
 CREATE SCHEMA pom;

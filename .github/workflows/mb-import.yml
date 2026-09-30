@@ -49,7 +49,7 @@ jobs:
         # zaczynamy od zera. Dzięki temu ładowanie jest kilka razy szybsze.
         run: |
           docker run -d --name robocza -p 5432:5432 \
-            -e POSTGRES_PASSWORD=robocza --shm-size=2g \
+            -e POSTGRES_PASSWORD=robocza --shm-size=6g \
             -v /mnt/pgdata:/var/lib/postgresql/data \
             postgres:16 \
             -c shared_buffers=1GB -c work_mem=256MB -c maintenance_work_mem=1GB \
