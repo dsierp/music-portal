@@ -225,3 +225,35 @@ export async function synchronizujHistorie(userId: string): Promise<void> {
     // konto podłączone przed tą zmianą), po prostu jej nie ma.
   }
 }
+
+/**
+ * Topy z całego dziennika — kogo i co człowiek puszcza najczęściej, bez okna
+ * czasowego. „W czym siedziałem" mówi o ostatnich dwóch tygodniach; to jest
+ * odpowiedź na „czego słucham w ogóle".
+ */
+export async function najczesciejGrani(userId: string, ile = 20) {
+  const rows = await db
+    .select({ artist: sql<string>`max(${schema.plays.artist})`, n: sql<number>`count(*)` })
+    .from(schema.plays)
+    .where(eq(schema.plays.userId, userId))
+    .groupBy(sql`lower(trim(${schema.plays.artist}))`)
+    .orderBy(desc(sql`count(*)`))
+    .limit(ile);
+  return rows.map((r) => ({ artist: r.artist, ile: Number(r.n) }));
+}
+
+export async function najczesciejGranePlyty(userId: string, ile = 20) {
+  const rows = await db
+    .select({
+      artist: sql<string>`coalesce(max(${schema.plays.artist}) filter (where ${schema.plays.mbid} is not null), max(${schema.plays.artist}))`,
+      album: sql<string | null>`coalesce(max(${schema.plays.album}) filter (where ${schema.plays.mbid} is not null), max(${schema.plays.album}))`,
+      mbid: sql<string | null>`max(${schema.plays.mbid})`,
+      n: sql<number>`count(*)`,
+    })
+    .from(schema.plays)
+    .where(and(eq(schema.plays.userId, userId), sql`${schema.plays.album} is not null`))
+    .groupBy(sql`lower(trim(${schema.plays.artist}))`, sql`lower(trim(${schema.plays.album}))`)
+    .orderBy(desc(sql`count(*)`), desc(sql`max(${schema.plays.playedAt})`))
+    .limit(ile);
+  return rows.filter((r) => r.album).map((r) => ({ ...r, album: r.album!, ile: Number(r.n) }));
+}

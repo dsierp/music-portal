@@ -30,6 +30,8 @@ export async function Nav() {
           <Link href="/best-of">{t.nav.bestOf}</Link>
           <Link href="/podroze">{t.nav.lists}</Link>
           <Link href="/rozmowa">{t.nav.chat}</Link>
+          {/* Tylko dla zalogowanych: to są JEGO topy, gościowi nie ma czego pokazać. */}
+          {user && <Link href="/topy">{t.nav.myTops}</Link>}
           {/* Znak zapytania zamiast słowa: w menu jest już ciasno, a to i tak
               zagląda się raz. Tytuł niesie nazwę dla czytników ekranu. */}
           <Link href="/pomoc" title={t.help.guideTitle} aria-label={t.help.guideTitle} className="font-mono text-muted hover:text-accent2">
