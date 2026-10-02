@@ -70,6 +70,10 @@ export async function GET(req: Request) {
     wyczyszczono = await cacheForgetPrefix("spotify:");
     wynik.wyczyszczonoWpisow = wyczyszczono;
   }
+  {
+    const { spotifyPauzaDo } = await import("@/lib/spotify");
+    wynik.pauzaDo = await spotifyPauzaDo().catch(() => null);
+  }
   const etykieta = sp.get("etykieta");
   const artist = sp.get("artist") ?? (etykieta ? rozbijEtykiete(etykieta).artist : "");
   const album = sp.get("album") ?? (etykieta ? rozbijEtykiete(etykieta).title : "");

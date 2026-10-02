@@ -12,7 +12,7 @@
  */
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { cached, cacheHasNote, cacheNote } from "./cache";
+import { cached, cacheHasNote, cacheNote, kvGet, kvSet } from "./cache";
 
 const API = "https://api.spotify.com/v1";
 const TOKEN_URL = "https://accounts.spotify.com/api/token";
@@ -41,14 +41,40 @@ function wKolejce<T>(zadanie: () => Promise<T>): Promise<T> {
   return moje;
 }
 
-/** Po 429 odczekujemy tyle, ile każe Spotify (a gdy nie powie — minutę). */
+/**
+ * Po 429 odczekujemy tyle, ile każe Spotify (a gdy nie powie — minutę).
+ *
+ * Pauza jest WSPÓLNA dla całego portalu (wpis w bazie), nie tylko dla jednego
+ * procesu. Sama pamięć procesu nie wystarczała: Vercel stawia nowe procesy co
+ * chwilę, każdy zaczynał z czystą kartą i od razu pukał do Spotify, który
+ * właśnie kazał czekać. Przy „QUOTA_EXCEEDED" Spotify potrafi kazać czekać
+ * godzinami — a portal co pół minuty (kafelek „słuchasz teraz") dokładał
+ * kolejne odbicie i wszystkie guziki prowadziły do wyszukiwarki.
+ */
+const KLUCZ_PAUZY = "spotifypauza:do";
+let pauzaSprawdzona = 0;
 function zapamietajPauze(res: Response) {
   const ile = Number(res.headers.get("retry-after") ?? "");
   pauzaDo = Date.now() + (Number.isFinite(ile) && ile > 0 ? ile * 1000 : 60_000);
+  pauzaSprawdzona = Date.now();
+  void kvSet(KLUCZ_PAUZY, { doKiedy: pauzaDo }).catch(() => {});
 }
 
-function wPauzie(): boolean {
+async function wPauzie(): Promise<boolean> {
+  if (Date.now() < pauzaDo) return true;
+  // Wspólny wpis czytamy najwyżej raz na 20 s na proces — to jedno tanie
+  // zapytanie do własnej bazy zamiast odbicia od Spotify.
+  if (Date.now() - pauzaSprawdzona > 20_000) {
+    pauzaSprawdzona = Date.now();
+    const w = await kvGet<{ doKiedy?: number }>(KLUCZ_PAUZY).catch(() => null);
+    if (w?.doKiedy && w.doKiedy > pauzaDo) pauzaDo = w.doKiedy;
+  }
   return Date.now() < pauzaDo;
+}
+
+/** Do kiedy portal milczy wobec Spotify (dla diagnostyki); null = nie milczy. */
+export async function spotifyPauzaDo(): Promise<string | null> {
+  return (await wPauzie()) ? new Date(pauzaDo).toISOString() : null;
 }
 
 /** Zakresy, o które prosimy przy łączeniu konta — patrz komentarz u góry. */
@@ -199,7 +225,7 @@ export async function spotifyBlocked(userId: string): Promise<boolean> {
 async function api<T>(userId: string, sciezka: string, init?: RequestInit & { bezBlokady?: boolean }): Promise<T | null> {
   const token = await tokenDla(userId);
   if (!token) return null;
-  if (wPauzie()) return null;
+  if (await wPauzie()) return null;
   const res = await wKolejce(() =>
     fetch(`${API}${sciezka}`, {
       ...init,
@@ -655,7 +681,7 @@ async function tokenAplikacji(): Promise<string | null> {
 async function katalog<T>(sciezka: string): Promise<T | null> {
   const token = await tokenAplikacji();
   if (!token) return null;
-  if (wPauzie()) return null;
+  if (await wPauzie()) return null;
   const res = await wKolejce(() =>
     fetch(`${API}${sciezka}`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -841,7 +867,7 @@ export async function spotifySondaSzukania(userId: string | null, q: string) {
     } catch {
       /* nie JSON — wtedy liczy się sam fragment */
     }
-    return { status: res.status, ok: res.ok, ile, fragment: tresc.slice(0, 300) };
+    return { status: res.status, ok: res.ok, ile, czekacSekund: res.headers.get("retry-after"), fragment: tresc.slice(0, 300) };
   };
   const sciezka = `/search?type=album&limit=3&q=${encodeURIComponent(q)}`;
   const out: Record<string, unknown> = { zapytanie: q };

@@ -38,7 +38,7 @@ export function SluchaszTeraz({ tytul, znajdz }: { tytul: string; znajdz: string
       }
     };
     pobierz();
-    const t = setInterval(pobierz, 30_000);
+    const t = setInterval(pobierz, 60_000);
     document.addEventListener("visibilitychange", pobierz);
     return () => {
       zyje = false;
