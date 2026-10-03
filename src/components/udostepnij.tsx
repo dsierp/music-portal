@@ -61,7 +61,7 @@ export function Udostepnij({ label, copied, failed }: { label: string; copied: s
   }
 
   return (
-    <span className="relative md:hidden">
+    <span className="bez-paska relative">
       <button
         type="button"
         onClick={kliknij}

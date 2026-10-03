@@ -157,3 +157,14 @@ a:hover { color: var(--accent2); }
 .ukryj-ep .znacznik-ep,
 .ukryj-kompilacja .znacznik-kompilacja,
 .ukryj-inne .znacznik-inne { display: none; }
+
+/*
+ * „Wstecz" i „skopiuj adres" — brakujące kawałki przeglądarki.
+ * Pokazujemy je wszędzie, gdzie paska przeglądarki może nie być: na ekranach
+ * dotykowych (telefon ORAZ tablet — sama szerokość chowała je na tablecie)
+ * i w aplikacji dodanej do ekranu głównego / Docka, niezależnie od rozmiaru.
+ */
+.bez-paska { display: none; }
+@media (max-width: 767px), (pointer: coarse), (display-mode: standalone), (display-mode: minimal-ui), (display-mode: fullscreen) {
+  .bez-paska { display: inline-flex; align-items: center; }
+}
