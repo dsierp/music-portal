@@ -468,6 +468,14 @@ FROM src.recording r
 JOIN (SELECT DISTINCT recording FROM pom.trk) t ON t.recording = r.id::int;
 CREATE UNIQUE INDEX ON pom.rec (id);
 
+-- MIEJSCE NA DYSKU. Import #4 padł dokładnie na następnym kroku: sortowanie
+-- wszystkich utworów z ich relacjami nie zmieściło się na dysku maszyny
+-- („could not write to file pgsql_tmp…: No space left on device"). Surowe
+-- tabele utworów i nagrań (kilkadziesiąt GB po załadowaniu) są już przepisane
+-- do pom.* i nikt ich dalej nie czyta — zwalniamy je PRZED najcięższym krokiem.
+DROP TABLE src.track, src.recording, src.l_artist_recording, src.l_recording_url, src.medium, src.url;
+DROP TABLE pom.rec_rels;
+
 CREATE TABLE pom.med_doc AS
 SELECT m.release,
        jsonb_agg(jsonb_build_object(

@@ -33,7 +33,10 @@ jobs:
         # Obraz maszyny ma kilkanaście GB zajętych przez narzędzia, których
         # tu nie potrzebujemy. Dane robocze i tak idą na /mnt (większy dysk).
         run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache \
+            /usr/share/swift /usr/local/share/boost /usr/local/.ghcup /usr/local/share/powershell \
+            /usr/local/share/chromium /usr/lib/jvm /opt/az /opt/microsoft /opt/google || true
+          docker image prune -af >/dev/null 2>&1 || true
           sudo mkdir -p /mnt/mbwork /mnt/pgdata
           sudo chown -R "$USER" /mnt/mbwork
           df -h / /mnt
@@ -53,7 +56,8 @@ jobs:
             -v /mnt/pgdata:/var/lib/postgresql/data \
             postgres:16 \
             -c shared_buffers=1GB -c work_mem=256MB -c maintenance_work_mem=1GB \
-            -c max_wal_size=16GB -c checkpoint_timeout=30min \
+            -c max_wal_size=4GB -c checkpoint_timeout=30min \
+            -c wal_level=minimal -c max_wal_senders=0 \
             -c fsync=off -c synchronous_commit=off -c full_page_writes=off
           for i in $(seq 1 60); do
             pg_isready -h localhost -p 5432 -U postgres && break
