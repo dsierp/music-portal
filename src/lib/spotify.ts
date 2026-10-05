@@ -61,11 +61,15 @@ function wKolejce<T>(zadanie: () => Promise<T>): Promise<T> {
  * Teraz katalog i konto milczą niezależnie, a najdłużej kwadrans: jeśli
  * blokada naprawdę trwa, kosztuje to jedno odbite zapytanie na 15 minut.
  */
-type Tor = "katalog" | "konto";
+// „dyskografia" osobno od szukania: lista płyt artysty (/artists/…/albums)
+// bywa odbijana 429, gdy szukanie działa normalnie — a wspólna pauza gasiła
+// wtedy guzik „Graj w Spotify" na każdej płycie po wejściu na stronę zespołu.
+type Tor = "katalog" | "dyskografia" | "konto";
 const NAJDLUZEJ_MS = 15 * 60 * 1000;
 const kluczPauzy = (t: Tor) => `spotifypauza2:${t}`;
 const pauza: Record<Tor, { doKiedy: number; sprawdzona: number }> = {
   katalog: { doKiedy: 0, sprawdzona: 0 },
+  dyskografia: { doKiedy: 0, sprawdzona: 0 },
   konto: { doKiedy: 0, sprawdzona: 0 },
 };
 function zapamietajPauze(res: Response, tor: Tor) {
@@ -91,7 +95,7 @@ async function wPauzie(tor: Tor): Promise<boolean> {
 /** Do kiedy portal milczy wobec Spotify (dla diagnostyki); null = nie milczy. */
 export async function spotifyPauzaDo(): Promise<Record<Tor, string | null>> {
   const out = {} as Record<Tor, string | null>;
-  for (const t of ["katalog", "konto"] as const) out[t] = (await wPauzie(t)) ? new Date(pauza[t].doKiedy).toISOString() : null;
+  for (const t of ["katalog", "dyskografia", "konto"] as const) out[t] = (await wPauzie(t)) ? new Date(pauza[t].doKiedy).toISOString() : null;
   return out;
 }
 
@@ -697,9 +701,10 @@ async function tokenAplikacji(): Promise<string | null> {
 }
 
 async function katalog<T>(sciezka: string): Promise<T | null> {
+  const tor: Tor = sciezka.startsWith("/search") ? "katalog" : "dyskografia";
   const token = await tokenAplikacji();
   if (!token) return null;
-  if (await wPauzie("katalog")) return null;
+  if (await wPauzie(tor)) return null;
   const res = await wKolejce(() =>
     fetch(`${API}${sciezka}`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -707,7 +712,7 @@ async function katalog<T>(sciezka: string): Promise<T | null> {
     }),
   );
   if (res.status === 429) {
-    zapamietajPauze(res, "katalog");
+    zapamietajPauze(res, tor);
     return null;
   }
   if (!res.ok) return null;
@@ -898,6 +903,27 @@ export async function spotifySondaSzukania(userId: string | null, q: string) {
       cache: "no-store",
     })
       .then(wynik)
+      .catch((e) => ({ blad: e instanceof Error ? e.message : String(e) }));
+  }
+
+  // Lista płyt artysty tym samym tokenem — osobny adres, który potrafi być
+  // odbijany, gdy szukanie działa. Bez tej próby nie widać, KTÓRE zapytanie
+  // ściąga na portal pauzę.
+  if (app) {
+    out.dyskografia = await fetch(`${API}/search?type=artist&limit=1&q=${encodeURIComponent(q.replace(/album:"[^"]*"\s*/, "").replace(/artist:"([^"]*)"/, "$1"))}`, {
+      headers: { Authorization: `Bearer ${app}` },
+      cache: "no-store",
+    })
+      .then((r) => r.json() as Promise<{ artists?: { items?: { id: string }[] } }>)
+      .then(async (d) => {
+        const id = d.artists?.items?.[0]?.id;
+        if (!id) return { blad: "nie znaleziono artysty" };
+        const r = await fetch(`${API}/artists/${id}/albums?include_groups=album,appears_on&limit=50&market=PL`, {
+          headers: { Authorization: `Bearer ${app}` },
+          cache: "no-store",
+        });
+        return { status: r.status, czekacSekund: r.headers.get("retry-after"), fragment: (await r.text()).slice(0, 200) };
+      })
       .catch((e) => ({ blad: e instanceof Error ? e.message : String(e) }));
   }
 
