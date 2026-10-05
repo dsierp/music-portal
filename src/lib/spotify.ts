@@ -28,8 +28,6 @@ const TOKEN_URL = "https://accounts.spotify.com/api/token";
  */
 const ODSTEP_MS = 120;
 let ogonek: Promise<unknown> = Promise.resolve();
-/** Do kiedy nie zaczepiamy Spotify (ustawiane po 429, wg Retry-After). */
-let pauzaDo = 0;
 
 function wKolejce<T>(zadanie: () => Promise<T>): Promise<T> {
   const moje = ogonek.then(async () => {
@@ -51,30 +49,50 @@ function wKolejce<T>(zadanie: () => Promise<T>): Promise<T> {
  * godzinami — a portal co pół minuty (kafelek „słuchasz teraz") dokładał
  * kolejne odbicie i wszystkie guziki prowadziły do wyszukiwarki.
  */
-const KLUCZ_PAUZY = "spotifypauza:do";
-let pauzaSprawdzona = 0;
-function zapamietajPauze(res: Response) {
+/**
+ * DWIE osobne pauzy i górna granica kwadransa.
+ *
+ * Pierwsza wersja miała jedną pauzę na wszystko i wierzyła Spotify co do
+ * sekundy. Wyszło źle: odbicie na kafelku „słuchasz teraz" (konto użytkownika)
+ * z terminem na kilkanaście godzin wyłączało też szukanie płyt w katalogu
+ * (token aplikacji) — choć katalog odpowiadał już normalnie. Guziki szły
+ * do wyszukiwarki przez pół dnia bez powodu.
+ *
+ * Teraz katalog i konto milczą niezależnie, a najdłużej kwadrans: jeśli
+ * blokada naprawdę trwa, kosztuje to jedno odbite zapytanie na 15 minut.
+ */
+type Tor = "katalog" | "konto";
+const NAJDLUZEJ_MS = 15 * 60 * 1000;
+const kluczPauzy = (t: Tor) => `spotifypauza2:${t}`;
+const pauza: Record<Tor, { doKiedy: number; sprawdzona: number }> = {
+  katalog: { doKiedy: 0, sprawdzona: 0 },
+  konto: { doKiedy: 0, sprawdzona: 0 },
+};
+function zapamietajPauze(res: Response, tor: Tor) {
   const ile = Number(res.headers.get("retry-after") ?? "");
-  pauzaDo = Date.now() + (Number.isFinite(ile) && ile > 0 ? ile * 1000 : 60_000);
-  pauzaSprawdzona = Date.now();
-  void kvSet(KLUCZ_PAUZY, { doKiedy: pauzaDo }).catch(() => {});
+  const ms = Number.isFinite(ile) && ile > 0 ? ile * 1000 : 60_000;
+  pauza[tor] = { doKiedy: Date.now() + Math.min(ms, NAJDLUZEJ_MS), sprawdzona: Date.now() };
+  void kvSet(kluczPauzy(tor), { doKiedy: pauza[tor].doKiedy, kazalCzekacSek: Math.round(ms / 1000) }).catch(() => {});
 }
 
-async function wPauzie(): Promise<boolean> {
-  if (Date.now() < pauzaDo) return true;
+async function wPauzie(tor: Tor): Promise<boolean> {
+  const p = pauza[tor];
+  if (Date.now() < p.doKiedy) return true;
   // Wspólny wpis czytamy najwyżej raz na 20 s na proces — to jedno tanie
   // zapytanie do własnej bazy zamiast odbicia od Spotify.
-  if (Date.now() - pauzaSprawdzona > 20_000) {
-    pauzaSprawdzona = Date.now();
-    const w = await kvGet<{ doKiedy?: number }>(KLUCZ_PAUZY).catch(() => null);
-    if (w?.doKiedy && w.doKiedy > pauzaDo) pauzaDo = w.doKiedy;
+  if (Date.now() - p.sprawdzona > 20_000) {
+    p.sprawdzona = Date.now();
+    const w = await kvGet<{ doKiedy?: number }>(kluczPauzy(tor)).catch(() => null);
+    if (w?.doKiedy && w.doKiedy > p.doKiedy) p.doKiedy = w.doKiedy;
   }
-  return Date.now() < pauzaDo;
+  return Date.now() < p.doKiedy;
 }
 
 /** Do kiedy portal milczy wobec Spotify (dla diagnostyki); null = nie milczy. */
-export async function spotifyPauzaDo(): Promise<string | null> {
-  return (await wPauzie()) ? new Date(pauzaDo).toISOString() : null;
+export async function spotifyPauzaDo(): Promise<Record<Tor, string | null>> {
+  const out = {} as Record<Tor, string | null>;
+  for (const t of ["katalog", "konto"] as const) out[t] = (await wPauzie(t)) ? new Date(pauza[t].doKiedy).toISOString() : null;
+  return out;
 }
 
 /** Zakresy, o które prosimy przy łączeniu konta — patrz komentarz u góry. */
@@ -225,7 +243,7 @@ export async function spotifyBlocked(userId: string): Promise<boolean> {
 async function api<T>(userId: string, sciezka: string, init?: RequestInit & { bezBlokady?: boolean }): Promise<T | null> {
   const token = await tokenDla(userId);
   if (!token) return null;
-  if (await wPauzie()) return null;
+  if (await wPauzie("konto")) return null;
   const res = await wKolejce(() =>
     fetch(`${API}${sciezka}`, {
       ...init,
@@ -236,7 +254,7 @@ async function api<T>(userId: string, sciezka: string, init?: RequestInit & { be
   // 429 to nasz nadmiar, nie odmowa dla tego konta — nie chowamy funkcji,
   // tylko na chwilę milkniemy.
   if (res.status === 429) {
-    zapamietajPauze(res);
+    zapamietajPauze(res, "konto");
     return null;
   }
   if (res.status === 403 || res.status === 401) {
@@ -681,7 +699,7 @@ async function tokenAplikacji(): Promise<string | null> {
 async function katalog<T>(sciezka: string): Promise<T | null> {
   const token = await tokenAplikacji();
   if (!token) return null;
-  if (await wPauzie()) return null;
+  if (await wPauzie("katalog")) return null;
   const res = await wKolejce(() =>
     fetch(`${API}${sciezka}`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -689,7 +707,7 @@ async function katalog<T>(sciezka: string): Promise<T | null> {
     }),
   );
   if (res.status === 429) {
-    zapamietajPauze(res);
+    zapamietajPauze(res, "katalog");
     return null;
   }
   if (!res.ok) return null;
