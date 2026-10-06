@@ -75,14 +75,20 @@ export function parseRatingsTemplate(wikitext: string): WikiReview[] {
 
   const names = new Map<string, string>();
   const scores = new Map<string, string>();
-  // Wartość może zawierać zagnieżdżony szablon z własnymi "|" ({{Rating|4|5}}),
-  // więc najpierw próbujemy dopasować cały taki szablon, dopiero potem zwykły tekst.
-  for (const m of body.matchAll(/\|\s*rev(\d+)(score)?\s*=\s*((?:\{\{[^{}]*\}\}|\[\[[^\]]*\]\]|[^|}])*)/gi)) {
+  // Pola tniemy po „|" stojących na WIERZCHU szablonu, licząc nawiasy.
+  // Wyrażenie regularne radziło sobie tylko z jednym poziomem zagnieżdżenia:
+  // przy „{{nowrap|{{Rating|5|5}}}}" urywało wartość w połowie i w kafelku
+  // oceny lądowało gołe „{{nowrap".
+  for (const pole of polaSzablonu(body)) {
+    const m = pole.match(/^\s*rev(\d+)(score)?\s*=([\s\S]*)$/i);
+    if (!m) continue;
     const [, idx, isScore, rawValue] = m;
     const value = rawValue.trim();
     if (!value) continue;
-    if (isScore) scores.set(idx, cleanScore(value));
-    else names.set(idx, cleanWikitext(value));
+    if (isScore) {
+      const ocena = cleanScore(value);
+      if (ocena) scores.set(idx, ocena);
+    } else names.set(idx, cleanWikitext(value));
   }
   const out: WikiReview[] = [];
   for (const [idx, source] of names) {
@@ -92,11 +98,44 @@ export function parseRatingsTemplate(wikitext: string): WikiReview[] {
   return out.slice(0, 12);
 }
 
-/** "{{Rating|4.5|5}}" → "4.5/5"; "8.4/10" zostaje; "[[AllMusic]]" → "AllMusic". */
+/** Pola szablonu: tekst między „|" na pierwszym poziomie ({{…}} i [[…]] w środku zostają całe). */
+function polaSzablonu(szablon: string): string[] {
+  const pola: string[] = [];
+  let klamry = 0, kwadraty = 0, od = -1;
+  for (let i = 0; i < szablon.length; i++) {
+    const dwa = szablon.slice(i, i + 2);
+    if (dwa === "{{") { klamry++; i++; continue; }
+    if (dwa === "}}") {
+      klamry--; i++;
+      if (klamry === 0) { if (od >= 0) pola.push(szablon.slice(od, i - 1)); break; }
+      continue;
+    }
+    if (dwa === "[[") { kwadraty++; i++; continue; }
+    if (dwa === "]]") { kwadraty = Math.max(0, kwadraty - 1); i++; continue; }
+    if (szablon[i] === "|" && klamry === 1 && kwadraty === 0) {
+      if (od >= 0) pola.push(szablon.slice(od, i));
+      od = i + 1;
+    }
+  }
+  return pola;
+}
+
+/**
+ * "{{Rating|4.5|5}}" → "4.5/5"; "8.4/10" zostaje; "[[AllMusic]]" → "AllMusic".
+ * Opakowania bez treści ({{nowrap|…}}, {{small|…}}) zdejmujemy. Gdy po
+ * wszystkim zostaje składnia wiki, oddajemy pusty tekst — lepiej nie pokazać
+ * oceny wcale, niż pokazać śmieci.
+ */
 function cleanScore(raw: string): string {
   const rating = raw.match(/\{\{\s*rating\s*\|\s*([\d.]+)\s*(?:\|\s*([\d.]+)\s*)?/i);
   if (rating) return `${rating[1]}/${rating[2] ?? "5"}`;
-  return cleanWikitext(raw);
+  let t = raw.replace(/<ref[\s\S]*?(?:<\/ref>|\/>)/gi, "");
+  for (let i = 0; i < 4; i++) t = t.replace(/\{\{\s*(?:nowrap|nobr|small|smaller|nobreak)\s*\|([^{}]*)\}\}/gi, "$1");
+  // Kerrang! daje ocenę literami: KKKKK = 5/5.
+  const k = t.trim().match(/^K{1,5}$/);
+  if (k) return `${k[0].length}/5`;
+  t = cleanWikitext(t).trim();
+  return /[{}[\]|]/.test(t) ? "" : t;
 }
 
 

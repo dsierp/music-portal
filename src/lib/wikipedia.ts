@@ -118,7 +118,7 @@ export async function wikiAlbumRatings(links: Links, preferred: string[] = ["en"
   for (const lang of preferred) {
     const title = titles[lang];
     if (!title) continue;
-    const reviews = await cached(`wiki:ratings:v1:${lang}:${title}`, TTL.wiki, async () => {
+    const reviews = await cached(`wiki:ratings:v2:${lang}:${title}`, TTL.wiki, async () => {
       const body = await getJson<{ parse?: { wikitext?: string } }>(
         `https://${lang}.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}&prop=wikitext&format=json&formatversion=2`,
       );
