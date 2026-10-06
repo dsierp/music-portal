@@ -10,7 +10,7 @@
  * PRYWATNYCH playlist. Żadnego sterowania odtwarzaniem, żadnego czytania
  * biblioteki, żadnych danych o innych ludziach.
  */
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { cached, cacheHasNote, cacheNote, kvGet, kvSet } from "./cache";
 
@@ -97,6 +97,43 @@ export async function spotifyPauzaDo(): Promise<Record<Tor, string | null>> {
   const out = {} as Record<Tor, string | null>;
   for (const t of ["katalog", "dyskografia", "konto"] as const) out[t] = (await wPauzie(t)) ? new Date(pauza[t].doKiedy).toISOString() : null;
   return out;
+}
+
+/**
+ * LICZNIK ZAPYTAŃ do Spotify — ile, jakich i o której godzinie.
+ *
+ * Spotify co kilka dni odcina portal na ~6 godzin („QUOTA_EXCEEDED"), a my
+ * nie wiemy, co zjada limit: każda część portalu z osobna pyta rzadko.
+ * Zamiast zgadywać, liczymy: jeden wiersz na godzinę i rodzaj zapytania
+ * (plus osobno te odbite 429). Widać to w /api/diag/spotify.
+ */
+function rodzajZapytania(sciezka: string): string {
+  const s = sciezka.split("?")[0];
+  if (s.startsWith("/search")) return /[?&]type=artist/.test(sciezka) ? "szukaj-artysty" : /[?&]type=track/.test(sciezka) ? "szukaj-utworu" : "szukaj-plyty";
+  if (s.startsWith("/artists/")) return "plyty-artysty";
+  if (s.includes("currently-playing")) return "teraz-gra";
+  if (s.includes("recently-played")) return "historia";
+  if (s.startsWith("/me/player")) return "odtwarzacz";
+  if (s.includes("/playlists")) return "playlisty";
+  return s.split("/").slice(0, 3).join("/") || "inne";
+}
+function policz(sciezka: string, status: number) {
+  const godzina = new Date().toISOString().slice(0, 13);
+  const klucz = `spotifylicznik:${godzina}:${rodzajZapytania(sciezka)}${status === 429 ? ":429" : ""}`;
+  void db
+    .execute(
+      sql`insert into api_cache (key, json, fetched_at) values (${klucz}, '{"n":1}'::jsonb, now())
+          on conflict (key) do update set json = jsonb_build_object('n', coalesce((api_cache.json->>'n')::int, 0) + 1)`,
+    )
+    .catch(() => {});
+}
+
+/** Ostatnie 48 godzin licznika — do diagnostyki. */
+export async function spotifyLicznik(): Promise<{ klucz: string; n: number }[]> {
+  const w = (await db.execute(
+    sql`select key, (json->>'n')::int as n from api_cache where key like 'spotifylicznik:%' and fetched_at > now() - interval '48 hours' order by key desc limit 400`,
+  )) as unknown as { rows: { key: string; n: number }[] };
+  return (w.rows ?? []).map((r) => ({ klucz: r.key.replace("spotifylicznik:", ""), n: Number(r.n) }));
 }
 
 /** Zakresy, o które prosimy przy łączeniu konta — patrz komentarz u góry. */
@@ -255,6 +292,7 @@ async function api<T>(userId: string, sciezka: string, init?: RequestInit & { be
       cache: "no-store",
     }),
   );
+  policz(sciezka, res.status);
   // 429 to nasz nadmiar, nie odmowa dla tego konta — nie chowamy funkcji,
   // tylko na chwilę milkniemy.
   if (res.status === 429) {
@@ -711,6 +749,7 @@ async function katalog<T>(sciezka: string): Promise<T | null> {
       cache: "no-store",
     }),
   );
+  policz(sciezka, res.status);
   if (res.status === 429) {
     zapamietajPauze(res, tor);
     return null;

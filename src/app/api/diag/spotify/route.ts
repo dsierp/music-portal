@@ -73,6 +73,8 @@ export async function GET(req: Request) {
   {
     const { spotifyPauzaDo } = await import("@/lib/spotify");
     wynik.pauzaDo = await spotifyPauzaDo().catch(() => null);
+    const { spotifyLicznik } = await import("@/lib/spotify");
+    wynik.licznik = await spotifyLicznik().catch(() => null);
   }
   const etykieta = sp.get("etykieta");
   const artist = sp.get("artist") ?? (etykieta ? rozbijEtykiete(etykieta).artist : "");
