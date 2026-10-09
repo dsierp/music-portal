@@ -100,19 +100,10 @@ export default async function SearchPage({
       <ScreenHelp screen="szukaj" />
       <SearchBox defaultValue={q} big placeholder={t.nav.searchPlaceholder} label={t.nav.search} />
       {czegoSzukamy && <FilterChips items={FILTERS} active={f} />}
-      <form action="/szukaj" className="mt-3 flex flex-wrap items-end gap-2">
-        <label className="text-xs text-muted">
-          {/* "Sigh" i "Goh-Ka" to przykładowe nazwa zespołu i tytuł płyty — nazwy własne, nie tłumaczymy. */}
-          <span className="label block">{t.search.artistLabel}</span>
-          <input name="a" defaultValue={artistQ} placeholder="np. Sigh" className="input w-56 py-1 text-sm" autoComplete="off" />
-        </label>
-        <label className="text-xs text-muted">
-          <span className="label block">{t.search.albumTitleLabel}</span>
-          <input name="t" defaultValue={titleQ} placeholder="np. Goh-Ka" className="input w-56 py-1 text-sm" autoComplete="off" />
-        </label>
-        <button className="btn">{t.search.narrow}</button>
-        {narrowed && <Link href="/szukaj" className="text-xs text-muted hover:text-accent2">{t.search.clear}</Link>}
-      </form>
+      {/* Osobne pola „artysta / tytuł płyty" z guzikiem „Zawęź" zniknęły: ludzie
+          wpisywali w nie frazę i klikali „Szukaj" przy głównym polu, które tych
+          pól nie czyta — i nic się nie działo. Jedno pole wystarcza, a stare
+          adresy z ?a=…&t=… dalej działają. */}
       {miss && <p className="mt-3 text-sm text-warn">{t.search.missNotice}</p>}
       {lubie && <p className="mt-3 text-sm text-muted">{t.search.likeNotice}</p>}
 
