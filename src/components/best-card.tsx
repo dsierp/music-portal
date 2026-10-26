@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Cover } from "./cover";
 import type { InferSelectModel } from "drizzle-orm";
 import { schema } from "@/db";
 import { SerwisyPills } from "./serwisy";
@@ -60,6 +61,10 @@ export function BestRow({ e, t }: { e: Entry; t: Dict }) {
   return (
     <li className="rel">
       <span className="display text-right text-lg text-faint">{e.rank}</span>
+      {/* Ta sama mała okładka co w premierach — oba zestawienia dzielą układ wiersza (.rel). */}
+      <Link href={href} className="okl" aria-hidden tabIndex={-1}>
+        {e.mbid ? <Cover mbid={e.mbid} size={56} noCoverLabel={t.album.noCoverLabel} /> : null}
+      </Link>
       <div className="body">
         <h3 className="title display">
           <Link href={href} className="font-semibold hover:text-accent2">{e.artist}</Link>
