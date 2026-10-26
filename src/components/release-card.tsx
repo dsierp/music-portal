@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { InferSelectModel } from "drizzle-orm";
 import { schema } from "@/db";
 import { SerwisyPills } from "./serwisy";
+import { Cover } from "./cover";
 import { genreLabel as genreLabelFallback } from "@/lib/lists";
 import { genreLabel } from "@/lib/dict";
 import type { Dict } from "@/lib/dict";
@@ -60,6 +61,7 @@ export function ReleaseCard({ r, t, odKiedy }: { r: Release; t: Dict; odKiedy?: 
     return (
       <li className="rel">
         <span className="text-faint">·</span>
+        <span />
         <div className="body">
           <p className="desc rich" dangerouslySetInnerHTML={{ __html: r.description }} />
         </div>
@@ -72,6 +74,11 @@ export function ReleaseCard({ r, t, odKiedy }: { r: Release; t: Dict; odKiedy?: 
     <li className={`rel ${r.star === 1 ? "star" : ""}`}>
       {/* wąska kolumna na gwiazdkę — jak w oryginalnym zestawieniu */}
       <span className={r.star === 1 ? "text-accent2" : "text-faint"}>{r.star === 1 ? "★" : "·"}</span>
+      {/* Mała okładka — tylko gdy znamy płytę w MusicBrainz. Bez niej zostaje
+          puste miejsce tej samej szerokości, żeby tytuły stały w jednej linii. */}
+      <Link href={href} className="okl" aria-hidden tabIndex={-1}>
+        {r.mbid ? <Cover mbid={r.mbid} size={56} noCoverLabel={t.album.noCoverLabel} /> : null}
+      </Link>
       <div className="body">
         <h3 className="title display">
           <Link href={href} className="font-semibold hover:text-accent2">{r.artist}</Link>
