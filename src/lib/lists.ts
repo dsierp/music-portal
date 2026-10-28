@@ -153,7 +153,15 @@ export async function bestOf(year: string) {
 export async function bestOfYears() {
   const lata = await db.select().from(schema.bestOfYears).orderBy(desc(schema.bestOfYears.year));
   const rok = (y: string) => /^\d{4}$/.test(y);
-  return [...lata.filter((y) => rok(y.year)), ...lata.filter((y) => !rok(y.year))];
+  // Kolejność chipsów: lata od najnowszego, potem kanon „wszech czasów",
+  // potem dekady od najnowszej (klucze „2010s", „1990s"…).
+  const dekada = (y: string) => /^\d{4}s$/.test(y);
+  return [
+    ...lata.filter((y) => rok(y.year)),
+    ...lata.filter((y) => y.year === "wszech"),
+    ...lata.filter((y) => dekada(y.year)),
+    ...lata.filter((y) => !rok(y.year) && !dekada(y.year) && y.year !== "wszech"),
+  ];
 }
 /**
  * Nazwy zapasowe kategorii best of (właściwe idą z tłumaczeń).
