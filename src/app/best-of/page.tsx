@@ -62,7 +62,7 @@ export default async function BestOfPage({ searchParams }: { searchParams: Promi
       <BestFilters
         cats={cats}
         domyslne={moje}
-        year={year}
+        year={y?.label ?? year}
         label={t.lists.categoriesLabel}
         teksty={{ all: t.common.selectAll, none: t.common.selectNone, mine: t.common.selectMine, jump: t.common.jumpTo }}
       >
