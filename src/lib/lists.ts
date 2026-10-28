@@ -144,8 +144,16 @@ export async function bestOf(year: string) {
   const entries = await db.select().from(schema.bestOfEntries).where(eq(schema.bestOfEntries.year, year)).orderBy(asc(schema.bestOfEntries.category), asc(schema.bestOfEntries.rank));
   return { year: y, entries };
 }
+/**
+ * Roczniki od najnowszego, a „wszech czasów" (klucz `wszech`) na końcu.
+ * Samo sortowanie po tekście postawiłoby „wszech" PRZED latami, a wtedy
+ * strona best of i kafelek na głównej otwierałyby się na kanonie, nie na
+ * bieżącym roku.
+ */
 export async function bestOfYears() {
-  return db.select().from(schema.bestOfYears).orderBy(desc(schema.bestOfYears.year));
+  const lata = await db.select().from(schema.bestOfYears).orderBy(desc(schema.bestOfYears.year));
+  const rok = (y: string) => /^\d{4}$/.test(y);
+  return [...lata.filter((y) => rok(y.year)), ...lata.filter((y) => !rok(y.year))];
 }
 /**
  * Nazwy zapasowe kategorii best of (właściwe idą z tłumaczeń).
