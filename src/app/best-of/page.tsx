@@ -67,9 +67,12 @@ export default async function BestOfPage({ searchParams }: { searchParams: Promi
         teksty={{ all: t.common.selectAll, none: t.common.selectNone, mine: t.common.selectMine, jump: t.common.jumpTo }}
       >
         <div className="label mb-2">{t.lists.yearLabel}</div>
-        <div className="flex gap-1.5">
+        {/* Chipsy się zawijają (lat i dekad jest już kilkanaście), a napis
+            w chipsie nie łamie się na dwie linie — „wszech czasów” w dwóch
+            wierszach robił z guzika jajko. */}
+        <div className="flex flex-wrap gap-1.5">
           {years.map((yy) => (
-            <Link key={yy.year} href={`?rok=${yy.year}`} className={`chip ${yy.year === year ? "chip-on" : ""}`}>{yy.label}</Link>
+            <Link key={yy.year} href={`?rok=${yy.year}`} className={`chip whitespace-nowrap ${yy.year === year ? "chip-on" : ""}`}>{yy.label}</Link>
           ))}
         </div>
       </BestFilters>
