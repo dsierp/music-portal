@@ -49,3 +49,6 @@ build.log
 # robocze pliki przenoszone z kontenera
 *.patch
 mbtest.mjs
+
+# smieci po blokadach gita przenoszone przez bridge
+_to_delete/
